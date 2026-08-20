@@ -1,0 +1,316 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Material Screensaver — Solar System 3D</title>
+<style>
+  :root {
+    --primary_rgb: 138 206 255;
+    --secondary_rgb: 180 199 233;
+    --surface_rgb: 6 9 14;
+    --on_surface_variant_rgb: 191 199 209;
+    --outline_rgb: 137 146 154;
+  }
+  html, body {
+    margin: 0; padding: 0; width: 100%; height: 100%;
+    overflow: hidden; background: rgb(var(--surface_rgb)); cursor: none;
+  }
+  canvas { display: block; }
+  #clock {
+    position: fixed; left: 32px; bottom: 28px;
+    font-family: "Google Sans", "Segoe UI", Roboto, system-ui, sans-serif;
+    font-weight: 400; font-variant-numeric: tabular-nums; letter-spacing: 0.5px;
+    font-size: clamp(28px, 4vw, 56px);
+    text-shadow: 0 0 24px rgba(0,0,0,0.5);
+    pointer-events: none; transition: opacity 0.6s ease; z-index: 10;
+  }
+  #clock .ampm {
+    font-size: 0.36em;
+    margin-left: 6px;
+    opacity: 0.82;
+    vertical-align: middle;
+  }
+  #date {
+    position: fixed; left: 34px; bottom: 14px;
+    font-family: "Google Sans", "Segoe UI", Roboto, system-ui, sans-serif;
+    font-size: clamp(12px, 1.2vw, 16px); letter-spacing: 1.5px; text-transform: uppercase;
+    pointer-events: none; transition: opacity 0.6s ease; z-index: 10;
+  }
+  #hint {
+    position: fixed; right: 28px; bottom: 26px;
+    font-family: "Google Sans", "Segoe UI", Roboto, system-ui, sans-serif;
+    font-size: 13px; letter-spacing: 0.5px;
+    pointer-events: none; opacity: 0; transition: opacity 0.8s ease; z-index: 10;
+  }
+  #hint.show { opacity: 1; }
+  #clock.hidden, #date.hidden { opacity: 0; }
+  .planet-label {
+    position: fixed; font-family: "Segoe UI", Roboto, system-ui, sans-serif;
+    font-size: 11px; pointer-events: none; transform: translate(8px, -6px);
+    text-shadow: 0 0 6px rgba(0,0,0,0.8); white-space: nowrap; z-index: 5;
+  }
+</style>
+<link rel="stylesheet" href="file:///home/sakib/.config/matugen/matugen-colors.css">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+</head>
+<body>
+<div id="clock">00:00</div>
+<div id="date">Mon, Jan 1</div>
+<div id="hint">press C to toggle clock</div>
+
+<script src="clock-shared.js"></script>
+<script>
+const clockEl = document.getElementById('clock');
+const dateEl = document.getElementById('date');
+const hintEl = document.getElementById('hint');
+
+function readRGB(name) {
+  const raw = getComputedStyle(document.documentElement).getPropertyValue(name).trim();
+  const parts = raw.split(/\s+/).map(Number);
+  if (parts.length === 3 && parts.every(n => !isNaN(n))) return parts;
+  return [200, 200, 200];
+}
+function rgbCss(rgb) { return `rgb(${rgb[0]}, ${rgb[1]}, ${rgb[2]})`; }
+function rgbHex(rgb) { return (rgb[0] << 16) | (rgb[1] << 8) | rgb[2]; }
+
+const theme = {
+  surface: readRGB('--surface_rgb'),
+  primary: readRGB('--primary_rgb'),
+  secondary: readRGB('--secondary_rgb'),
+  onSurfaceVariant: readRGB('--on_surface_variant_rgb'),
+  outline: readRGB('--outline_rgb'),
+};
+clockEl.style.color = rgbCss(theme.primary);
+dateEl.style.color = rgbCss(theme.secondary);
+hintEl.style.color = rgbCss(theme.outline);
+
+const reduceMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+const speedMul = reduceMotion ? 0.1 : 1;
+
+// real relative orbital periods (days), real eccentricities, real orbital-plane
+// inclinations (deg, relative to ecliptic). Distance placement uses sqrt-AU
+// scaling (see note in chat) — order/relative spacing preserved, not literal AU-px.
+const DAYS_PER_SECOND = 6;
+const PLANETS = [
+  { name: 'Mercury', au: 0.39,  periodDays: 88,    e: 0.2056, incl: 7.00, color: 0xB0B0B2, r: 0.55 },
+  { name: 'Venus',   au: 0.72,  periodDays: 225,   e: 0.0068, incl: 3.39, color: 0xE6C88C, r: 0.95 },
+  { name: 'Earth',   au: 1.00,  periodDays: 365.25,e: 0.0167, incl: 0.00, color: 0x5A96E6, r: 1.0,
+    moons: [{ name: 'Moon', displaySeconds: 6, color: 0xC8C8C8, dist: 1.8, size: 0.27 }] },
+  { name: 'Mars',    au: 1.52,  periodDays: 687,   e: 0.0934, incl: 1.85, color: 0xD26E50, r: 0.75 },
+  { name: 'Jupiter', au: 5.20,  periodDays: 4333,  e: 0.0484, incl: 1.30, color: 0xD6B894, r: 2.6,
+    moons: [
+      { name: 'Io',       displaySeconds: 3,  color: 0xE6D296, dist: 3.6, size: 0.25 },
+      { name: 'Europa',   displaySeconds: 6,  color: 0xDCDCD2, dist: 4.6, size: 0.22 },
+      { name: 'Ganymede', displaySeconds: 12, color: 0xB4AAA0, dist: 5.8, size: 0.32 },
+      { name: 'Callisto', displaySeconds: 28, color: 0x8C8278, dist: 7.2, size: 0.30 },
+    ] },
+  { name: 'Saturn',  au: 9.58,  periodDays: 10759, e: 0.0542, incl: 2.49, color: 0xE2CE96, r: 2.2, ring: true,
+    moons: [{ name: 'Titan', displaySeconds: 10, color: 0xDCBE82, dist: 4.4, size: 0.34 }] },
+  { name: 'Uranus',  au: 19.2,  periodDays: 30687, e: 0.0472, incl: 0.77, color: 0x96D2DC, r: 1.6 },
+  { name: 'Neptune', au: 30.05, periodDays: 60190, e: 0.0086, incl: 1.77, color: 0x506EDC, r: 1.55 },
+];
+
+const sqrtAUs = PLANETS.map(p => Math.sqrt(p.au));
+const sqrtMin = Math.min(...sqrtAUs), sqrtMax = Math.max(...sqrtAUs);
+const MIN_ORBIT = 6, MAX_ORBIT = 32;
+for (const p of PLANETS) {
+  const s = Math.sqrt(p.au);
+  p.a = MIN_ORBIT + (s - sqrtMin) / (sqrtMax - sqrtMin) * (MAX_ORBIT - MIN_ORBIT); // semi-major axis, world units
+  p.phase = Math.random() * Math.PI * 2;
+  p.inclRad = p.incl * Math.PI / 180 * 0.22; // real inclinations scaled down for legibility (see note in chat)
+  if (p.moons) for (const m of p.moons) m.phase = Math.random() * Math.PI * 2;
+}
+
+const scene = new THREE.Scene();
+scene.fog = new THREE.FogExp2(rgbHex(theme.surface), 0.006);
+
+const camera = new THREE.PerspectiveCamera(58, window.innerWidth / window.innerHeight, 0.1, 500);
+const renderer = new THREE.WebGLRenderer({ antialias: true });
+renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
+renderer.setSize(window.innerWidth, window.innerHeight);
+renderer.setClearColor(rgbHex(theme.surface), 1);
+document.body.appendChild(renderer.domElement);
+
+window.addEventListener('resize', () => {
+  camera.aspect = window.innerWidth / window.innerHeight;
+  camera.updateProjectionMatrix();
+  renderer.setSize(window.innerWidth, window.innerHeight);
+});
+
+// starfield
+{
+  const starCount = 2000;
+  const positions = new Float32Array(starCount * 3);
+  for (let i = 0; i < starCount; i++) {
+    const r = 220 + Math.random() * 260;
+    const theta = Math.random() * Math.PI * 2;
+    const phi = Math.acos(2 * Math.random() - 1);
+    positions[i * 3] = r * Math.sin(phi) * Math.cos(theta);
+    positions[i * 3 + 1] = r * Math.cos(phi);
+    positions[i * 3 + 2] = r * Math.sin(phi) * Math.sin(theta);
+  }
+  const geo = new THREE.BufferGeometry();
+  geo.setAttribute('position', new THREE.BufferAttribute(positions, 3));
+  const mat = new THREE.PointsMaterial({ color: 0xffffff, size: 1.1, sizeAttenuation: false, transparent: true, opacity: 0.8 });
+  scene.add(new THREE.Points(geo, mat));
+}
+
+// sun
+const sun = new THREE.Mesh(
+  new THREE.SphereGeometry(2.6, 32, 32),
+  new THREE.MeshBasicMaterial({ color: 0xffd678 })
+);
+scene.add(sun);
+
+const sunLight = new THREE.PointLight(0xffe9c0, 2.2, 300, 1.6);
+scene.add(sunLight);
+scene.add(new THREE.AmbientLight(0x404050, 0.5));
+
+// sun glow sprite
+{
+  const canvas = document.createElement('canvas');
+  canvas.width = 128; canvas.height = 128;
+  const g = canvas.getContext('2d');
+  const grad = g.createRadialGradient(64, 64, 0, 64, 64, 64);
+  grad.addColorStop(0, 'rgba(255,230,170,0.9)');
+  grad.addColorStop(0.4, 'rgba(255,210,140,0.35)');
+  grad.addColorStop(1, 'rgba(255,210,140,0)');
+  g.fillStyle = grad;
+  g.fillRect(0, 0, 128, 128);
+  const tex = new THREE.CanvasTexture(canvas);
+  const sprite = new THREE.Sprite(new THREE.SpriteMaterial({ map: tex, transparent: true, blending: THREE.AdditiveBlending, depthWrite: false }));
+  sprite.scale.set(16, 16, 1);
+  scene.add(sprite);
+}
+
+// orbit path lines (static ellipse shape, computed once)
+function buildOrbitLine(p) {
+  const points = [];
+  const b = p.a * Math.sqrt(1 - p.e * p.e);
+  for (let i = 0; i <= 128; i++) {
+    const ang = (i / 128) * Math.PI * 2;
+    const r = p.a * (1 - p.e * p.e) / (1 + p.e * Math.cos(ang));
+    const x = r * Math.cos(ang);
+    const z0 = r * Math.sin(ang);
+    const y = z0 * Math.sin(p.inclRad);
+    const z = z0 * Math.cos(p.inclRad);
+    points.push(new THREE.Vector3(x, y, z));
+  }
+  const geo = new THREE.BufferGeometry().setFromPoints(points);
+  const mat = new THREE.LineBasicMaterial({ color: rgbHex(theme.outline), transparent: true, opacity: 0.22 });
+  scene.add(new THREE.Line(geo, mat));
+}
+
+const labelContainer = document.createElement('div');
+document.body.appendChild(labelContainer);
+
+for (const p of PLANETS) {
+  buildOrbitLine(p);
+
+  p.mesh = new THREE.Mesh(
+    new THREE.SphereGeometry(p.r, 24, 24),
+    new THREE.MeshStandardMaterial({ color: p.color, roughness: 0.85, metalness: 0.05 })
+  );
+  scene.add(p.mesh);
+
+  if (p.ring) {
+    const ring = new THREE.Mesh(
+      new THREE.RingGeometry(p.r * 1.6, p.r * 2.6, 48),
+      new THREE.MeshBasicMaterial({ color: 0xE2CE96, side: THREE.DoubleSide, transparent: true, opacity: 0.55 })
+    );
+    ring.rotation.x = Math.PI / 2 - 0.4;
+    p.mesh.add(ring);
+  }
+
+  if (p.moons) {
+    for (const m of p.moons) {
+      m.anchor = new THREE.Object3D();
+      p.mesh.add(m.anchor);
+      m.mesh = new THREE.Mesh(
+        new THREE.SphereGeometry(m.size, 12, 12),
+        new THREE.MeshStandardMaterial({ color: m.color, roughness: 0.9 })
+      );
+      m.mesh.position.set(m.dist, 0, 0);
+      m.anchor.add(m.mesh);
+    }
+  }
+
+  p.label = document.createElement('div');
+  p.label.className = 'planet-label';
+  p.label.textContent = p.name;
+  p.label.style.color = rgbCss(theme.onSurfaceVariant);
+  labelContainer.appendChild(p.label);
+}
+
+const projVec = new THREE.Vector3();
+function updateLabel(mesh, label) {
+  mesh.getWorldPosition(projVec);
+  const v = projVec.clone().project(camera);
+  if (v.z > 1) { label.style.display = 'none'; return; }
+  label.style.display = 'block';
+  label.style.left = `${(v.x * 0.5 + 0.5) * window.innerWidth}px`;
+  label.style.top = `${(-v.y * 0.5 + 0.5) * window.innerHeight}px`;
+}
+
+let start = performance.now();
+const CAMERA_ELEVATION = 0.92; // radians above the orbital plane — steeper = rounder ellipse, more vertical fill
+// distance chosen so a sphere circumscribing the full orbit system (radius MAX_ORBIT)
+// always fits within the vertical FOV, regardless of the camera's auto-rotation angle —
+// this is the calculation that guarantees nothing gets clipped at the window edge
+const FIT_MARGIN = 1.12;
+const CAMERA_DISTANCE = (MAX_ORBIT * FIT_MARGIN) / Math.sin((camera.fov * Math.PI / 180) / 2);
+const CAMERA_PERIOD_SEC = 340; // slow cinematic auto-orbit
+
+function frame(now) {
+  const t = ((now - start) / 1000) * speedMul;
+  const elapsedDays = t * DAYS_PER_SECOND;
+
+  const az = (t / CAMERA_PERIOD_SEC) * Math.PI * 2;
+  camera.position.set(
+    Math.cos(az) * CAMERA_DISTANCE * Math.cos(CAMERA_ELEVATION),
+    Math.sin(CAMERA_ELEVATION) * CAMERA_DISTANCE,
+    Math.sin(az) * CAMERA_DISTANCE * Math.cos(CAMERA_ELEVATION)
+  );
+  camera.lookAt(0, 0, 0);
+
+  const sunPulse = 1 + 0.05 * Math.sin(t * 0.8);
+  sun.scale.setScalar(sunPulse);
+
+  for (const p of PLANETS) {
+    const angle = p.phase + (Math.PI * 2) * (elapsedDays / p.periodDays);
+    const r = p.a * (1 - p.e * p.e) / (1 + p.e * Math.cos(angle));
+    const x = r * Math.cos(angle);
+    const z0 = r * Math.sin(angle);
+    p.mesh.position.set(x, z0 * Math.sin(p.inclRad), z0 * Math.cos(p.inclRad));
+    p.mesh.rotation.y += 0.01 * speedMul; // stylized axial spin, not physically scaled
+
+    if (p.moons) {
+      for (const m of p.moons) {
+        m.anchor.rotation.y = m.phase + (Math.PI * 2) * (t / m.displaySeconds);
+      }
+    }
+    updateLabel(p.mesh, p.label);
+  }
+
+  renderer.render(scene, camera);
+  requestAnimationFrame(frame);
+}
+
+startClock(clockEl, dateEl);
+
+let clockVisible = true;
+window.addEventListener('keydown', (e) => {
+  if (e.key.toLowerCase() === 'c') {
+    clockVisible = !clockVisible;
+    clockEl.classList.toggle('hidden', !clockVisible);
+    dateEl.classList.toggle('hidden', !clockVisible);
+  }
+});
+
+hintEl.classList.add('show');
+setTimeout(() => hintEl.classList.remove('show'), 4000);
+
+requestAnimationFrame(frame);
+</script>
+</body>
+</html>

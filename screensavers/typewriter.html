@@ -1,0 +1,193 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Material Screensaver — Typewriter</title>
+<style>
+  :root {
+    --primary_rgb: 138 206 255;
+    --secondary_rgb: 180 199 233;
+    --surface_rgb: 12 20 27;
+    --on_surface_variant_rgb: 191 199 209;
+    --outline_rgb: 137 146 154;
+  }
+  html, body {
+    margin: 0; padding: 0; width: 100%; height: 100%;
+    overflow: hidden; background: rgb(var(--surface_rgb)); cursor: none;
+    display: flex; align-items: center; justify-content: center;
+  }
+  #stage {
+    font-family: "Google Sans", "Segoe UI", Roboto, system-ui, sans-serif;
+    font-size: clamp(28px, 4.2vw, 64px);
+    font-weight: 400;
+    text-align: center;
+    padding: 0 8vw;
+    max-width: 80vw;
+  }
+  #cursor {
+    display: inline-block;
+    width: 0.05em;
+    margin-left: 4px;
+    animation: blink 1s steps(1) infinite;
+  }
+  @keyframes blink { 50% { opacity: 0; } }
+  #clock {
+    position: fixed; left: 32px; bottom: 28px;
+    font-family: "Google Sans", "Segoe UI", Roboto, system-ui, sans-serif;
+    font-weight: 400; font-variant-numeric: tabular-nums; letter-spacing: 0.5px;
+    font-size: clamp(22px, 3vw, 40px);
+    text-shadow: 0 0 24px rgba(0,0,0,0.4);
+    pointer-events: none; transition: opacity 0.6s ease;
+  }
+  #clock .ampm {
+    font-size: 0.36em;
+    margin-left: 6px;
+    opacity: 0.82;
+    vertical-align: middle;
+  }
+  #date {
+    position: fixed; left: 34px; bottom: 14px;
+    font-family: "Google Sans", "Segoe UI", Roboto, system-ui, sans-serif;
+    font-size: clamp(11px, 1vw, 14px); letter-spacing: 1.5px; text-transform: uppercase;
+    pointer-events: none; transition: opacity 0.6s ease;
+  }
+  #hint {
+    position: fixed; right: 28px; bottom: 26px;
+    font-family: "Google Sans", "Segoe UI", Roboto, system-ui, sans-serif;
+    font-size: 13px; letter-spacing: 0.5px;
+    pointer-events: none; opacity: 0; transition: opacity 0.8s ease;
+  }
+  #hint.show { opacity: 1; }
+  #clock.hidden, #date.hidden { opacity: 0; }
+</style>
+<link rel="stylesheet" href="file:///home/sakib/.config/matugen/matugen-colors.css">
+</head>
+<body>
+<div id="stage"><span id="text"></span><span id="cursor">|</span></div>
+<div id="clock">00:00</div>
+<div id="date">Mon, Jan 1</div>
+<div id="hint">press C to toggle clock</div>
+
+<script src="clock-shared.js"></script>
+<script>
+const stageEl = document.getElementById('stage');
+const textEl = document.getElementById('text');
+const cursorEl = document.getElementById('cursor');
+const clockEl = document.getElementById('clock');
+const dateEl = document.getElementById('date');
+const hintEl = document.getElementById('hint');
+
+function readRGB(name) {
+  const raw = getComputedStyle(document.documentElement).getPropertyValue(name).trim();
+  const parts = raw.split(/\s+/).map(Number);
+  if (parts.length === 3 && parts.every(n => !isNaN(n))) return parts;
+  return [200, 200, 200];
+}
+function rgbCss(rgb) { return `rgb(${rgb[0]}, ${rgb[1]}, ${rgb[2]})`; }
+
+const theme = {
+  primary: readRGB('--primary_rgb'),
+  secondary: readRGB('--secondary_rgb'),
+  onSurfaceVariant: readRGB('--on_surface_variant_rgb'),
+  outline: readRGB('--outline_rgb'),
+};
+textEl.style.color = rgbCss(theme.primary);
+cursorEl.style.background = rgbCss(theme.primary);
+clockEl.style.color = rgbCss(theme.secondary);
+dateEl.style.color = rgbCss(theme.onSurfaceVariant);
+hintEl.style.color = rgbCss(theme.outline);
+
+// original phrases — no quoted or attributed material
+const PHRASES = [
+  "Take a slow breath.",
+  "Good things take time.",
+  "The screen can wait a little longer.",
+  "Small steps still move you forward.",
+  "Rest is productive too.",
+  "Stay curious.",
+  "One thing at a time.",
+  "You've got this.",
+  "Quiet moments count.",
+  "Tomorrow is unwritten.",
+];
+
+const reduceMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+const TYPE_MS = reduceMotion ? 90 : 55;
+const HOLD_MS = 3200;
+const ERASE_MS = reduceMotion ? 45 : 28;
+
+let order = [];
+function shuffledOrder() {
+  const arr = PHRASES.map((_, i) => i);
+  for (let i = arr.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [arr[i], arr[j]] = [arr[j], arr[i]];
+  }
+  return arr;
+}
+
+let orderIdx = 0;
+function nextPhrase() {
+  if (orderIdx >= order.length) order = shuffledOrder(), orderIdx = 0;
+  const phrase = PHRASES[order[orderIdx]];
+  orderIdx++;
+  return phrase;
+}
+
+function typeText(str, onDone) {
+  let i = 0;
+  const step = () => {
+    if (i <= str.length) {
+      textEl.textContent = str.slice(0, i);
+      i++;
+      setTimeout(step, TYPE_MS);
+    } else {
+      onDone();
+    }
+  };
+  step();
+}
+
+function eraseText(str, onDone) {
+  let i = str.length;
+  const step = () => {
+    if (i >= 0) {
+      textEl.textContent = str.slice(0, i);
+      i--;
+      setTimeout(step, ERASE_MS);
+    } else {
+      onDone();
+    }
+  };
+  step();
+}
+
+function cycle() {
+  const phrase = nextPhrase();
+  typeText(phrase, () => {
+    setTimeout(() => {
+      eraseText(phrase, cycle);
+    }, HOLD_MS);
+  });
+}
+
+let clockVisible = true;
+window.addEventListener('keydown', (e) => {
+  if (e.key.toLowerCase() === 'c') {
+    clockVisible = !clockVisible;
+    clockEl.classList.toggle('hidden', !clockVisible);
+    dateEl.classList.toggle('hidden', !clockVisible);
+  }
+});
+
+hintEl.classList.add('show');
+setTimeout(() => hintEl.classList.remove('show'), 4000);
+
+window.addEventListener('load', () => {
+  startClock(clockEl, dateEl);
+  order = shuffledOrder();
+  cycle();
+});
+</script>
+</body>
+</html>

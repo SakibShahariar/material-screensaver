@@ -1,0 +1,224 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Material Screensaver — Orbit</title>
+<style>
+  :root {
+    --primary_rgb: 138 206 255;
+    --primary_container_rgb: 0 75 111;
+    --secondary_rgb: 180 199 233;
+    --secondary_container_rgb: 53 72 99;
+    --tertiary_rgb: 186 196 250;
+    --tertiary_container_rgb: 58 68 114;
+    --inverse_primary_rgb: 0 100 145;
+    --surface_rgb: 12 20 27;
+    --surface_bright_rgb: 50 58 65;
+    --on_surface_rgb: 219 227 237;
+    --on_surface_variant_rgb: 191 199 209;
+    --outline_rgb: 137 146 154;
+  }
+  html, body {
+    margin: 0; padding: 0; width: 100%; height: 100%;
+    overflow: hidden; background: rgb(var(--surface_rgb)); cursor: none;
+  }
+  canvas { display: block; width: 100vw; height: 100vh; }
+  #clock {
+    position: fixed; left: 32px; bottom: 28px;
+    font-family: "Google Sans", "Segoe UI", Roboto, system-ui, sans-serif;
+    font-weight: 400; font-variant-numeric: tabular-nums; letter-spacing: 0.5px;
+    font-size: clamp(28px, 4vw, 56px);
+    text-shadow: 0 0 24px rgba(0,0,0,0.4);
+    pointer-events: none; transition: opacity 0.6s ease;
+  }
+  #clock .ampm {
+    font-size: 0.36em;
+    margin-left: 6px;
+    opacity: 0.82;
+    vertical-align: middle;
+  }
+  #date {
+    position: fixed; left: 34px; bottom: 14px;
+    font-family: "Google Sans", "Segoe UI", Roboto, system-ui, sans-serif;
+    font-size: clamp(12px, 1.2vw, 16px); letter-spacing: 1.5px; text-transform: uppercase;
+    pointer-events: none; transition: opacity 0.6s ease;
+  }
+  #hint {
+    position: fixed; right: 28px; bottom: 26px;
+    font-family: "Google Sans", "Segoe UI", Roboto, system-ui, sans-serif;
+    font-size: 13px; letter-spacing: 0.5px;
+    pointer-events: none; opacity: 0; transition: opacity 0.8s ease;
+  }
+  #hint.show { opacity: 1; }
+  #clock.hidden, #date.hidden { opacity: 0; }
+</style>
+<link rel="stylesheet" href="file:///home/sakib/.config/matugen/matugen-colors.css">
+</head>
+<body>
+<canvas id="c"></canvas>
+<div id="clock">00:00</div>
+<div id="date">Mon, Jan 1</div>
+<div id="hint">press C to toggle clock</div>
+
+<script src="clock-shared.js"></script>
+<script>
+const canvas = document.getElementById('c');
+const ctx = canvas.getContext('2d');
+const clockEl = document.getElementById('clock');
+const dateEl = document.getElementById('date');
+const hintEl = document.getElementById('hint');
+
+let dpr = Math.min(window.devicePixelRatio || 1, 2);
+let W, H;
+function resize() {
+  W = window.innerWidth;
+  H = window.innerHeight;
+  canvas.width = W * dpr;
+  canvas.height = H * dpr;
+  ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+  ctx.fillStyle = 'rgb(12, 20, 27)';
+  ctx.fillRect(0, 0, W, H);
+  layoutCenters();
+}
+window.addEventListener('resize', resize);
+
+const reduceMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+const speedMul = reduceMotion ? 0.15 : 1;
+
+function readRGB(name) {
+  const raw = getComputedStyle(document.documentElement).getPropertyValue(name).trim();
+  const parts = raw.split(/\s+/).map(Number);
+  if (parts.length === 3 && parts.every(n => !isNaN(n))) return parts;
+  return [200, 200, 200];
+}
+function rgba(rgb, a) { return `rgba(${rgb[0]}, ${rgb[1]}, ${rgb[2]}, ${a})`; }
+
+let theme = {};
+let roleList = [];
+function loadTheme() {
+  theme = {
+    surface: readRGB('--surface_rgb'),
+    primary: readRGB('--primary_rgb'),
+    primaryContainer: readRGB('--primary_container_rgb'),
+    secondary: readRGB('--secondary_rgb'),
+    secondaryContainer: readRGB('--secondary_container_rgb'),
+    tertiary: readRGB('--tertiary_rgb'),
+    tertiaryContainer: readRGB('--tertiary_container_rgb'),
+    inversePrimary: readRGB('--inverse_primary_rgb'),
+    outline: readRGB('--outline_rgb'),
+  };
+  roleList = [theme.primary, theme.secondary, theme.tertiary, theme.primaryContainer, theme.secondaryContainer, theme.tertiaryContainer, theme.inversePrimary];
+
+  clockEl.style.color = rgba(theme.primary, 0.92);
+  dateEl.style.color = rgba(theme.secondary, 0.85);
+  hintEl.style.color = rgba(theme.outline, 0.9);
+
+  centers.forEach((c, i) => { c.color = roleList[i % roleList.length]; });
+}
+
+const CENTER_LAYOUT = [
+  { fx: 0.22, fy: 0.28 },
+  { fx: 0.78, fy: 0.24 },
+  { fx: 0.28, fy: 0.76 },
+  { fx: 0.80, fy: 0.72 },
+];
+let centers = [];
+
+function layoutCenters() {
+  centers = CENTER_LAYOUT.map((c, i) => {
+    const existing = centers[i];
+    return {
+      x: c.fx * W,
+      y: c.fy * H,
+      color: existing ? existing.color : (roleList[i % roleList.length] || [200, 200, 200]),
+      particles: existing ? existing.particles : makeOrbitParticles(),
+      glowPhase: Math.random() * Math.PI * 2,
+    };
+  });
+}
+
+function makeOrbitParticles() {
+  const count = 22 + Math.floor(Math.random() * 10);
+  const particles = [];
+  for (let i = 0; i < count; i++) {
+    particles.push({
+      radius: 30 + Math.random() * 160,
+      speed: (0.15 + Math.random() * 0.35) * (Math.random() < 0.5 ? 1 : -1),
+      phase: Math.random() * Math.PI * 2,
+      squash: 0.35 + Math.random() * 0.5,
+      tilt: Math.random() * Math.PI,
+      size: 1 + Math.random() * 2,
+    });
+  }
+  return particles;
+}
+
+let start = performance.now();
+
+function frame(now) {
+  const t = ((now - start) / 1000) * speedMul;
+
+  ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+  ctx.globalCompositeOperation = 'source-over';
+  ctx.fillStyle = rgba(theme.surface || [12, 20, 27], 0.10);
+  ctx.fillRect(0, 0, W, H);
+
+  ctx.globalCompositeOperation = 'lighter';
+  for (const c of centers) {
+    for (const p of c.particles) {
+      const angle = p.phase + t * p.speed;
+      const ex = Math.cos(angle) * p.radius;
+      const ey = Math.sin(angle) * p.radius * p.squash;
+      const cosT = Math.cos(p.tilt), sinT = Math.sin(p.tilt);
+      const x = c.x + ex * cosT - ey * sinT;
+      const y = c.y + ex * sinT + ey * cosT;
+
+      ctx.beginPath();
+      ctx.arc(x, y, p.size, 0, Math.PI * 2);
+      ctx.fillStyle = rgba(c.color, 0.85);
+      ctx.fill();
+    }
+  }
+
+  // glow uses normal (non-additive) blending: it's redrawn at the same fixed
+  // pixels every frame, so additive blending here would accumulate brightness
+  // forever and clip to white — moving particles above don't have that problem
+  ctx.globalCompositeOperation = 'source-over';
+  for (const c of centers) {
+    const breathe = (Math.sin(t * 0.4 + c.glowPhase) + 1) / 2;
+    const glowR = 22 + breathe * 10;
+    const grad = ctx.createRadialGradient(c.x, c.y, 0, c.x, c.y, glowR);
+    grad.addColorStop(0, rgba(c.color, 0.5));
+    grad.addColorStop(1, rgba(c.color, 0));
+    ctx.fillStyle = grad;
+    ctx.beginPath();
+    ctx.arc(c.x, c.y, glowR, 0, Math.PI * 2);
+    ctx.fill();
+  }
+  ctx.globalCompositeOperation = 'source-over';
+
+  requestAnimationFrame(frame);
+}
+
+startClock(clockEl, dateEl);
+
+let clockVisible = true;
+window.addEventListener('keydown', (e) => {
+  if (e.key.toLowerCase() === 'c') {
+    clockVisible = !clockVisible;
+    clockEl.classList.toggle('hidden', !clockVisible);
+    dateEl.classList.toggle('hidden', !clockVisible);
+  }
+});
+
+hintEl.classList.add('show');
+setTimeout(() => hintEl.classList.remove('show'), 4000);
+
+window.addEventListener('load', () => {
+  resize();
+  loadTheme();
+  requestAnimationFrame(frame);
+});
+</script>
+</body>
+</html>

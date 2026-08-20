@@ -1,0 +1,228 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Material Screensaver — Vinyl</title>
+<style>
+  :root {
+    --primary_rgb: 138 206 255;
+    --secondary_rgb: 180 199 233;
+    --tertiary_rgb: 186 196 250;
+    --surface_rgb: 12 20 27;
+    --surface_container_rgb: 24 33 39;
+    --on_surface_variant_rgb: 191 199 209;
+    --outline_rgb: 137 146 154;
+  }
+  html, body {
+    margin: 0; padding: 0; width: 100%; height: 100%;
+    overflow: hidden; background: rgb(var(--surface_rgb)); cursor: none;
+  }
+  canvas { display: block; width: 100vw; height: 100vh; }
+  #clock {
+    position: fixed; left: 32px; bottom: 28px;
+    font-family: "Google Sans", "Segoe UI", Roboto, system-ui, sans-serif;
+    font-weight: 400; font-variant-numeric: tabular-nums; letter-spacing: 0.5px;
+    font-size: clamp(28px, 4vw, 56px);
+    text-shadow: 0 0 24px rgba(0,0,0,0.4);
+    pointer-events: none; transition: opacity 0.6s ease;
+  }
+  #clock .ampm {
+    font-size: 0.36em;
+    margin-left: 6px;
+    opacity: 0.82;
+    vertical-align: middle;
+  }
+  #date {
+    position: fixed; left: 34px; bottom: 14px;
+    font-family: "Google Sans", "Segoe UI", Roboto, system-ui, sans-serif;
+    font-size: clamp(12px, 1.2vw, 16px); letter-spacing: 1.5px; text-transform: uppercase;
+    pointer-events: none; transition: opacity 0.6s ease;
+  }
+  #hint {
+    position: fixed; right: 28px; bottom: 26px;
+    font-family: "Google Sans", "Segoe UI", Roboto, system-ui, sans-serif;
+    font-size: 13px; letter-spacing: 0.5px;
+    pointer-events: none; opacity: 0; transition: opacity 0.8s ease;
+  }
+  #hint.show { opacity: 1; }
+  #clock.hidden, #date.hidden { opacity: 0; }
+</style>
+<link rel="stylesheet" href="file:///home/sakib/.config/matugen/matugen-colors.css">
+</head>
+<body>
+<canvas id="c"></canvas>
+<div id="clock">00:00</div>
+<div id="date">Mon, Jan 1</div>
+<div id="hint">press C to toggle clock</div>
+
+<script src="clock-shared.js"></script>
+<script>
+const canvas = document.getElementById('c');
+const ctx = canvas.getContext('2d');
+const clockEl = document.getElementById('clock');
+const dateEl = document.getElementById('date');
+const hintEl = document.getElementById('hint');
+
+let dpr = Math.min(window.devicePixelRatio || 1, 2);
+let W, H, cx, cy, R;
+function resize() {
+  W = window.innerWidth;
+  H = window.innerHeight;
+  cx = W / 2;
+  cy = H / 2;
+  R = Math.min(W, H) * 0.38;
+  canvas.width = W * dpr;
+  canvas.height = H * dpr;
+  ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+}
+window.addEventListener('resize', resize);
+resize();
+
+const reduceMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+const speedMul = reduceMotion ? 0.15 : 1;
+
+function readRGB(name) {
+  const raw = getComputedStyle(document.documentElement).getPropertyValue(name).trim();
+  const parts = raw.split(/\s+/).map(Number);
+  if (parts.length === 3 && parts.every(n => !isNaN(n))) return parts;
+  return [200, 200, 200];
+}
+function rgba(rgb, a) { return `rgba(${rgb[0]}, ${rgb[1]}, ${rgb[2]}, ${a})`; }
+
+let theme = {};
+function loadTheme() {
+  theme = {
+    surface: readRGB('--surface_rgb'),
+    surfaceContainer: readRGB('--surface_container_rgb'),
+    primary: readRGB('--primary_rgb'),
+    secondary: readRGB('--secondary_rgb'),
+    tertiary: readRGB('--tertiary_rgb'),
+    outline: readRGB('--outline_rgb'),
+  };
+  clockEl.style.color = rgba(theme.primary, 0.92);
+  dateEl.style.color = rgba(theme.secondary, 0.85);
+  hintEl.style.color = rgba(theme.outline, 0.9);
+}
+
+// real 33⅓ RPM turntable speed
+const RPM = 33.333;
+const RAD_PER_SEC = (RPM / 60) * Math.PI * 2;
+
+function drawRecord(angle) {
+  ctx.save();
+  ctx.translate(cx, cy);
+  ctx.rotate(angle);
+
+  // disc body
+  ctx.beginPath();
+  ctx.arc(0, 0, R, 0, Math.PI * 2);
+  ctx.fillStyle = 'rgb(16,16,18)';
+  ctx.fill();
+
+  // grooves — many thin concentric rings, alternating tone for texture
+  const grooveCount = 90;
+  for (let i = 0; i < grooveCount; i++) {
+    const r = R * (0.22 + (i / grooveCount) * 0.76);
+    ctx.beginPath();
+    ctx.arc(0, 0, r, 0, Math.PI * 2);
+    ctx.strokeStyle = i % 2 === 0 ? 'rgba(255,255,255,0.035)' : 'rgba(255,255,255,0.015)';
+    ctx.lineWidth = 1;
+    ctx.stroke();
+  }
+
+  // label
+  ctx.beginPath();
+  ctx.arc(0, 0, R * 0.2, 0, Math.PI * 2);
+  const labelGrad = ctx.createRadialGradient(0, 0, 0, 0, 0, R * 0.2);
+  labelGrad.addColorStop(0, `rgb(${theme.tertiary.join(',')})`);
+  labelGrad.addColorStop(1, `rgb(${theme.primary.join(',')})`);
+  ctx.fillStyle = labelGrad;
+  ctx.fill();
+
+  ctx.beginPath();
+  ctx.arc(0, 0, R * 0.02, 0, Math.PI * 2);
+  ctx.fillStyle = 'rgb(10,10,10)';
+  ctx.fill();
+
+  ctx.restore();
+
+  // rotating light catch — a soft diagonal highlight band fixed in disc-space,
+  // drawn after restore so it sweeps across grooves as the disc turns beneath it
+  ctx.save();
+  ctx.beginPath();
+  ctx.arc(cx, cy, R, 0, Math.PI * 2);
+  ctx.clip();
+  ctx.translate(cx, cy);
+  ctx.rotate(angle * 0.35 + 0.6);
+  const glintGrad = ctx.createLinearGradient(-R, -R * 0.3, R, R * 0.3);
+  glintGrad.addColorStop(0, 'rgba(255,255,255,0)');
+  glintGrad.addColorStop(0.5, 'rgba(255,255,255,0.06)');
+  glintGrad.addColorStop(1, 'rgba(255,255,255,0)');
+  ctx.fillStyle = glintGrad;
+  ctx.fillRect(-R, -R, R * 2, R * 2);
+  ctx.restore();
+}
+
+function drawTonearm() {
+  const pivotX = cx + R * 1.35;
+  const pivotY = cy - R * 1.05;
+  const tipX = cx + R * 0.05;
+  const tipY = cy - R * 0.1;
+
+  ctx.save();
+  ctx.strokeStyle = rgba(theme.outline, 0.8);
+  ctx.lineWidth = 5;
+  ctx.lineCap = 'round';
+  ctx.beginPath();
+  ctx.moveTo(pivotX, pivotY);
+  ctx.lineTo(tipX, tipY);
+  ctx.stroke();
+
+  ctx.beginPath();
+  ctx.arc(pivotX, pivotY, 12, 0, Math.PI * 2);
+  ctx.fillStyle = rgba(theme.secondary, 0.9);
+  ctx.fill();
+
+  ctx.beginPath();
+  ctx.arc(tipX, tipY, 4, 0, Math.PI * 2);
+  ctx.fillStyle = rgba(theme.primary, 0.95);
+  ctx.fill();
+  ctx.restore();
+}
+
+let start = performance.now();
+
+function frame(now) {
+  const t = ((now - start) / 1000) * speedMul;
+  const angle = t * RAD_PER_SEC;
+
+  ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+  ctx.fillStyle = `rgb(${(theme.surface || [12, 20, 27]).join(',')})`;
+  ctx.fillRect(0, 0, W, H);
+
+  drawRecord(angle);
+  drawTonearm();
+
+  requestAnimationFrame(frame);
+}
+
+let clockVisible = true;
+window.addEventListener('keydown', (e) => {
+  if (e.key.toLowerCase() === 'c') {
+    clockVisible = !clockVisible;
+    clockEl.classList.toggle('hidden', !clockVisible);
+    dateEl.classList.toggle('hidden', !clockVisible);
+  }
+});
+
+hintEl.classList.add('show');
+setTimeout(() => hintEl.classList.remove('show'), 4000);
+
+window.addEventListener('load', () => {
+  loadTheme();
+  startClock(clockEl, dateEl);
+  requestAnimationFrame(frame);
+});
+</script>
+</body>
+</html>

@@ -1,0 +1,227 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Material Screensaver — Lorenz Attractor</title>
+<style>
+  :root {
+    --primary_rgb: 138 206 255;
+    --primary_container_rgb: 0 75 111;
+    --secondary_rgb: 180 199 233;
+    --secondary_container_rgb: 53 72 99;
+    --tertiary_rgb: 186 196 250;
+    --tertiary_container_rgb: 58 68 114;
+    --inverse_primary_rgb: 0 100 145;
+    --surface_rgb: 12 20 27;
+    --surface_bright_rgb: 50 58 65;
+    --on_surface_rgb: 219 227 237;
+    --on_surface_variant_rgb: 191 199 209;
+    --outline_rgb: 137 146 154;
+  }
+  html, body {
+    margin: 0; padding: 0; width: 100%; height: 100%;
+    overflow: hidden; background: rgb(var(--surface_rgb)); cursor: none;
+  }
+  canvas { display: block; width: 100vw; height: 100vh; }
+  #clock {
+    position: fixed; left: 32px; bottom: 28px;
+    font-family: "Google Sans", "Segoe UI", Roboto, system-ui, sans-serif;
+    font-weight: 400; font-variant-numeric: tabular-nums; letter-spacing: 0.5px;
+    font-size: clamp(28px, 4vw, 56px);
+    text-shadow: 0 0 24px rgba(0,0,0,0.4);
+    pointer-events: none; transition: opacity 0.6s ease;
+  }
+  #clock .ampm {
+    font-size: 0.36em;
+    margin-left: 6px;
+    opacity: 0.82;
+    vertical-align: middle;
+  }
+  #date {
+    position: fixed; left: 34px; bottom: 14px;
+    font-family: "Google Sans", "Segoe UI", Roboto, system-ui, sans-serif;
+    font-size: clamp(12px, 1.2vw, 16px); letter-spacing: 1.5px; text-transform: uppercase;
+    pointer-events: none; transition: opacity 0.6s ease;
+  }
+  #hint {
+    position: fixed; right: 28px; bottom: 26px;
+    font-family: "Google Sans", "Segoe UI", Roboto, system-ui, sans-serif;
+    font-size: 13px; letter-spacing: 0.5px;
+    pointer-events: none; opacity: 0; transition: opacity 0.8s ease;
+  }
+  #hint.show { opacity: 1; }
+  #clock.hidden, #date.hidden { opacity: 0; }
+</style>
+<link rel="stylesheet" href="file:///home/sakib/.config/matugen/matugen-colors.css">
+</head>
+<body>
+<canvas id="c"></canvas>
+<div id="clock">00:00</div>
+<div id="date">Mon, Jan 1</div>
+<div id="hint">press C to toggle clock</div>
+
+<script src="clock-shared.js"></script>
+<script>
+const canvas = document.getElementById('c');
+const ctx = canvas.getContext('2d');
+const clockEl = document.getElementById('clock');
+const dateEl = document.getElementById('date');
+const hintEl = document.getElementById('hint');
+
+let dpr = Math.min(window.devicePixelRatio || 1, 2);
+let W, H, cx, cy, scale;
+function resize() {
+  W = window.innerWidth;
+  H = window.innerHeight;
+  cx = W / 2;
+  cy = H / 2;
+  scale = Math.min(W, H) / 55;
+  canvas.width = W * dpr;
+  canvas.height = H * dpr;
+  ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+  ctx.fillStyle = 'rgb(12, 20, 27)';
+  ctx.fillRect(0, 0, W, H);
+}
+window.addEventListener('resize', resize);
+
+const reduceMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+const speedMul = reduceMotion ? 0.2 : 1;
+
+function readRGB(name) {
+  const raw = getComputedStyle(document.documentElement).getPropertyValue(name).trim();
+  const parts = raw.split(/\s+/).map(Number);
+  if (parts.length === 3 && parts.every(n => !isNaN(n))) return parts;
+  return [200, 200, 200];
+}
+function rgba(rgb, a) { return `rgba(${rgb[0]}, ${rgb[1]}, ${rgb[2]}, ${a})`; }
+
+let theme = {};
+let roleList = [];
+function loadTheme() {
+  theme = {
+    surface: readRGB('--surface_rgb'),
+    primary: readRGB('--primary_rgb'),
+    secondary: readRGB('--secondary_rgb'),
+    tertiary: readRGB('--tertiary_rgb'),
+    primaryContainer: readRGB('--primary_container_rgb'),
+    secondaryContainer: readRGB('--secondary_container_rgb'),
+    tertiaryContainer: readRGB('--tertiary_container_rgb'),
+    inversePrimary: readRGB('--inverse_primary_rgb'),
+    outline: readRGB('--outline_rgb'),
+  };
+  roleList = [theme.primary, theme.secondary, theme.tertiary, theme.primaryContainer, theme.secondaryContainer, theme.tertiaryContainer, theme.inversePrimary];
+  clockEl.style.color = rgba(theme.primary, 0.92);
+  dateEl.style.color = rgba(theme.secondary, 0.85);
+  hintEl.style.color = rgba(theme.outline, 0.9);
+  trajectories.forEach((tr, i) => { tr.color = roleList[i % roleList.length]; });
+}
+
+// the Lorenz system — the original chaos-theory equations (Edward Lorenz, 1963).
+// Each trajectory starts within 0.0001 of the others, yet within a few seconds
+// they separate onto completely different paths around the two "wings".
+const SIGMA = 10, RHO = 28, BETA = 8 / 3;
+const TRAJECTORY_COUNT = 5;
+let trajectories = [];
+
+function makeTrajectories() {
+  trajectories = [];
+  for (let i = 0; i < TRAJECTORY_COUNT; i++) {
+    trajectories.push({
+      x: 0.1 + i * 0.0001,
+      y: 0,
+      z: 0,
+      color: [200, 200, 200],
+      prevScreen: null,
+    });
+  }
+}
+
+function derivatives(x, y, z) {
+  return [SIGMA * (y - x), x * (RHO - z) - y, x * y - BETA * z];
+}
+
+function stepRK4(tr, dt) {
+  const [k1x, k1y, k1z] = derivatives(tr.x, tr.y, tr.z);
+  const [k2x, k2y, k2z] = derivatives(tr.x + k1x * dt / 2, tr.y + k1y * dt / 2, tr.z + k1z * dt / 2);
+  const [k3x, k3y, k3z] = derivatives(tr.x + k2x * dt / 2, tr.y + k2y * dt / 2, tr.z + k2z * dt / 2);
+  const [k4x, k4y, k4z] = derivatives(tr.x + k3x * dt, tr.y + k3y * dt, tr.z + k3z * dt);
+  tr.x += (dt / 6) * (k1x + 2 * k2x + 2 * k3x + k4x);
+  tr.y += (dt / 6) * (k1y + 2 * k2y + 2 * k3y + k4y);
+  tr.z += (dt / 6) * (k1z + 2 * k2z + 2 * k3z + k4z);
+}
+
+const DT = 0.006;
+const SUBSTEPS = 4;
+let start = performance.now();
+
+function project(tr, rotAngle) {
+  // Lorenz coords roughly span x,y in [-20,20], z in [0,50] — recenter z, then
+  // rotate slowly around the vertical axis for a living pseudo-3D feel
+  const zc = tr.z - 25;
+  const rx = tr.x * Math.cos(rotAngle) - zc * Math.sin(rotAngle);
+  const rz = tr.x * Math.sin(rotAngle) + zc * Math.cos(rotAngle);
+  const depth = (rz + 30) / 60; // 0..1, used for subtle depth shading
+  return {
+    x: cx + rx * scale,
+    y: cy - tr.y * scale * 0.75 - rz * scale * 0.15,
+    depth: Math.max(0.25, Math.min(1, depth)),
+  };
+}
+
+function frame(now) {
+  const t = ((now - start) / 1000) * speedMul;
+  const rotAngle = t * 0.06;
+
+  ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+  ctx.globalCompositeOperation = 'source-over';
+  ctx.fillStyle = rgba(theme.surface || [12, 20, 27], 0.05);
+  ctx.fillRect(0, 0, W, H);
+
+  ctx.globalCompositeOperation = 'lighter';
+  for (const tr of trajectories) {
+    for (let s = 0; s < SUBSTEPS; s++) stepRK4(tr, DT * speedMul);
+
+    const p = project(tr, rotAngle);
+    if (tr.prevScreen) {
+      ctx.strokeStyle = rgba(tr.color, 0.55 * p.depth);
+      ctx.lineWidth = 1.4;
+      ctx.beginPath();
+      ctx.moveTo(tr.prevScreen.x, tr.prevScreen.y);
+      ctx.lineTo(p.x, p.y);
+      ctx.stroke();
+    }
+    tr.prevScreen = p;
+
+    ctx.beginPath();
+    ctx.arc(p.x, p.y, 2, 0, Math.PI * 2);
+    ctx.fillStyle = rgba(tr.color, 0.9 * p.depth);
+    ctx.fill();
+  }
+  ctx.globalCompositeOperation = 'source-over';
+
+  requestAnimationFrame(frame);
+}
+
+startClock(clockEl, dateEl);
+
+let clockVisible = true;
+window.addEventListener('keydown', (e) => {
+  if (e.key.toLowerCase() === 'c') {
+    clockVisible = !clockVisible;
+    clockEl.classList.toggle('hidden', !clockVisible);
+    dateEl.classList.toggle('hidden', !clockVisible);
+  }
+});
+
+hintEl.classList.add('show');
+setTimeout(() => hintEl.classList.remove('show'), 4000);
+
+window.addEventListener('load', () => {
+  resize();
+  makeTrajectories();
+  loadTheme();
+  requestAnimationFrame(frame);
+});
+</script>
+</body>
+</html>

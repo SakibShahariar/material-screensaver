@@ -1,0 +1,219 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Material Screensaver — Kaleidoscope</title>
+<style>
+  :root {
+    --primary_rgb: 138 206 255;
+    --primary_container_rgb: 0 75 111;
+    --secondary_rgb: 180 199 233;
+    --secondary_container_rgb: 53 72 99;
+    --tertiary_rgb: 186 196 250;
+    --tertiary_container_rgb: 58 68 114;
+    --inverse_primary_rgb: 0 100 145;
+    --surface_rgb: 12 20 27;
+    --surface_bright_rgb: 50 58 65;
+    --on_surface_rgb: 219 227 237;
+    --on_surface_variant_rgb: 191 199 209;
+    --outline_rgb: 137 146 154;
+  }
+  html, body {
+    margin: 0; padding: 0; width: 100%; height: 100%;
+    overflow: hidden; background: rgb(var(--surface_rgb)); cursor: none;
+  }
+  canvas { display: block; width: 100vw; height: 100vh; }
+  #clock {
+    position: fixed; left: 32px; bottom: 28px;
+    font-family: "Google Sans", "Segoe UI", Roboto, system-ui, sans-serif;
+    font-weight: 400; font-variant-numeric: tabular-nums; letter-spacing: 0.5px;
+    font-size: clamp(28px, 4vw, 56px);
+    text-shadow: 0 0 24px rgba(0,0,0,0.4);
+    pointer-events: none; transition: opacity 0.6s ease;
+  }
+  #clock .ampm {
+    font-size: 0.36em;
+    margin-left: 6px;
+    opacity: 0.82;
+    vertical-align: middle;
+  }
+  #date {
+    position: fixed; left: 34px; bottom: 14px;
+    font-family: "Google Sans", "Segoe UI", Roboto, system-ui, sans-serif;
+    font-size: clamp(12px, 1.2vw, 16px); letter-spacing: 1.5px; text-transform: uppercase;
+    pointer-events: none; transition: opacity 0.6s ease;
+  }
+  #hint {
+    position: fixed; right: 28px; bottom: 26px;
+    font-family: "Google Sans", "Segoe UI", Roboto, system-ui, sans-serif;
+    font-size: 13px; letter-spacing: 0.5px;
+    pointer-events: none; opacity: 0; transition: opacity 0.8s ease;
+  }
+  #hint.show { opacity: 1; }
+  #clock.hidden, #date.hidden { opacity: 0; }
+</style>
+<link rel="stylesheet" href="file:///home/sakib/.config/matugen/matugen-colors.css">
+</head>
+<body>
+<canvas id="c"></canvas>
+<div id="clock">00:00</div>
+<div id="date">Mon, Jan 1</div>
+<div id="hint">press C to toggle clock</div>
+
+<script src="clock-shared.js"></script>
+<script>
+const canvas = document.getElementById('c');
+const ctx = canvas.getContext('2d');
+const clockEl = document.getElementById('clock');
+const dateEl = document.getElementById('date');
+const hintEl = document.getElementById('hint');
+
+let dpr = Math.min(window.devicePixelRatio || 1, 2);
+let W, H, cx, cy;
+function resize() {
+  W = window.innerWidth;
+  H = window.innerHeight;
+  cx = W / 2;
+  cy = H / 2;
+  canvas.width = W * dpr;
+  canvas.height = H * dpr;
+  ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+  ctx.fillStyle = 'rgb(12, 20, 27)';
+  ctx.fillRect(0, 0, W, H);
+}
+window.addEventListener('resize', resize);
+
+const reduceMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+const speedMul = reduceMotion ? 0.15 : 1;
+
+function readRGB(name) {
+  const raw = getComputedStyle(document.documentElement).getPropertyValue(name).trim();
+  const parts = raw.split(/\s+/).map(Number);
+  if (parts.length === 3 && parts.every(n => !isNaN(n))) return parts;
+  return [200, 200, 200];
+}
+function rgba(rgb, a) { return `rgba(${rgb[0]}, ${rgb[1]}, ${rgb[2]}, ${a})`; }
+
+let theme = {};
+let roleList = [];
+function loadTheme() {
+  theme = {
+    surface: readRGB('--surface_rgb'),
+    primary: readRGB('--primary_rgb'),
+    primaryContainer: readRGB('--primary_container_rgb'),
+    secondary: readRGB('--secondary_rgb'),
+    secondaryContainer: readRGB('--secondary_container_rgb'),
+    tertiary: readRGB('--tertiary_rgb'),
+    tertiaryContainer: readRGB('--tertiary_container_rgb'),
+    inversePrimary: readRGB('--inverse_primary_rgb'),
+    outline: readRGB('--outline_rgb'),
+  };
+  roleList = [theme.primary, theme.secondary, theme.tertiary, theme.primaryContainer, theme.secondaryContainer, theme.tertiaryContainer, theme.inversePrimary];
+
+  clockEl.style.color = rgba(theme.primary, 0.92);
+  dateEl.style.color = rgba(theme.secondary, 0.85);
+  hintEl.style.color = rgba(theme.outline, 0.9);
+
+  motifs.forEach((m, i) => { m.color = roleList[i % roleList.length]; });
+}
+
+const SEGMENTS = 12; // finer mirror detail, closer to a real scope
+const MOTIF_COUNT = 11;
+let motifs = [];
+
+function makeMotifs() {
+  motifs = [];
+  for (let i = 0; i < MOTIF_COUNT; i++) {
+    motifs.push({
+      color: [200, 200, 200],
+      baseRadius: 0.08 + Math.random() * 0.34,
+      radiusAmp: 0.02 + Math.random() * 0.05,
+      radiusSpeed: 0.05 + Math.random() * 0.09,
+      angleBase: Math.random() * (Math.PI * 2) / SEGMENTS,
+      angleAmp: 0.15 + Math.random() * 0.35,
+      angleSpeed: 0.06 + Math.random() * 0.12,
+      size: 0.025 + Math.random() * 0.045,
+      sizePulseSpeed: 0.15 + Math.random() * 0.2,
+      phase: Math.random() * Math.PI * 2,
+    });
+  }
+}
+
+function drawMotif(m, t, scale) {
+  const radius = (m.baseRadius + Math.sin(t * m.radiusSpeed + m.phase) * m.radiusAmp) * scale;
+  const angle = m.angleBase + Math.sin(t * m.angleSpeed + m.phase * 1.7) * m.angleAmp;
+  const size = (m.size + Math.sin(t * m.sizePulseSpeed + m.phase) * m.size * 0.3) * scale;
+
+  const x = Math.cos(angle) * radius;
+  const y = Math.sin(angle) * radius;
+
+  // glassy bead: soft-edged fill plus a small bright specular glint,
+  // like light catching a piece of colored glass — not a flat hard shard
+  ctx.beginPath();
+  ctx.arc(x, y, size, 0, Math.PI * 2);
+  const grad = ctx.createRadialGradient(x - size * 0.3, y - size * 0.3, size * 0.1, x, y, size);
+  grad.addColorStop(0, rgba(m.color, 0.75));
+  grad.addColorStop(0.75, rgba(m.color, 0.55));
+  grad.addColorStop(1, rgba(m.color, 0.2));
+  ctx.fillStyle = grad;
+  ctx.fill();
+
+  ctx.beginPath();
+  ctx.arc(x - size * 0.32, y - size * 0.32, size * 0.28, 0, Math.PI * 2);
+  ctx.fillStyle = 'rgba(255,255,255,0.35)';
+  ctx.fill();
+}
+
+let start = performance.now();
+
+function frame(now) {
+  const t = ((now - start) / 1000) * speedMul;
+  const scale = Math.min(W, H);
+  const globalRotation = t * 0.035;
+
+  ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+  ctx.globalCompositeOperation = 'source-over';
+  ctx.fillStyle = rgba(theme.surface || [12, 20, 27], 0.4);
+  ctx.fillRect(0, 0, W, H);
+
+  ctx.save();
+  ctx.translate(cx, cy);
+  ctx.rotate(globalRotation);
+
+  const wedgeAngle = (Math.PI * 2) / SEGMENTS;
+  for (let k = 0; k < SEGMENTS; k++) {
+    ctx.save();
+    ctx.rotate(wedgeAngle * k);
+    if (k % 2 === 1) ctx.scale(1, -1); // alternate mirror, like real kaleidoscope glass
+    for (const m of motifs) drawMotif(m, t, scale);
+    ctx.restore();
+  }
+
+  ctx.restore();
+
+  requestAnimationFrame(frame);
+}
+
+startClock(clockEl, dateEl);
+
+let clockVisible = true;
+window.addEventListener('keydown', (e) => {
+  if (e.key.toLowerCase() === 'c') {
+    clockVisible = !clockVisible;
+    clockEl.classList.toggle('hidden', !clockVisible);
+    dateEl.classList.toggle('hidden', !clockVisible);
+  }
+});
+
+hintEl.classList.add('show');
+setTimeout(() => hintEl.classList.remove('show'), 4000);
+
+window.addEventListener('load', () => {
+  resize();
+  makeMotifs();
+  loadTheme();
+  requestAnimationFrame(frame);
+});
+</script>
+</body>
+</html>
