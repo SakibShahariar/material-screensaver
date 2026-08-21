@@ -14,10 +14,16 @@ keyboard shortcut.
 
 Blob, Flow, Ripple, Orbit, Kaleidoscope, Constellation, Solar System (3D, Three.js),
 Lorenz Attractor, Fireworks, Typewriter, Terrain, Vinyl, City, Bubbles, Origami,
-Lanterns, Rain, Koi Pond, DNA, Oscilloscope, Sakura, Paper Boats.
+Lanterns, Rain, Koi Pond, DNA, Oscilloscope, Sakura, Paper Boats, Snow Globe,
+Starfield, Solar-Orbit, Aurora Wave, Organic Harmonic Field, Quantum Interference,
+Hyper-Tesseract, Strange Attractor Flow, Metaphysical Horizon.
 
 All pull their color palette live from a [matugen](https://github.com/InioX/matugen)
 generated stylesheet, so they follow your current wallpaper-derived Material You theme.
+
+Known loose end: `fireworks.html` sets `cursor: crosshair` implying click-to-launch,
+but no click handler is actually wired up — either finish that feature or switch the
+cursor back to `none` for consistency with the rest.
 
 ## Requirements
 

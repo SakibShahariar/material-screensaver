@@ -1,0 +1,460 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Material Screensaver — Snow Globe</title>
+<style>
+  :root {
+    --primary_rgb: 138 206 255;
+    --primary_container_rgb: 0 75 111;
+    --secondary_rgb: 180 199 233;
+    --secondary_container_rgb: 53 72 99;
+    --tertiary_rgb: 186 196 250;
+    --tertiary_container_rgb: 58 68 114;
+    --surface_rgb: 12 20 27;
+    --surface_bright_rgb: 50 58 65;
+    --outline_rgb: 137 146 154;
+  }
+  html, body {
+    margin: 0; padding: 0; width: 100%; height: 100%;
+    overflow: hidden; background: #0c141b;
+    font-family: "Google Sans", "Segoe UI", Roboto, system-ui, sans-serif;
+    user-select: none;
+  }
+
+  body { cursor: none; }
+  body.show-cursor { cursor: default; }
+
+  canvas { display: block; width: 100vw; height: 100vh; }
+
+  #ui-container {
+    position: fixed; inset: 0; pointer-events: none; z-index: 10;
+    display: flex; flex-direction: column; justify-content: space-between;
+    padding: 36px; box-sizing: border-box;
+    transition: opacity 0.8s ease;
+  }
+  #ui-container.hidden { opacity: 0; }
+
+  .vignette-glass {
+    background: radial-gradient(circle at center, rgba(12, 20, 27, 0.65) 0%, rgba(12, 20, 27, 0) 80%);
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
+    padding: 28px 40px;
+    width: fit-content;
+    border-radius: 24px;
+  }
+
+  #clock {
+    font-size: clamp(32px, 4.5vw, 64px);
+    font-weight: 300;
+    font-variant-numeric: tabular-nums;
+    letter-spacing: -0.5px;
+    line-height: 1;
+    text-shadow: 0 2px 14px rgba(0, 0, 0, 0.6);
+  }
+  #clock .ampm {
+    font-size: 0.35em;
+    margin-left: 8px;
+    opacity: 0.8;
+    font-weight: 400;
+    text-transform: uppercase;
+  }
+  #date {
+    font-size: clamp(12px, 1.2vw, 15px);
+    letter-spacing: 2px;
+    text-transform: uppercase;
+    margin-top: 8px;
+    opacity: 0.85;
+    text-shadow: 0 2px 10px rgba(0, 0, 0, 0.6);
+  }
+  #hint {
+    position: fixed; right: 36px; bottom: 36px;
+    font-size: 12px; letter-spacing: 0.8px;
+    opacity: 0; transition: opacity 0.8s ease;
+    text-shadow: 0 2px 10px rgba(0, 0, 0, 0.6);
+  }
+  #hint.show { opacity: 0.75; }
+</style>
+<link rel="stylesheet" href="file:///home/sakib/.config/matugen/matugen-colors.css">
+</head>
+<body>
+
+<canvas id="c"></canvas>
+
+<div id="ui-container">
+  <div class="vignette-glass">
+    <div id="clock">00:00</div>
+    <div id="date">Mon, Jan 1</div>
+  </div>
+  <div id="hint">Press <b>C</b> to toggle UI</div>
+</div>
+
+<script src="clock-shared.js"></script>
+<script>
+const canvas = document.getElementById('c');
+const ctx = canvas.getContext('2d');
+const clockEl = document.getElementById('clock');
+const dateEl = document.getElementById('date');
+const hintEl = document.getElementById('hint');
+const uiContainer = document.getElementById('ui-container');
+
+let cursorTimeout;
+let shakeForce = 0;
+
+function triggerCursor() {
+  document.body.classList.add('show-cursor');
+  clearTimeout(cursorTimeout);
+  cursorTimeout = setTimeout(() => {
+    document.body.classList.remove('show-cursor');
+  }, 2500);
+}
+
+function triggerShake() {
+  shakeForce = 1.0;
+  for (const f of flakes) {
+    f.vy = -(15 + Math.random() * 45);
+    f.vx = (Math.random() - 0.5) * 40;
+  }
+}
+
+window.addEventListener('pointermove', (e) => {
+  triggerCursor();
+  if (Math.hypot(e.movementX, e.movementY) > 22) {
+    shakeForce = Math.min(1.0, shakeForce + 0.15);
+  }
+});
+
+window.addEventListener('pointerdown', () => {
+  triggerCursor();
+  triggerShake();
+});
+
+let dpr = Math.min(window.devicePixelRatio || 1, 2);
+let W, H, cx, cy, globeR;
+
+function resize() {
+  W = window.innerWidth;
+  H = window.innerHeight;
+  cx = W / 2;
+  cy = H * 0.44;
+  globeR = Math.min(W, H) * 0.31;
+  canvas.width = W * dpr;
+  canvas.height = H * dpr;
+  ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+  initPile();
+}
+window.addEventListener('resize', resize);
+
+const reduceMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+const speedMul = reduceMotion ? 0.25 : 1;
+
+function readRGB(name, fallback) {
+  const raw = getComputedStyle(document.documentElement).getPropertyValue(name).trim();
+  const parts = raw.split(/\s+/).map(Number);
+  return (parts.length === 3 && parts.every(n => !isNaN(n))) ? parts : fallback;
+}
+function rgba(rgb, a) {
+  const c = rgb || [200, 200, 200];
+  return `rgba(${c[0]}, ${c[1]}, ${c[2]}, ${a})`;
+}
+
+let theme = {};
+function loadTheme() {
+  theme = {
+    surface: readRGB('--surface_rgb', [12, 20, 27]),
+    primary: readRGB('--primary_rgb', [138, 206, 255]),
+    secondary: readRGB('--secondary_rgb', [180, 199, 233]),
+    tertiary: readRGB('--tertiary_rgb', [186, 196, 250]),
+    tertiaryContainer: readRGB('--tertiary_container_rgb', [58, 68, 114]),
+    secondaryContainer: readRGB('--secondary_container_rgb', [53, 72, 99]),
+    outline: readRGB('--outline_rgb', [137, 146, 154]),
+  };
+  clockEl.style.color = rgba(theme.primary, 0.95);
+  dateEl.style.color = rgba(theme.secondary, 0.85);
+  hintEl.style.color = rgba(theme.outline, 0.9);
+}
+
+let flakes = [];
+let pile = [];
+const PILE_RES = 80;
+
+function initPile() {
+  pile = new Array(PILE_RES).fill(0);
+  flakes = [];
+  for (let i = 0; i < 140; i++) {
+    const f = {};
+    spawnFlake(f);
+    f.y = cy - globeR + Math.random() * globeR * 1.8;
+    flakes.push(f);
+  }
+}
+
+function spawnFlake(f) {
+  const ang = Math.random() * Math.PI * 2;
+  const dist = Math.random() * globeR * 0.9;
+  f.x = cx + Math.cos(ang) * dist;
+  f.y = cy - globeR + 4;
+  f.vx = (Math.random() - 0.5) * 4;
+  f.vy = 12 + Math.random() * 18;
+  f.wobAmp = 5 + Math.random() * 10;
+  f.wobFreq = 0.6 + Math.random() * 1.2;
+  f.phase = Math.random() * Math.PI * 2;
+  f.r = 1 + Math.random() * 2.2;
+  f.alpha = 0.75 + Math.random() * 0.25;
+}
+
+function pileIndex(x) {
+  const rel = (x - (cx - globeR)) / (globeR * 2);
+  return Math.max(0, Math.min(PILE_RES - 1, Math.floor(rel * PILE_RES)));
+}
+
+function pileHeightAt(x) {
+  const idx = pileIndex(x);
+  return pile[idx] || 0;
+}
+
+function addSnowToPile(x) {
+  const idx = pileIndex(x);
+  if (idx < 0 || idx >= PILE_RES) return;
+
+  // Gaussian smooth distribution across neighboring cells
+  const amount = 0.4;
+  pile[idx] = Math.min(globeR * 1.2, pile[idx] + amount);
+  if (idx > 0) pile[idx - 1] = Math.min(globeR * 1.2, pile[idx - 1] + amount * 0.5);
+  if (idx < PILE_RES - 1) pile[idx + 1] = Math.min(globeR * 1.2, pile[idx + 1] + amount * 0.5);
+}
+
+function drawPineTree(tx, ty, scale) {
+  ctx.save();
+  ctx.translate(tx, ty);
+  ctx.scale(scale, scale);
+
+  ctx.fillStyle = 'rgba(10, 16, 22, 0.92)';
+  // Trunk
+  ctx.fillRect(-2, 0, 4, 12);
+
+  // Layered needles
+  ctx.beginPath();
+  ctx.moveTo(0, -32); ctx.lineTo(14, -16); ctx.lineTo(-14, -16); ctx.closePath();
+  ctx.moveTo(0, -22); ctx.lineTo(18, -4); ctx.lineTo(-18, -4); ctx.closePath();
+  ctx.moveTo(0, -12); ctx.lineTo(22, 8); ctx.lineTo(-22, 8); ctx.closePath();
+  ctx.fill();
+
+  ctx.restore();
+}
+
+function drawCabin(bx, by) {
+  ctx.save();
+  ctx.translate(bx, by);
+
+  ctx.fillStyle = 'rgba(15, 22, 30, 0.95)';
+  // Main body
+  ctx.fillRect(-18, -14, 36, 14);
+  // Roof
+  ctx.beginPath();
+  ctx.moveTo(-22, -14); ctx.lineTo(0, -26); ctx.lineTo(22, -14); ctx.closePath();
+  ctx.fill();
+
+  // Cozy Window Glow
+  ctx.fillStyle = rgba(theme.primary, 0.9);
+  ctx.fillRect(-10, -10, 7, 7);
+  ctx.fillRect(3, -10, 7, 7);
+
+  ctx.restore();
+}
+
+let start = performance.now();
+let lastT = 0;
+let lastReset = 0;
+
+function frame(now) {
+  const t = ((now - start) / 1000) * speedMul;
+  const dt = Math.min(0.05, t - lastT);
+  lastT = t;
+
+  if (t - lastReset > 120) {
+    initPile();
+    lastReset = t;
+  }
+
+  shakeForce *= 0.96;
+
+  ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+  ctx.fillStyle = rgba(theme.surface, 1);
+  ctx.fillRect(0, 0, W, H);
+
+  // Globe Shake Offset
+  const shakeX = (Math.random() - 0.5) * shakeForce * 12;
+  const shakeY = (Math.random() - 0.5) * shakeForce * 12;
+
+  ctx.save();
+  ctx.translate(shakeX, shakeY);
+
+  // Metallic Pedestal Base
+  const baseTopY = cy + globeR * 0.82;
+  ctx.beginPath();
+  ctx.ellipse(cx, baseTopY + 28, globeR * 0.68, globeR * 0.16, 0, 0, Math.PI * 2);
+  ctx.fillStyle = rgba(theme.tertiaryContainer, 0.95);
+  ctx.fill();
+
+  ctx.beginPath();
+  ctx.moveTo(cx - globeR * 0.58, baseTopY);
+  ctx.lineTo(cx + globeR * 0.58, baseTopY);
+  ctx.lineTo(cx + globeR * 0.68, baseTopY + 28);
+  ctx.lineTo(cx - globeR * 0.68, baseTopY + 28);
+  ctx.closePath();
+  ctx.fillStyle = rgba(theme.secondaryContainer, 0.9);
+  ctx.fill();
+
+  // Decorative Metallic Ring on Base
+  ctx.beginPath();
+  ctx.ellipse(cx, baseTopY + 8, globeR * 0.6, globeR * 0.08, 0, 0, Math.PI * 2);
+  ctx.strokeStyle = rgba(theme.primary, 0.4);
+  ctx.lineWidth = 3;
+  ctx.stroke();
+
+  // Glass Globe Clipping Region
+  ctx.save();
+  ctx.beginPath();
+  ctx.arc(cx, cy, globeR, 0, Math.PI * 2);
+  ctx.clip();
+
+  // Inside Atmospheric Gradient
+  const innerGrad = ctx.createRadialGradient(cx, cy - globeR * 0.25, 0, cx, cy, globeR);
+  innerGrad.addColorStop(0, rgba(theme.tertiaryContainer, 0.55));
+  innerGrad.addColorStop(0.7, rgba(theme.surface, 0.9));
+  innerGrad.addColorStop(1, rgba(theme.surface, 0.98));
+  ctx.fillStyle = innerGrad;
+  ctx.fillRect(cx - globeR, cy - globeR, globeR * 2, globeR * 2);
+
+  // Background Hills Silhouette
+  ctx.fillStyle = 'rgba(20, 28, 38, 0.85)';
+  ctx.beginPath();
+  ctx.arc(cx - globeR * 0.3, cy + globeR * 0.7, globeR * 0.5, 0, Math.PI * 2);
+  ctx.arc(cx + globeR * 0.35, cy + globeR * 0.75, globeR * 0.55, 0, Math.PI * 2);
+  ctx.fill();
+
+  // Pine Trees & Cabin Scenery
+  drawPineTree(cx - globeR * 0.42, cy + globeR * 0.32, 0.85);
+  drawPineTree(cx - globeR * 0.22, cy + globeR * 0.35, 1.1);
+  drawCabin(cx + globeR * 0.1, cy + globeR * 0.42);
+  drawPineTree(cx + globeR * 0.45, cy + globeR * 0.34, 0.95);
+
+  // Accumulated Snow Pile
+  ctx.beginPath();
+  ctx.moveTo(cx - globeR, cy + globeR);
+  for (let i = 0; i < PILE_RES; i++) {
+    const px = cx - globeR + (i / (PILE_RES - 1)) * globeR * 2;
+    ctx.lineTo(px, cy + globeR - pile[i]);
+  }
+  ctx.lineTo(cx + globeR, cy + globeR);
+  ctx.closePath();
+  ctx.fillStyle = 'rgba(235, 245, 255, 0.92)';
+  ctx.fill();
+
+  // Falling & Swirling Snowflakes
+  for (const f of flakes) {
+    if (shakeForce > 0.1) {
+      f.vx += (Math.random() - 0.5) * shakeForce * 15;
+      f.vy += (Math.random() - 0.5) * shakeForce * 15;
+    }
+
+    f.vy += 8 * dt; // Gravity
+    f.vy = Math.min(f.vy, 40);
+    f.y += f.vy * dt;
+
+    const sway = Math.sin(t * f.wobFreq + f.phase) * f.wobAmp;
+    f.x += (f.vx + sway * 0.2) * dt;
+
+    // Check collision with sphere rim or snow floor
+    const distFromCenter = Math.hypot(f.x - cx, f.y - cy);
+    const floorY = cy + globeR - pileHeightAt(f.x);
+
+    if (f.y >= floorY || distFromCenter >= globeR - 2) {
+      if (f.y >= floorY) addSnowToPile(f.x);
+      spawnFlake(f);
+      continue;
+    }
+
+    ctx.beginPath();
+    ctx.arc(f.x, f.y, f.r, 0, Math.PI * 2);
+    ctx.fillStyle = `rgba(255, 255, 255, ${f.alpha})`;
+    ctx.fill();
+  }
+
+  ctx.restore(); // Exit Glass Clipping
+
+  // Glass Glare Highlights & Outer Rim Refraction
+  ctx.beginPath();
+  ctx.arc(cx, cy, globeR, 0, Math.PI * 2);
+  ctx.strokeStyle = rgba(theme.primary, 0.38);
+  ctx.lineWidth = 2.5;
+  ctx.stroke();
+
+  // Top Curved Specular Glare
+  ctx.beginPath();
+  ctx.arc(cx - globeR * 0.35, cy - globeR * 0.45, globeR * 0.32, -0.7, 0.9);
+  ctx.strokeStyle = 'rgba(255, 255, 255, 0.32)';
+  ctx.lineWidth = 7;
+  ctx.lineCap = 'round';
+  ctx.stroke();
+
+  // Secondary Soft Glare
+  ctx.beginPath();
+  ctx.arc(cx + globeR * 0.45, cy + globeR * 0.2, globeR * 0.25, 0.8, 2.2);
+  ctx.strokeStyle = 'rgba(255, 255, 255, 0.14)';
+  ctx.lineWidth = 4;
+  ctx.stroke();
+
+  ctx.restore(); // Exit Shake Transform
+
+  requestAnimationFrame(frame);
+}
+
+function fallbackClock() {
+  const update = () => {
+    const now = new Date();
+    let hours = now.getHours();
+    const minutes = String(now.getMinutes()).padStart(2, '0');
+    const ampm = hours >= 12 ? 'PM' : 'AM';
+    hours = hours % 12 || 12;
+    clockEl.innerHTML = `${String(hours).padStart(2, '0')}:${minutes}<span class="ampm">${ampm}</span>`;
+
+    const options = { weekday: 'short', month: 'short', day: 'numeric' };
+    dateEl.textContent = now.toLocaleDateString('en-US', options);
+  };
+  update();
+  setInterval(update, 1000);
+}
+
+let uiVisible = true;
+window.addEventListener('keydown', (e) => {
+  if (e.key.toLowerCase() === 'c') {
+    uiVisible = !uiVisible;
+    uiContainer.classList.toggle('hidden', !uiVisible);
+  }
+});
+
+hintEl.classList.add('show');
+setTimeout(() => hintEl.classList.remove('show'), 4000);
+
+window.addEventListener('load', () => {
+  resize();
+  loadTheme();
+
+  try {
+    if (typeof startClock === 'function') {
+      startClock(clockEl, dateEl);
+    } else {
+      fallbackClock();
+    }
+  } catch (err) {
+    fallbackClock();
+  }
+
+  requestAnimationFrame(frame);
+});
+</script>
+</body>
+</html>

@@ -2,10 +2,12 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Material Screensaver — Vinyl</title>
 <style>
   :root {
     --primary_rgb: 138 206 255;
+    --primary_container_rgb: 0 75 111;
     --secondary_rgb: 180 199 233;
     --tertiary_rgb: 186 196 250;
     --surface_rgb: 12 20 27;
@@ -15,45 +17,77 @@
   }
   html, body {
     margin: 0; padding: 0; width: 100%; height: 100%;
-    overflow: hidden; background: rgb(var(--surface_rgb)); cursor: none;
-  }
-  canvas { display: block; width: 100vw; height: 100vh; }
-  #clock {
-    position: fixed; left: 32px; bottom: 28px;
+    overflow: hidden; background: rgb(var(--surface_rgb));
     font-family: "Google Sans", "Segoe UI", Roboto, system-ui, sans-serif;
-    font-weight: 400; font-variant-numeric: tabular-nums; letter-spacing: 0.5px;
-    font-size: clamp(28px, 4vw, 56px);
-    text-shadow: 0 0 24px rgba(0,0,0,0.4);
-    pointer-events: none; transition: opacity 0.6s ease;
+    user-select: none;
+  }
+
+  body { cursor: none; }
+  body.show-cursor { cursor: default; }
+
+  canvas { display: block; width: 100vw; height: 100vh; }
+
+  #ui-container {
+    position: fixed; inset: 0; pointer-events: none; z-index: 10;
+    display: flex; flex-direction: column; justify-content: flex-end;
+    padding: 36px; box-sizing: border-box;
+    transition: opacity 0.6s ease;
+  }
+  #ui-container.hidden { opacity: 0; }
+
+  .vignette-card {
+    background: radial-gradient(circle at center, rgba(12, 20, 27, 0.65) 0%, rgba(12, 20, 27, 0) 80%);
+    backdrop-filter: blur(10px);
+    -webkit-backdrop-filter: blur(10px);
+    padding: 24px 32px;
+    width: fit-content;
+    border-radius: 20px;
+  }
+
+  #clock {
+    font-size: clamp(32px, 4.5vw, 64px);
+    font-weight: 300;
+    font-variant-numeric: tabular-nums;
+    letter-spacing: -0.5px;
+    line-height: 1;
+    text-shadow: 0 2px 16px rgba(0, 0, 0, 0.7);
   }
   #clock .ampm {
-    font-size: 0.36em;
-    margin-left: 6px;
-    opacity: 0.82;
+    font-size: 0.35em;
+    margin-left: 8px;
+    opacity: 0.8;
+    font-weight: 400;
+    text-transform: uppercase;
     vertical-align: middle;
   }
   #date {
-    position: fixed; left: 34px; bottom: 14px;
-    font-family: "Google Sans", "Segoe UI", Roboto, system-ui, sans-serif;
-    font-size: clamp(12px, 1.2vw, 16px); letter-spacing: 1.5px; text-transform: uppercase;
-    pointer-events: none; transition: opacity 0.6s ease;
+    font-size: clamp(12px, 1.2vw, 15px);
+    letter-spacing: 2px;
+    text-transform: uppercase;
+    margin-top: 8px;
+    opacity: 0.85;
+    text-shadow: 0 2px 10px rgba(0, 0, 0, 0.7);
   }
   #hint {
-    position: fixed; right: 28px; bottom: 26px;
-    font-family: "Google Sans", "Segoe UI", Roboto, system-ui, sans-serif;
-    font-size: 13px; letter-spacing: 0.5px;
-    pointer-events: none; opacity: 0; transition: opacity 0.8s ease;
+    position: fixed; right: 36px; bottom: 36px;
+    font-size: 12px; letter-spacing: 0.8px;
+    opacity: 0; transition: opacity 0.8s ease;
+    text-shadow: 0 2px 10px rgba(0, 0, 0, 0.7);
   }
-  #hint.show { opacity: 1; }
-  #clock.hidden, #date.hidden { opacity: 0; }
+  #hint.show { opacity: 0.75; }
 </style>
 <link rel="stylesheet" href="file:///home/sakib/.config/matugen/matugen-colors.css">
 </head>
 <body>
 <canvas id="c"></canvas>
-<div id="clock">00:00</div>
-<div id="date">Mon, Jan 1</div>
-<div id="hint">press C to toggle clock</div>
+
+<div id="ui-container">
+  <div class="vignette-card">
+    <div id="clock">00:00</div>
+    <div id="date">Mon, Jan 1</div>
+  </div>
+  <div id="hint">Press <b>C</b> to toggle UI</div>
+</div>
 
 <script src="clock-shared.js"></script>
 <script>
@@ -62,6 +96,17 @@ const ctx = canvas.getContext('2d');
 const clockEl = document.getElementById('clock');
 const dateEl = document.getElementById('date');
 const hintEl = document.getElementById('hint');
+const uiContainer = document.getElementById('ui-container');
+
+let cursorTimeout;
+function triggerCursor() {
+  document.body.classList.add('show-cursor');
+  clearTimeout(cursorTimeout);
+  cursorTimeout = setTimeout(() => {
+    document.body.classList.remove('show-cursor');
+  }, 2500);
+}
+window.addEventListener('pointermove', triggerCursor);
 
 let dpr = Math.min(window.devicePixelRatio || 1, 2);
 let W, H, cx, cy, R;
@@ -70,7 +115,7 @@ function resize() {
   H = window.innerHeight;
   cx = W / 2;
   cy = H / 2;
-  R = Math.min(W, H) * 0.38;
+  R = Math.min(W, H) * 0.36;
   canvas.width = W * dpr;
   canvas.height = H * dpr;
   ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
@@ -81,112 +126,184 @@ resize();
 const reduceMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
 const speedMul = reduceMotion ? 0.15 : 1;
 
-function readRGB(name) {
+function readRGB(name, fallback) {
   const raw = getComputedStyle(document.documentElement).getPropertyValue(name).trim();
   const parts = raw.split(/\s+/).map(Number);
-  if (parts.length === 3 && parts.every(n => !isNaN(n))) return parts;
-  return [200, 200, 200];
+  return (parts.length === 3 && parts.every(n => !isNaN(n))) ? parts : fallback;
 }
-function rgba(rgb, a) { return `rgba(${rgb[0]}, ${rgb[1]}, ${rgb[2]}, ${a})`; }
+function rgba(rgb, a) {
+  const c = rgb || [200, 200, 200];
+  return `rgba(${c[0]}, ${c[1]}, ${c[2]}, ${a})`;
+}
 
 let theme = {};
 function loadTheme() {
   theme = {
-    surface: readRGB('--surface_rgb'),
-    surfaceContainer: readRGB('--surface_container_rgb'),
-    primary: readRGB('--primary_rgb'),
-    secondary: readRGB('--secondary_rgb'),
-    tertiary: readRGB('--tertiary_rgb'),
-    outline: readRGB('--outline_rgb'),
+    surface: readRGB('--surface_rgb', [12, 20, 27]),
+    surfaceContainer: readRGB('--surface_container_rgb', [24, 33, 39]),
+    primary: readRGB('--primary_rgb', [138, 206, 255]),
+    secondary: readRGB('--secondary_rgb', [180, 199, 233]),
+    tertiary: readRGB('--tertiary_rgb', [186, 196, 250]),
+    outline: readRGB('--outline_rgb', [137, 146, 154]),
   };
-  clockEl.style.color = rgba(theme.primary, 0.92);
+
+  document.body.style.backgroundColor = rgba(theme.surface, 1);
+  clockEl.style.color = rgba(theme.primary, 0.95);
   dateEl.style.color = rgba(theme.secondary, 0.85);
   hintEl.style.color = rgba(theme.outline, 0.9);
 }
 
-// real 33⅓ RPM turntable speed
+// 33⅓ RPM turntable speed
 const RPM = 33.333;
 const RAD_PER_SEC = (RPM / 60) * Math.PI * 2;
+
+function drawTurntableBase() {
+  ctx.save();
+  // Outer subtle turntable platter / deck plate matching surface_container
+  ctx.beginPath();
+  ctx.arc(cx, cy, R * 1.08, 0, Math.PI * 2);
+  ctx.fillStyle = rgba(theme.surfaceContainer, 0.5);
+  ctx.fill();
+  ctx.lineWidth = 2;
+  ctx.strokeStyle = rgba(theme.outline, 0.15);
+  ctx.stroke();
+  ctx.restore();
+}
 
 function drawRecord(angle) {
   ctx.save();
   ctx.translate(cx, cy);
   ctx.rotate(angle);
 
-  // disc body
+  // Outer black vinyl body with soft shadow rim
   ctx.beginPath();
   ctx.arc(0, 0, R, 0, Math.PI * 2);
-  ctx.fillStyle = 'rgb(16,16,18)';
+  const vinylGrad = ctx.createRadialGradient(0, 0, R * 0.8, 0, 0, R);
+  vinylGrad.addColorStop(0, 'rgb(18, 18, 20)');
+  vinylGrad.addColorStop(0.9, 'rgb(12, 12, 14)');
+  vinylGrad.addColorStop(1, 'rgb(5, 5, 6)');
+  ctx.fillStyle = vinylGrad;
   ctx.fill();
 
-  // grooves — many thin concentric rings, alternating tone for texture
-  const grooveCount = 90;
+  // High-density stereo grooves
+  const grooveCount = 110;
   for (let i = 0; i < grooveCount; i++) {
-    const r = R * (0.22 + (i / grooveCount) * 0.76);
+    const r = R * (0.24 + (i / grooveCount) * 0.73);
     ctx.beginPath();
     ctx.arc(0, 0, r, 0, Math.PI * 2);
-    ctx.strokeStyle = i % 2 === 0 ? 'rgba(255,255,255,0.035)' : 'rgba(255,255,255,0.015)';
-    ctx.lineWidth = 1;
+    ctx.strokeStyle = i % 3 === 0 ? 'rgba(255, 255, 255, 0.04)' : 'rgba(255, 255, 255, 0.015)';
+    ctx.lineWidth = 0.8;
     ctx.stroke();
   }
 
-  // label
+  // Center Record Label
   ctx.beginPath();
-  ctx.arc(0, 0, R * 0.2, 0, Math.PI * 2);
-  const labelGrad = ctx.createRadialGradient(0, 0, 0, 0, 0, R * 0.2);
-  labelGrad.addColorStop(0, `rgb(${theme.tertiary.join(',')})`);
-  labelGrad.addColorStop(1, `rgb(${theme.primary.join(',')})`);
+  ctx.arc(0, 0, R * 0.22, 0, Math.PI * 2);
+  const labelGrad = ctx.createRadialGradient(0, 0, 0, 0, 0, R * 0.22);
+  labelGrad.addColorStop(0, rgba(theme.tertiary, 1));
+  labelGrad.addColorStop(0.7, rgba(theme.primary, 0.9));
+  labelGrad.addColorStop(1, rgba(theme.primary_container || theme.outline, 0.8));
   ctx.fillStyle = labelGrad;
   ctx.fill();
 
+  // Label border ring
+  ctx.lineWidth = 1.5;
+  ctx.strokeStyle = rgba(theme.surface, 0.3);
+  ctx.stroke();
+
+  // Spindle hole
   ctx.beginPath();
-  ctx.arc(0, 0, R * 0.02, 0, Math.PI * 2);
-  ctx.fillStyle = 'rgb(10,10,10)';
+  ctx.arc(0, 0, R * 0.025, 0, Math.PI * 2);
+  ctx.fillStyle = 'rgb(8, 8, 10)';
+  ctx.fill();
+  
+  // Metallic spindle pin highlight
+  ctx.beginPath();
+  ctx.arc(-R * 0.005, -R * 0.005, R * 0.008, 0, Math.PI * 2);
+  ctx.fillStyle = 'rgba(255, 255, 255, 0.6)';
   ctx.fill();
 
   ctx.restore();
 
-  // rotating light catch — a soft diagonal highlight band fixed in disc-space,
-  // drawn after restore so it sweeps across grooves as the disc turns beneath it
+  // Rotating specular light reflection (glint) across vinyl surface
   ctx.save();
   ctx.beginPath();
   ctx.arc(cx, cy, R, 0, Math.PI * 2);
   ctx.clip();
   ctx.translate(cx, cy);
-  ctx.rotate(angle * 0.35 + 0.6);
-  const glintGrad = ctx.createLinearGradient(-R, -R * 0.3, R, R * 0.3);
-  glintGrad.addColorStop(0, 'rgba(255,255,255,0)');
-  glintGrad.addColorStop(0.5, 'rgba(255,255,255,0.06)');
-  glintGrad.addColorStop(1, 'rgba(255,255,255,0)');
+  ctx.rotate(angle * 0.4 + 0.5);
+  const glintGrad = ctx.createLinearGradient(-R, -R * 0.4, R, R * 0.4);
+  glintGrad.addColorStop(0, 'rgba(255, 255, 255, 0)');
+  glintGrad.addColorStop(0.5, 'rgba(255, 255, 255, 0.07)');
+  glintGrad.addColorStop(1, 'rgba(255, 255, 255, 0)');
   ctx.fillStyle = glintGrad;
   ctx.fillRect(-R, -R, R * 2, R * 2);
   ctx.restore();
 }
 
 function drawTonearm() {
-  const pivotX = cx + R * 1.35;
-  const pivotY = cy - R * 1.05;
+  const pivotX = cx + R * 1.4;
+  const pivotY = cy - R * 1.1;
   const tipX = cx + R * 0.05;
-  const tipY = cy - R * 0.1;
+  const tipY = cy - R * 0.08;
 
   ctx.save();
-  ctx.strokeStyle = rgba(theme.outline, 0.8);
-  ctx.lineWidth = 5;
+
+  // Tonearm shadow for depth
+  ctx.strokeStyle = 'rgba(0, 0, 0, 0.4)';
+  ctx.lineWidth = 6;
+  ctx.lineCap = 'round';
+  ctx.beginPath();
+  ctx.moveTo(pivotX + 3, pivotY + 3);
+  ctx.lineTo(tipX + 3, tipY + 3);
+  ctx.stroke();
+
+  // Main metallic tonearm pipe
+  const armGrad = ctx.createLinearGradient(pivotX, pivotY, tipX, tipY);
+  armGrad.addColorStop(0, rgba(theme.outline, 0.95));
+  armGrad.addColorStop(0.5, rgba(theme.secondary, 0.9));
+  armGrad.addColorStop(1, rgba(theme.outline, 0.95));
+
+  ctx.strokeStyle = armGrad;
+  ctx.lineWidth = 4.5;
   ctx.lineCap = 'round';
   ctx.beginPath();
   ctx.moveTo(pivotX, pivotY);
   ctx.lineTo(tipX, tipY);
   ctx.stroke();
 
+  // Pivot Base / Counterweight Housing
   ctx.beginPath();
-  ctx.arc(pivotX, pivotY, 12, 0, Math.PI * 2);
-  ctx.fillStyle = rgba(theme.secondary, 0.9);
+  ctx.arc(pivotX, pivotY, 14, 0, Math.PI * 2);
+  const pivotGrad = ctx.createRadialGradient(pivotX - 3, pivotY - 3, 2, pivotX, pivotY, 14);
+  pivotGrad.addColorStop(0, rgba(theme.secondary, 1));
+  pivotGrad.addColorStop(1, rgba(theme.outline, 1));
+  ctx.fillStyle = pivotGrad;
+  ctx.fill();
+  ctx.lineWidth = 2;
+  ctx.strokeStyle = rgba(theme.surface, 0.6);
+  ctx.stroke();
+
+  // Counterweight rings at the rear
+  ctx.beginPath();
+  ctx.arc(pivotX + 18, pivotY + 14, 8, 0, Math.PI * 2);
+  ctx.fillStyle = rgba(theme.outline, 0.8);
   ctx.fill();
 
-  ctx.beginPath();
-  ctx.arc(tipX, tipY, 4, 0, Math.PI * 2);
+  // Cartridge / Headshell at the needle tip
+  ctx.save();
+  ctx.translate(tipX, tipY);
+  ctx.rotate(Math.PI / 6);
   ctx.fillStyle = rgba(theme.primary, 0.95);
+  ctx.fillRect(-3, -2, 10, 16);
+  ctx.restore();
+
+  // Needle point pin
+  ctx.beginPath();
+  ctx.arc(tipX, tipY, 3, 0, Math.PI * 2);
+  ctx.fillStyle = rgba(theme.primary, 1);
   ctx.fill();
+
   ctx.restore();
 }
 
@@ -197,21 +314,37 @@ function frame(now) {
   const angle = t * RAD_PER_SEC;
 
   ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
-  ctx.fillStyle = `rgb(${(theme.surface || [12, 20, 27]).join(',')})`;
+  ctx.fillStyle = rgba(theme.surface, 1);
   ctx.fillRect(0, 0, W, H);
 
+  drawTurntableBase();
   drawRecord(angle);
   drawTonearm();
 
   requestAnimationFrame(frame);
 }
 
-let clockVisible = true;
+function fallbackClock() {
+  const update = () => {
+    const now = new Date();
+    let hours = now.getHours();
+    const minutes = String(now.getMinutes()).padStart(2, '0');
+    const ampm = hours >= 12 ? 'PM' : 'AM';
+    hours = hours % 12 || 12;
+    clockEl.innerHTML = `${String(hours).padStart(2, '0')}:${minutes}<span class="ampm">${ampm}</span>`;
+
+    const options = { weekday: 'short', month: 'short', day: 'numeric' };
+    dateEl.textContent = now.toLocaleDateString('en-US', options);
+  };
+  update();
+  setInterval(update, 1000);
+}
+
+let uiVisible = true;
 window.addEventListener('keydown', (e) => {
   if (e.key.toLowerCase() === 'c') {
-    clockVisible = !clockVisible;
-    clockEl.classList.toggle('hidden', !clockVisible);
-    dateEl.classList.toggle('hidden', !clockVisible);
+    uiVisible = !uiVisible;
+    uiContainer.classList.toggle('hidden', !uiVisible);
   }
 });
 
@@ -220,7 +353,17 @@ setTimeout(() => hintEl.classList.remove('show'), 4000);
 
 window.addEventListener('load', () => {
   loadTheme();
-  startClock(clockEl, dateEl);
+
+  try {
+    if (typeof startClock === 'function') {
+      startClock(clockEl, dateEl);
+    } else {
+      fallbackClock();
+    }
+  } catch (err) {
+    fallbackClock();
+  }
+
   requestAnimationFrame(frame);
 });
 </script>

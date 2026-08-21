@@ -2,6 +2,7 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Material Screensaver — Koi Pond</title>
 <style>
   :root {
@@ -9,22 +10,80 @@
     --primary_container_rgb: 0 75 111; --secondary_container_rgb: 53 72 99; --tertiary_container_rgb: 58 68 114;
     --surface_rgb: 12 20 27; --outline_rgb: 137 146 154;
   }
-  html, body { margin: 0; padding: 0; width: 100%; height: 100%; overflow: hidden; background: rgb(var(--surface_rgb)); cursor: none; }
+  html, body {
+    margin: 0; padding: 0; width: 100%; height: 100%;
+    overflow: hidden; background: #0c141b;
+    font-family: "Google Sans", "Segoe UI", Roboto, system-ui, sans-serif;
+    user-select: none;
+  }
+
+  body { cursor: none; }
+  body.show-cursor { cursor: default; }
+
   canvas { display: block; width: 100vw; height: 100vh; }
-  #clock { position: fixed; left: 32px; bottom: 28px; font-family: "Google Sans","Segoe UI",Roboto,system-ui,sans-serif; font-weight: 400; font-variant-numeric: tabular-nums; letter-spacing: 0.5px; font-size: clamp(28px,4vw,56px); text-shadow: 0 0 24px rgba(0,0,0,0.4); pointer-events: none; transition: opacity 0.6s ease; }
-  #clock .ampm { font-size: 0.36em; margin-left: 6px; opacity: 0.82; vertical-align: middle; }
-  #date { position: fixed; left: 34px; bottom: 14px; font-family: "Google Sans","Segoe UI",Roboto,system-ui,sans-serif; font-size: clamp(12px,1.2vw,16px); letter-spacing: 1.5px; text-transform: uppercase; pointer-events: none; transition: opacity 0.6s ease; }
-  #hint { position: fixed; right: 28px; bottom: 26px; font-family: "Google Sans","Segoe UI",Roboto,system-ui,sans-serif; font-size: 13px; letter-spacing: 0.5px; pointer-events: none; opacity: 0; transition: opacity 0.8s ease; }
-  #hint.show { opacity: 1; }
-  #clock.hidden, #date.hidden { opacity: 0; }
+
+  #ui-container {
+    position: fixed; inset: 0; pointer-events: none; z-index: 10;
+    display: flex; flex-direction: column; justify-content: space-between;
+    padding: 36px; box-sizing: border-box;
+    transition: opacity 0.8s ease;
+  }
+  #ui-container.hidden { opacity: 0; }
+
+  .vignette-glass {
+    background: radial-gradient(circle at center, rgba(12, 20, 27, 0.55) 0%, rgba(12, 20, 27, 0) 80%);
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
+    padding: 28px 40px;
+    width: fit-content;
+    border-radius: 24px;
+  }
+
+  #clock {
+    font-size: clamp(32px, 4.5vw, 64px);
+    font-weight: 300;
+    font-variant-numeric: tabular-nums;
+    letter-spacing: -0.5px;
+    line-height: 1;
+    text-shadow: 0 2px 14px rgba(0, 0, 0, 0.6);
+  }
+  #clock .ampm {
+    font-size: 0.35em;
+    margin-left: 8px;
+    opacity: 0.8;
+    font-weight: 400;
+    text-transform: uppercase;
+  }
+  #date {
+    font-size: clamp(12px, 1.2vw, 15px);
+    letter-spacing: 2px;
+    text-transform: uppercase;
+    margin-top: 8px;
+    opacity: 0.85;
+    text-shadow: 0 2px 10px rgba(0, 0, 0, 0.6);
+  }
+  #hint {
+    position: fixed; right: 36px; bottom: 36px;
+    font-size: 12px; letter-spacing: 0.8px;
+    opacity: 0; transition: opacity 0.8s ease;
+    text-shadow: 0 2px 10px rgba(0, 0, 0, 0.6);
+  }
+  #hint.show { opacity: 0.75; }
 </style>
 <link rel="stylesheet" href="file:///home/sakib/.config/matugen/matugen-colors.css">
 </head>
 <body>
+
 <canvas id="c"></canvas>
-<div id="clock">00:00</div>
-<div id="date">Mon, Jan 1</div>
-<div id="hint">press C to toggle clock</div>
+
+<div id="ui-container">
+  <div class="vignette-glass">
+    <div id="clock">00:00</div>
+    <div id="date">Mon, Jan 1</div>
+  </div>
+  <div id="hint">Click or move to disturb water • Press <b>C</b> to toggle UI</div>
+</div>
+
 <script src="clock-shared.js"></script>
 <script>
 const canvas = document.getElementById('c');
@@ -32,39 +91,83 @@ const ctx = canvas.getContext('2d');
 const clockEl = document.getElementById('clock');
 const dateEl = document.getElementById('date');
 const hintEl = document.getElementById('hint');
+const uiContainer = document.getElementById('ui-container');
 
-let dpr = Math.min(window.devicePixelRatio || 1, 2);
-let W, H;
+let cursorTimeout;
+function triggerCursor() {
+  document.body.classList.add('show-cursor');
+  clearTimeout(cursorTimeout);
+  cursorTimeout = setTimeout(() => {
+    document.body.classList.remove('show-cursor');
+  }, 2500);
+}
+
+let mouse = { x: -1000, y: -1000, active: false };
+let lastMouseDisturb = 0;
+
+function spawnRipple(x, y, maxR = 35) {
+  ripples.push({ x, y, start: performance.now() / 1000, duration: 3.2, maxR });
+}
+
+window.addEventListener('pointermove', (e) => {
+  triggerCursor();
+  mouse.x = e.clientX;
+  mouse.y = e.clientY;
+  mouse.active = true;
+
+  const now = performance.now() / 1000;
+  if (now - lastMouseDisturb > 0.12) {
+    spawnRipple(mouse.x, mouse.y, 25 + Math.random() * 20);
+    lastMouseDisturb = now;
+  }
+});
+
+window.addEventListener('pointerdown', (e) => {
+  triggerCursor();
+  spawnRipple(e.clientX, e.clientY, 55 + Math.random() * 25);
+});
+
+window.addEventListener('pointerleave', () => {
+  mouse.active = false;
+});
+
+let W = window.innerWidth;
+let H = window.innerHeight;
+
 function resize() {
-  W = window.innerWidth; H = window.innerHeight;
-  canvas.width = W * dpr; canvas.height = H * dpr;
-  ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+  W = window.innerWidth; 
+  H = window.innerHeight;
+  canvas.width = W; 
+  canvas.height = H;
 }
 window.addEventListener('resize', resize);
 resize();
 
-const reduceMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
-const speedMul = reduceMotion ? 0.25 : 1;
-
-function readRGB(name) {
+function readRGB(name, fallback) {
   const raw = getComputedStyle(document.documentElement).getPropertyValue(name).trim();
   const parts = raw.split(/\s+/).map(Number);
-  if (parts.length === 3 && parts.every(n => !isNaN(n))) return parts;
-  return [200, 200, 200];
+  return (parts.length === 3 && parts.every(n => !isNaN(n))) ? parts : fallback;
 }
-function rgba(rgb, a) { return `rgba(${rgb[0]}, ${rgb[1]}, ${rgb[2]}, ${a})`; }
+function rgba(rgb, a) { 
+  const c = rgb || [200, 200, 200];
+  return `rgba(${c[0]}, ${c[1]}, ${c[2]}, ${a})`; 
+}
 
 let theme = {};
 let roleList = [];
 function loadTheme() {
   theme = {
-    surface: readRGB('--surface_rgb'), primary: readRGB('--primary_rgb'), secondary: readRGB('--secondary_rgb'),
-    tertiary: readRGB('--tertiary_rgb'), primaryContainer: readRGB('--primary_container_rgb'),
-    secondaryContainer: readRGB('--secondary_container_rgb'), tertiaryContainer: readRGB('--tertiary_container_rgb'),
-    outline: readRGB('--outline_rgb'),
+    surface: readRGB('--surface_rgb', [12, 20, 27]), 
+    primary: readRGB('--primary_rgb', [138, 206, 255]), 
+    secondary: readRGB('--secondary_rgb', [180, 199, 233]),
+    tertiary: readRGB('--tertiary_rgb', [186, 196, 250]), 
+    primaryContainer: readRGB('--primary_container_rgb', [0, 75, 111]),
+    secondaryContainer: readRGB('--secondary_container_rgb', [53, 72, 99]), 
+    tertiaryContainer: readRGB('--tertiary_container_rgb', [58, 68, 114]),
+    outline: readRGB('--outline_rgb', [137, 146, 154]),
   };
   roleList = [theme.primary, theme.secondary, theme.tertiary, theme.primaryContainer, theme.secondaryContainer, theme.tertiaryContainer];
-  clockEl.style.color = rgba(theme.primary, 0.92);
+  clockEl.style.color = rgba(theme.primary, 0.95);
   dateEl.style.color = rgba(theme.secondary, 0.85);
   hintEl.style.color = rgba(theme.outline, 0.9);
   fish.forEach((f, i) => { f.color = roleList[i % roleList.length]; });
@@ -75,14 +178,15 @@ let ripples = [];
 
 function makeFish() {
   fish = [];
-  for (let i = 0; i < 6; i++) {
+  for (let i = 0; i < 7; i++) {
     fish.push({
-      x: Math.random() * W, y: Math.random() * H,
+      x: W * 0.2 + Math.random() * (W * 0.6), 
+      y: H * 0.2 + Math.random() * (H * 0.6),
       angle: Math.random() * Math.PI * 2,
       turnPhase: Math.random() * Math.PI * 2,
       turnSpeed: 0.15 + Math.random() * 0.2,
-      speed: 22 + Math.random() * 18,
-      len: 20 + Math.random() * 14,
+      speed: 40 + Math.random() * 25,
+      len: 28 + Math.random() * 14,
       color: [200, 200, 200],
       nextRipple: Math.random() * 2,
     });
@@ -90,28 +194,49 @@ function makeFish() {
 }
 
 function drawFish(f, t) {
-  const wag = Math.sin(t * 4 + f.turnPhase) * 0.3;
+  const bodyWag = Math.sin(t * 4.5 + f.turnPhase);
+  const tailWag = Math.sin(t * 4.5 + f.turnPhase - 0.8);
+
   ctx.save();
   ctx.translate(f.x, f.y);
   ctx.rotate(f.angle);
+
+  // Shadow
+  ctx.save();
+  ctx.translate(12, 16);
   ctx.beginPath();
-  ctx.moveTo(f.len * 0.55, 0);
-  ctx.quadraticCurveTo(f.len * 0.2, f.len * 0.22, -f.len * 0.35, f.len * 0.12);
-  ctx.quadraticCurveTo(-f.len * 0.55, 0, -f.len * 0.35, -f.len * 0.12);
-  ctx.quadraticCurveTo(f.len * 0.2, -f.len * 0.22, f.len * 0.55, 0);
-  ctx.closePath();
-  ctx.fillStyle = rgba(f.color, 0.75);
+  ctx.ellipse(0, 0, f.len * 0.6, f.len * 0.22, 0, 0, Math.PI * 2);
+  ctx.fillStyle = 'rgba(0, 0, 0, 0.28)';
+  ctx.fill();
+  ctx.restore();
+
+  // Pectoral Fins
+  ctx.beginPath();
+  ctx.ellipse(f.len * 0.1, f.len * 0.28, f.len * 0.2, f.len * 0.08, 0.5 + bodyWag * 0.1, 0, Math.PI * 2);
+  ctx.ellipse(f.len * 0.1, -f.len * 0.28, f.len * 0.2, f.len * 0.08, -0.5 + bodyWag * 0.1, 0, Math.PI * 2);
+  ctx.fillStyle = rgba(f.color, 0.5);
   ctx.fill();
 
+  // Torso
+  ctx.beginPath();
+  ctx.moveTo(f.len * 0.6, 0);
+  ctx.quadraticCurveTo(f.len * 0.2, f.len * 0.26 + bodyWag * 1.5, -f.len * 0.3, f.len * 0.15);
+  ctx.quadraticCurveTo(-f.len * 0.55, 0, -f.len * 0.3, -f.len * 0.15);
+  ctx.quadraticCurveTo(f.len * 0.2, -f.len * 0.26 + bodyWag * 1.5, f.len * 0.6, 0);
+  ctx.closePath();
+  ctx.fillStyle = rgba(f.color, 0.9);
+  ctx.fill();
+
+  // Tail Fin
   ctx.save();
-  ctx.translate(-f.len * 0.5, 0);
-  ctx.rotate(wag);
+  ctx.translate(-f.len * 0.4, 0);
+  ctx.rotate(tailWag * 0.35);
   ctx.beginPath();
   ctx.moveTo(0, 0);
-  ctx.lineTo(-f.len * 0.35, f.len * 0.2);
-  ctx.lineTo(-f.len * 0.35, -f.len * 0.2);
+  ctx.lineTo(-f.len * 0.45, f.len * 0.25);
+  ctx.quadraticCurveTo(-f.len * 0.3, 0, -f.len * 0.45, -f.len * 0.25);
   ctx.closePath();
-  ctx.fillStyle = rgba(f.color, 0.55);
+  ctx.fillStyle = rgba(f.color, 0.65);
   ctx.fill();
   ctx.restore();
 
@@ -122,40 +247,72 @@ let start = performance.now();
 let lastT = 0;
 
 function frame(now) {
-  const t = ((now - start) / 1000) * speedMul;
+  const t = (now - start) / 1000;
   const dt = Math.min(0.05, t - lastT);
   lastT = t;
 
-  ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+  // Clear Canvas
+  ctx.clearRect(0, 0, W, H);
+
+  // Deep Water
   const water = ctx.createRadialGradient(W / 2, H / 2, 0, W / 2, H / 2, Math.max(W, H) * 0.7);
-  water.addColorStop(0, `rgb(${(theme.primaryContainer || [10, 40, 60]).map((v,i)=>Math.round(v*0.5+theme.surface[i]*0.5)).join(',')})`);
-  water.addColorStop(1, `rgb(${(theme.surface || [12,20,27]).join(',')})`);
+  water.addColorStop(0, `rgb(${(theme.primaryContainer || [0, 75, 111]).join(',')})`);
+  water.addColorStop(1, `rgb(${(theme.surface || [12, 20, 27]).join(',')})`);
   ctx.fillStyle = water;
   ctx.fillRect(0, 0, W, H);
 
+  // Caustics
+  ctx.fillStyle = rgba(theme.primary, 0.03);
+  ctx.beginPath();
+  ctx.arc(W / 2 + Math.sin(t * 0.2) * 40, H / 2 + Math.cos(t * 0.15) * 40, Math.max(W, H) * 0.45, 0, Math.PI * 2);
+  ctx.fill();
+
+  // Ripples
   ripples = ripples.filter(r => (t - r.start) < r.duration);
   for (const r of ripples) {
     const p = (t - r.start) / r.duration;
     ctx.beginPath();
     ctx.arc(r.x, r.y, r.maxR * p, 0, Math.PI * 2);
-    ctx.strokeStyle = rgba(theme.outline, (1 - p) * 0.3);
-    ctx.lineWidth = 1;
+    ctx.strokeStyle = rgba(theme.outline, (1 - p) * 0.35);
+    ctx.lineWidth = 1.2;
     ctx.stroke();
   }
 
+  // Fish Loop
   for (const f of fish) {
-    f.angle += Math.sin(t * f.turnSpeed + f.turnPhase) * dt * 0.6;
+    // Smooth turn towards center near boundaries
+    const margin = 100;
+    if (f.x < margin || f.x > W - margin || f.y < margin || f.y > H - margin) {
+      const targetAngle = Math.atan2(H / 2 - f.y, W / 2 - f.x);
+      let diff = targetAngle - f.angle;
+      diff = Math.atan2(Math.sin(diff), Math.cos(diff));
+      f.angle += diff * dt * 3;
+    } else {
+      f.angle += Math.sin(t * f.turnSpeed + f.turnPhase) * dt * 0.5;
+    }
+
+    // Flee mouse
+    if (mouse.active) {
+      const dx = f.x - mouse.x;
+      const dy = f.y - mouse.y;
+      if (dx * dx + dy * dy < 150 * 150) {
+        let diff = Math.atan2(dy, dx) - f.angle;
+        diff = Math.atan2(Math.sin(diff), Math.cos(diff));
+        f.angle += diff * dt * 4;
+      }
+    }
+
+    // Move
     f.x += Math.cos(f.angle) * f.speed * dt;
     f.y += Math.sin(f.angle) * f.speed * dt;
 
-    if (f.x < 0) { f.x = 0; f.angle = Math.PI - f.angle; }
-    if (f.x > W) { f.x = W; f.angle = Math.PI - f.angle; }
-    if (f.y < 0) { f.y = 0; f.angle = -f.angle; }
-    if (f.y > H) { f.y = H; f.angle = -f.angle; }
+    // Hard boundary safety clamp
+    f.x = Math.max(30, Math.min(W - 30, f.x));
+    f.y = Math.max(30, Math.min(H - 30, f.y));
 
     if (t >= f.nextRipple) {
-      ripples.push({ x: f.x, y: f.y, start: t, duration: 3.5, maxR: 30 + Math.random() * 20 });
-      f.nextRipple = t + 1.2 + Math.random() * 1.5;
+      spawnRipple(f.x, f.y, 25 + Math.random() * 18);
+      f.nextRipple = t + 1.2 + Math.random() * 1.6;
     }
 
     drawFish(f, t);
@@ -164,21 +321,48 @@ function frame(now) {
   requestAnimationFrame(frame);
 }
 
-let clockVisible = true;
+function fallbackClock() {
+  const update = () => {
+    const now = new Date();
+    let hours = now.getHours();
+    const minutes = String(now.getMinutes()).padStart(2, '0');
+    const ampm = hours >= 12 ? 'PM' : 'AM';
+    hours = hours % 12 || 12;
+    clockEl.innerHTML = `${String(hours).padStart(2, '0')}:${minutes}<span class="ampm">${ampm}</span>`;
+    
+    const options = { weekday: 'short', month: 'short', day: 'numeric' };
+    dateEl.textContent = now.toLocaleDateString('en-US', options);
+  };
+  update();
+  setInterval(update, 1000);
+}
+
+let uiVisible = true;
 window.addEventListener('keydown', (e) => {
   if (e.key.toLowerCase() === 'c') {
-    clockVisible = !clockVisible;
-    clockEl.classList.toggle('hidden', !clockVisible);
-    dateEl.classList.toggle('hidden', !clockVisible);
+    uiVisible = !uiVisible;
+    uiContainer.classList.toggle('hidden', !uiVisible);
   }
 });
+
 hintEl.classList.add('show');
 setTimeout(() => hintEl.classList.remove('show'), 4000);
 
 window.addEventListener('load', () => {
+  resize();
   makeFish();
   loadTheme();
-  startClock(clockEl, dateEl);
+
+  try {
+    if (typeof startClock === 'function') {
+      startClock(clockEl, dateEl);
+    } else {
+      fallbackClock();
+    }
+  } catch (err) {
+    fallbackClock();
+  }
+
   requestAnimationFrame(frame);
 });
 </script>

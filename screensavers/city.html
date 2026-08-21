@@ -2,7 +2,8 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<title>Material Screensaver — City</title>
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Material Screensaver — City Skyline</title>
 <style>
   :root {
     --primary_rgb: 138 206 255;
@@ -10,50 +11,85 @@
     --tertiary_rgb: 186 196 250;
     --surface_rgb: 12 20 27;
     --surface_container_lowest_rgb: 7 15 21;
-    --on_surface_variant_rgb: 191 199 209;
     --outline_rgb: 137 146 154;
   }
   html, body {
     margin: 0; padding: 0; width: 100%; height: 100%;
     overflow: hidden; background: rgb(var(--surface_rgb)); cursor: none;
+    font-family: "Google Sans", "Segoe UI", Roboto, system-ui, sans-serif;
+    user-select: none;
   }
   canvas { display: block; width: 100vw; height: 100vh; }
+
+  /* Non-Distracting UI Vignette Layout */
+  #ui-container {
+    position: fixed; inset: 0; pointer-events: none; z-index: 10;
+    display: flex; flex-direction: column; justify-content: space-between;
+    padding: 36px; box-sizing: border-box;
+    transition: opacity 0.8s ease;
+  }
+  #ui-container.hidden { opacity: 0; }
+
+  .vignette-panel {
+    background: radial-gradient(circle at center, rgba(12, 20, 27, 0.45) 0%, rgba(12, 20, 27, 0) 80%);
+  
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  
+  mask-image: radial-gradient(circle at center, black 40%, transparent 85%);
+  -webkit-mask-image: radial-gradient(circle at center, black 40%, transparent 85%);
+
+  border: none;
+  border-radius: 0;
+  padding: 28px 40px;
+  width: fit-content;
+  box-shadow: none;
+  }
+
   #clock {
-    position: fixed; left: 32px; bottom: 28px;
-    font-family: "Google Sans", "Segoe UI", Roboto, system-ui, sans-serif;
-    font-weight: 400; font-variant-numeric: tabular-nums; letter-spacing: 0.5px;
-    font-size: clamp(28px, 4vw, 56px);
-    text-shadow: 0 0 24px rgba(0,0,0,0.5);
-    pointer-events: none; transition: opacity 0.6s ease;
+    font-size: clamp(32px, 4.5vw, 64px);
+    font-weight: 300;
+    font-variant-numeric: tabular-nums;
+    letter-spacing: -0.5px;
+    line-height: 1;
+    text-shadow: 0 2px 14px rgba(0, 0, 0, 0.6);
   }
   #clock .ampm {
-    font-size: 0.36em;
-    margin-left: 6px;
-    opacity: 0.82;
-    vertical-align: middle;
+    font-size: 0.35em;
+    margin-left: 8px;
+    opacity: 0.8;
+    font-weight: 400;
+    text-transform: uppercase;
   }
   #date {
-    position: fixed; left: 34px; bottom: 14px;
-    font-family: "Google Sans", "Segoe UI", Roboto, system-ui, sans-serif;
-    font-size: clamp(12px, 1.2vw, 16px); letter-spacing: 1.5px; text-transform: uppercase;
-    pointer-events: none; transition: opacity 0.6s ease;
+    font-size: clamp(12px, 1.2vw, 15px);
+    letter-spacing: 2px;
+    text-transform: uppercase;
+    margin-top: 8px;
+    opacity: 0.85;
+    text-shadow: 0 2px 10px rgba(0, 0, 0, 0.6);
   }
   #hint {
-    position: fixed; right: 28px; bottom: 26px;
-    font-family: "Google Sans", "Segoe UI", Roboto, system-ui, sans-serif;
-    font-size: 13px; letter-spacing: 0.5px;
-    pointer-events: none; opacity: 0; transition: opacity 0.8s ease;
+    position: fixed; right: 36px; bottom: 36px;
+    font-size: 12px; letter-spacing: 0.8px;
+    opacity: 0; transition: opacity 0.8s ease;
+    text-shadow: 0 2px 10px rgba(0, 0, 0, 0.6);
   }
-  #hint.show { opacity: 1; }
-  #clock.hidden, #date.hidden { opacity: 0; }
+  #hint.show { opacity: 0.75; }
 </style>
 <link rel="stylesheet" href="file:///home/sakib/.config/matugen/matugen-colors.css">
 </head>
 <body>
+
 <canvas id="c"></canvas>
-<div id="clock">00:00</div>
-<div id="date">Mon, Jan 1</div>
-<div id="hint">press C to toggle clock</div>
+
+<div id="ui-container">
+  <div class="vignette-panel">
+    <div id="clock">00:00</div>
+    <div id="date">Mon, Jan 1</div>
+  </div>
+  <div id="hint">Press <b>C</b> to toggle UI</div>
+</div>
 
 <script src="clock-shared.js"></script>
 <script>
@@ -62,27 +98,25 @@ const ctx = canvas.getContext('2d');
 const clockEl = document.getElementById('clock');
 const dateEl = document.getElementById('date');
 const hintEl = document.getElementById('hint');
+const uiContainer = document.getElementById('ui-container');
 
 let dpr = Math.min(window.devicePixelRatio || 1, 2);
 let W, H;
+
 function resize() {
   W = window.innerWidth;
   H = window.innerHeight;
   canvas.width = W * dpr;
   canvas.height = H * dpr;
   ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
-  makeBuildings();
-  makeStars();
+  initCity();
 }
 window.addEventListener('resize', resize);
-
-const reduceMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
 
 function readRGB(name) {
   const raw = getComputedStyle(document.documentElement).getPropertyValue(name).trim();
   const parts = raw.split(/\s+/).map(Number);
-  if (parts.length === 3 && parts.every(n => !isNaN(n))) return parts;
-  return [200, 200, 200];
+  return (parts.length === 3 && parts.every(n => !isNaN(n))) ? parts : [200, 200, 200];
 }
 function rgba(rgb, a) { return `rgba(${rgb[0]}, ${rgb[1]}, ${rgb[2]}, ${a})`; }
 
@@ -98,117 +132,225 @@ function loadTheme() {
     outline: readRGB('--outline_rgb'),
   };
   windowColors = [theme.primary, theme.secondary, theme.tertiary];
-  clockEl.style.color = rgba(theme.primary, 0.92);
+  clockEl.style.color = rgba(theme.primary, 0.95);
   dateEl.style.color = rgba(theme.secondary, 0.85);
   hintEl.style.color = rgba(theme.outline, 0.9);
 }
 
-let buildings = [];
-function makeBuildings() {
-  buildings = [];
-  let x = 0;
-  while (x < W * 1.05) {
-    const width = 40 + Math.random() * 80;
-    const isSkyscraper = Math.random() < 0.16;
-    const heightFrac = isSkyscraper ? 0.72 + Math.random() * 0.22 : 0.2 + Math.random() * 0.42;
-    const winW = 6, winH = 9, gapX = 5, gapY = 10;
-    const cols = Math.max(1, Math.floor((width - 10) / (winW + gapX)));
-    const height = H * heightFrac;
-    const rows = Math.max(1, Math.floor((height - 20) / (winH + gapY)));
+// City Procedural Generation (Far and Near Layers)
+let bgBuildings = [];
+let fgBuildings = [];
+let stars = [];
+let clouds = [];
+let shootingStars = [];
+
+function createBuildingLayer(heightFactor, minW, maxW, tintOffset, isForeground) {
+  const list = [];
+  let x = -10;
+  while (x < W + 20) {
+    const width = minW + Math.random() * (maxW - minW);
+    const isSkyscraper = isForeground && Math.random() < 0.18;
+    const hFrac = isSkyscraper ? 0.65 + Math.random() * 0.25 : heightFactor * (0.3 + Math.random() * 0.7);
+    const height = H * hFrac;
+    const winW = isForeground ? 5 : 3;
+    const winH = isForeground ? 8 : 4;
+    const gapX = isForeground ? 6 : 4;
+    const gapY = isForeground ? 9 : 5;
+    
+    const cols = Math.max(1, Math.floor((width - 12) / (winW + gapX)));
+    const rows = Math.max(1, Math.floor((height - 24) / (winH + gapY)));
     const windows = [];
+
     for (let r = 0; r < rows; r++) {
       for (let c = 0; c < cols; c++) {
         windows.push({
           x: c * (winW + gapX) + 8,
-          y: r * (winH + gapY) + 12,
-          on: Math.random() < 0.4,
+          y: r * (winH + gapY) + 14,
+          on: Math.random() < (isForeground ? 0.38 : 0.25),
           nextToggle: Math.random() * 20,
           colorIdx: Math.floor(Math.random() * windowColors.length),
         });
       }
     }
+
     const roofRoll = Math.random();
-    const roofStyle = roofRoll < 0.4 ? 'flat' : roofRoll < 0.62 ? 'antenna' : roofRoll < 0.84 ? 'setback' : 'point';
-    const tint = 4 + Math.random() * 10;
-    buildings.push({ x, width, height, windows, winW, winH, roofStyle, tint });
-    x += width + 2 + Math.random() * 4;
+    const roofStyle = roofRoll < 0.35 ? 'flat' : roofRoll < 0.6 ? 'antenna' : roofRoll < 0.8 ? 'setback' : 'point';
+
+    list.push({ x, width, height, windows, winW, winH, roofStyle, tintOffset });
+    x += width + (isForeground ? 2 + Math.random() * 6 : 1 + Math.random() * 3);
+  }
+  return list;
+}
+
+function initCity() {
+  bgBuildings = createBuildingLayer(0.35, 30, 60, 2, false);
+  fgBuildings = createBuildingLayer(0.55, 45, 90, 8, true);
+
+  // Celestial Setup
+  stars = [];
+  const starCount = Math.floor((W * H) / 12000);
+  for (let i = 0; i < starCount; i++) {
+    stars.push({
+      x: Math.random() * W,
+      y: Math.random() * H * 0.55,
+      r: 0.4 + Math.random() * 1.1,
+      phase: Math.random() * Math.PI * 2
+    });
+  }
+
+  // Clouds
+  clouds = [];
+  for (let i = 0; i < 4; i++) {
+    clouds.push({
+      x: Math.random() * W,
+      y: H * (0.05 + Math.random() * 0.25),
+      speed: 4 + Math.random() * 8,
+      radius: 60 + Math.random() * 90
+    });
   }
 }
 
-function drawRoof(b, baseY) {
+function drawRoof(b, baseY, baseColor) {
   const cx = b.x + b.width / 2;
-  ctx.fillStyle = `rgb(${8 + b.tint},${10 + b.tint},${14 + b.tint})`;
+  ctx.fillStyle = baseColor;
+
   if (b.roofStyle === 'antenna') {
     ctx.fillRect(cx - 1.5, baseY - 22, 3, 22);
+    // Red beacon blinking light
+    const blink = (Math.sin(performance.now() * 0.004 + b.x) + 1) / 2;
     ctx.beginPath();
     ctx.arc(cx, baseY - 22, 2.5, 0, Math.PI * 2);
-    ctx.fillStyle = 'rgba(255,80,80,0.85)';
+    ctx.fillStyle = `rgba(255, 70, 70, ${0.3 + blink * 0.7})`;
     ctx.fill();
   } else if (b.roofStyle === 'setback') {
     const tierW = b.width * 0.55;
-    ctx.fillRect(b.x + (b.width - tierW) / 2, baseY - 20, tierW, 20);
+    ctx.fillRect(b.x + (b.width - tierW) / 2, baseY - 18, tierW, 18);
   } else if (b.roofStyle === 'point') {
     ctx.beginPath();
     ctx.moveTo(b.x, baseY);
-    ctx.lineTo(cx, baseY - 26);
+    ctx.lineTo(cx, baseY - 24);
     ctx.lineTo(b.x + b.width, baseY);
     ctx.closePath();
     ctx.fill();
   }
 }
 
-let stars = [];
-function makeStars() {
-  stars = [];
-  const count = Math.floor((W * H * 0.5) / 9000);
-  for (let i = 0; i < count; i++) {
-    stars.push({ x: Math.random() * W, y: Math.random() * H * 0.55, r: 0.4 + Math.random() * 1.1, phase: Math.random() * Math.PI * 2 });
-  }
-}
-
 let start = performance.now();
+let lastShootingStar = 0;
 
 function frame(now) {
   const t = (now - start) / 1000;
 
   ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+
+  // 1. Sky Gradient
   const sky = ctx.createLinearGradient(0, 0, 0, H);
   sky.addColorStop(0, `rgb(${(theme.surfaceLow || [7, 15, 21]).join(',')})`);
   sky.addColorStop(1, `rgb(${(theme.surface || [12, 20, 27]).join(',')})`);
   ctx.fillStyle = sky;
   ctx.fillRect(0, 0, W, H);
 
+  // 2. Stars
   for (const s of stars) {
-    const tw = 0.35 + 0.65 * Math.abs(Math.sin(t * 0.4 + s.phase));
+    const tw = 0.3 + 0.7 * Math.abs(Math.sin(t * 0.5 + s.phase));
     ctx.beginPath();
     ctx.arc(s.x, s.y, s.r, 0, Math.PI * 2);
-    ctx.fillStyle = `rgba(255,255,255,${tw * 0.7})`;
+    ctx.fillStyle = `rgba(255, 255, 255, ${tw * 0.75})`;
     ctx.fill();
   }
 
-  // moon
+  // 3. Random Shooting Stars
+  if (t - lastShootingStar > 6 + Math.random() * 12) {
+    shootingStars.push({
+      x: Math.random() * W * 0.8,
+      y: Math.random() * H * 0.3,
+      len: 40 + Math.random() * 60,
+      speed: 400 + Math.random() * 300,
+      life: 1.0
+    });
+    lastShootingStar = t;
+  }
+  for (let i = shootingStars.length - 1; i >= 0; i--) {
+    const ss = shootingStars[i];
+    ss.x += ss.speed * 0.016;
+    ss.y += ss.speed * 0.008;
+    ss.life -= 0.02;
+
+    if (ss.life <= 0) { shootingStars.splice(i, 1); continue; }
+
+    const grad = ctx.createLinearGradient(ss.x, ss.y, ss.x - ss.len, ss.y - ss.len * 0.5);
+    grad.addColorStop(0, `rgba(255, 255, 255, ${ss.life})`);
+    grad.addColorStop(1, 'rgba(255, 255, 255, 0)');
+    ctx.strokeStyle = grad;
+    ctx.lineWidth = 1.5;
+    ctx.beginPath();
+    ctx.moveTo(ss.x, ss.y);
+    ctx.lineTo(ss.x - ss.len, ss.y - ss.len * 0.5);
+    ctx.stroke();
+  }
+
+  // 4. Moon with Glow
+  const moonX = W * 0.8, moonY = H * 0.18;
+  const moonGlow = ctx.createRadialGradient(moonX, moonY, 0, moonX, moonY, 60);
+  moonGlow.addColorStop(0, 'rgba(255, 248, 220, 0.25)');
+  moonGlow.addColorStop(1, 'rgba(255, 248, 220, 0)');
+  ctx.fillStyle = moonGlow;
+  ctx.fillRect(moonX - 60, moonY - 60, 120, 120);
+
   ctx.beginPath();
-  ctx.arc(W * 0.82, H * 0.16, 30, 0, Math.PI * 2);
-  const moonGrad = ctx.createRadialGradient(W * 0.82, H * 0.16, 0, W * 0.82, H * 0.16, 55);
-  moonGrad.addColorStop(0, 'rgba(255,250,235,0.9)');
-  moonGrad.addColorStop(1, 'rgba(255,250,235,0)');
-  ctx.fillStyle = moonGrad;
-  ctx.fill();
-  ctx.beginPath();
-  ctx.arc(W * 0.82, H * 0.16, 22, 0, Math.PI * 2);
-  ctx.fillStyle = 'rgb(255,250,235)';
+  ctx.arc(moonX, moonY, 20, 0, Math.PI * 2);
+  ctx.fillStyle = 'rgb(255, 250, 235)';
   ctx.fill();
 
-  for (const b of buildings) {
+  // 5. Drifting Clouds
+  for (const c of clouds) {
+    c.x += c.speed * 0.016;
+    if (c.x - c.radius > W) c.x = -c.radius * 2;
+
+    const cGrad = ctx.createRadialGradient(c.x, c.y, 0, c.x, c.y, c.radius);
+    cGrad.addColorStop(0, 'rgba(255, 255, 255, 0.03)');
+    cGrad.addColorStop(1, 'rgba(255, 255, 255, 0)');
+    ctx.fillStyle = cGrad;
+    ctx.beginPath();
+    ctx.arc(c.x, c.y, c.radius, 0, Math.PI * 2);
+    ctx.fill();
+  }
+
+  // 6. Background Buildings (Distant Silhouette)
+  const bgBaseColor = `rgb(${4}, ${6}, ${9})`;
+  for (const b of bgBuildings) {
     const baseY = H - b.height;
-    ctx.fillStyle = `rgb(${8 + b.tint},${10 + b.tint},${14 + b.tint})`;
+    ctx.fillStyle = bgBaseColor;
     ctx.fillRect(b.x, baseY, b.width, b.height);
-    drawRoof(b, baseY);
+    drawRoof(b, baseY, bgBaseColor);
+
+    for (const w of b.windows) {
+      if (w.on) {
+        ctx.fillStyle = rgba(windowColors[w.colorIdx], 0.35);
+        ctx.fillRect(b.x + w.x, baseY + w.y, b.winW, b.winH);
+      }
+    }
+  }
+
+  // Atmospheric Mid-Layer Horizon Fog
+  const fog = ctx.createLinearGradient(0, H * 0.4, 0, H);
+  fog.addColorStop(0, 'rgba(12, 20, 27, 0)');
+  fog.addColorStop(1, 'rgba(12, 20, 27, 0.45)');
+  ctx.fillStyle = fog;
+  ctx.fillRect(0, H * 0.4, W, H * 0.6);
+
+  // 7. Foreground Buildings
+  for (const b of fgBuildings) {
+    const baseY = H - b.height;
+    const fgBaseColor = `rgb(${8 + b.tintOffset}, ${10 + b.tintOffset}, ${14 + b.tintOffset})`;
+    ctx.fillStyle = fgBaseColor;
+    ctx.fillRect(b.x, baseY, b.width, b.height);
+    drawRoof(b, baseY, fgBaseColor);
 
     for (const w of b.windows) {
       if (t >= w.nextToggle) {
-        w.on = Math.random() < 0.55;
-        w.nextToggle = t + 4 + Math.random() * 20;
+        w.on = Math.random() < 0.45;
+        w.nextToggle = t + 5 + Math.random() * 25;
       }
       if (w.on) {
         ctx.fillStyle = rgba(windowColors[w.colorIdx], 0.85);
@@ -217,15 +359,26 @@ function frame(now) {
     }
   }
 
+  // Ambient Ground Light Reflection
+  const groundGlow = ctx.createLinearGradient(0, H - 20, 0, H);
+  groundGlow.addColorStop(0, 'rgba(0, 0, 0, 0)');
+  groundGlow.addColorStop(1, rgba(theme.primary || [138, 206, 255], 0.08));
+  ctx.fillStyle = groundGlow;
+  ctx.fillRect(0, H - 20, W, 20);
+
   requestAnimationFrame(frame);
 }
 
-let clockVisible = true;
+// Clock Execution
+if (typeof startClock === 'function') {
+  startClock(clockEl, dateEl);
+}
+
+let uiVisible = true;
 window.addEventListener('keydown', (e) => {
   if (e.key.toLowerCase() === 'c') {
-    clockVisible = !clockVisible;
-    clockEl.classList.toggle('hidden', !clockVisible);
-    dateEl.classList.toggle('hidden', !clockVisible);
+    uiVisible = !uiVisible;
+    uiContainer.classList.toggle('hidden', !uiVisible);
   }
 });
 
@@ -235,7 +388,6 @@ setTimeout(() => hintEl.classList.remove('show'), 4000);
 window.addEventListener('load', () => {
   resize();
   loadTheme();
-  startClock(clockEl, dateEl);
   requestAnimationFrame(frame);
 });
 </script>
