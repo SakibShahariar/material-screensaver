@@ -12,7 +12,7 @@ keyboard shortcut.
 
 Blob, Flow, Ripple, Orbit, Kaleidoscope, Constellation, Solar System (3D, Three.js),
 Lorenz Attractor, Fireworks, Typewriter, Terrain, Vinyl, City, Bubbles, Origami,
-Lanterns.
+Lanterns, Rain, Koi Pond, DNA, Oscilloscope, Sakura, Paper Boats.
 
 All pull their color palette live from a [matugen](https://github.com/InioX/matugen)
 generated stylesheet, so they follow your current wallpaper-derived Material You theme.
@@ -35,8 +35,9 @@ generated stylesheet, so they follow your current wallpaper-derived Material You
 ```
 
 This places files under `~/.local/bin`, `~/.local/share/material-screensaver/`,
-`~/.config/systemd/user/`, and `~/.local/share/applications/`, then enables the
-idle-watching systemd service and opens the settings GUI.
+`~/.local/share/icons/`, `~/.config/systemd/user/`, and `~/.local/share/applications/`,
+then enables the idle-watching systemd service and opens the settings GUI. The app
+also shows up in GNOME's Activities search with its own icon once installed.
 
 ## Manage
 
