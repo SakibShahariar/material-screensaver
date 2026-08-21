@@ -1,5 +1,7 @@
 # Material Screensaver
 
+<img src="icons/material-screensaver-icon.png" width="96" height="96" alt="Material Screensaver icon">
+
 A collection of animated, matugen-themed "screensavers" for GNOME (Wayland), plus a
 GTK4/libadwaita settings app to manage them.
 
