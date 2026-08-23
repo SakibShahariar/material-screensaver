@@ -2,11 +2,13 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<title>Material Screensaver — Koi Pond</title>
+<title>Material Screensaver — Game of Life</title>
 <style>
   :root {
-    --primary_rgb: 138 206 255; --secondary_rgb: 180 199 233; --tertiary_rgb: 186 196 250;
-    --primary_container_rgb: 0 75 111; --secondary_container_rgb: 53 72 99; --tertiary_container_rgb: 58 68 114;
+    --primary_rgb: 138 206 255; --primary_container_rgb: 0 75 111;
+    --secondary_rgb: 180 199 233; --secondary_container_rgb: 53 72 99;
+    --tertiary_rgb: 186 196 250; --tertiary_container_rgb: 58 68 114;
+    --inverse_primary_rgb: 0 100 145;
     --surface_rgb: 12 20 27; --outline_rgb: 137 146 154;
   }
   html, body { margin: 0; padding: 0; width: 100%; height: 100%; overflow: hidden; background: rgb(var(--surface_rgb)); cursor: none; }
@@ -34,17 +36,20 @@ const dateEl = document.getElementById('date');
 const hintEl = document.getElementById('hint');
 
 let dpr = Math.min(window.devicePixelRatio || 1, 2);
-let W, H;
+let W, H, cols, rows, cellSize;
 function resize() {
   W = window.innerWidth; H = window.innerHeight;
   canvas.width = W * dpr; canvas.height = H * dpr;
   ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+  cellSize = 30;
+  cols = Math.ceil(W / cellSize);
+  rows = Math.ceil(H / cellSize);
+  seedGrid();
 }
 window.addEventListener('resize', resize);
-resize();
 
 const reduceMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
-const speedMul = reduceMotion ? 0.25 : 1;
+const STEP_MS = reduceMotion ? 420 : 170;
 
 function readRGB(name) {
   const raw = getComputedStyle(document.documentElement).getPropertyValue(name).trim();
@@ -61,104 +66,114 @@ function loadTheme() {
     surface: readRGB('--surface_rgb'), primary: readRGB('--primary_rgb'), secondary: readRGB('--secondary_rgb'),
     tertiary: readRGB('--tertiary_rgb'), primaryContainer: readRGB('--primary_container_rgb'),
     secondaryContainer: readRGB('--secondary_container_rgb'), tertiaryContainer: readRGB('--tertiary_container_rgb'),
-    outline: readRGB('--outline_rgb'),
+    inversePrimary: readRGB('--inverse_primary_rgb'), outline: readRGB('--outline_rgb'),
   };
-  roleList = [theme.primary, theme.secondary, theme.tertiary, theme.primaryContainer, theme.secondaryContainer, theme.tertiaryContainer];
+  roleList = [theme.primary, theme.secondary, theme.tertiary, theme.primaryContainer, theme.secondaryContainer, theme.tertiaryContainer, theme.inversePrimary];
   clockEl.style.color = rgba(theme.primary, 0.92);
   dateEl.style.color = rgba(theme.secondary, 0.85);
   hintEl.style.color = rgba(theme.outline, 0.9);
-  fish.forEach((f, i) => { f.color = roleList[i % roleList.length]; });
 }
 
-let fish = [];
-let ripples = [];
+let grid = [];        // 0/1 alive state
+let colorGrid = [];   // assigned color index per cell, set at birth
+let displayAlpha = []; // smoothed render alpha per cell, eases toward grid state
+let popHistory = [];
 
-function makeFish() {
-  fish = [];
-  for (let i = 0; i < 6; i++) {
-    fish.push({
-      x: Math.random() * W, y: Math.random() * H,
-      angle: Math.random() * Math.PI * 2,
-      turnPhase: Math.random() * Math.PI * 2,
-      turnSpeed: 0.15 + Math.random() * 0.2,
-      speed: 22 + Math.random() * 18,
-      len: 20 + Math.random() * 14,
-      color: [200, 200, 200],
-      nextRipple: Math.random() * 2,
-    });
+function idx(x, y) { return y * cols + x; }
+
+function seedGrid() {
+  grid = new Uint8Array(cols * rows);
+  colorGrid = new Uint8Array(cols * rows);
+  displayAlpha = new Float32Array(cols * rows);
+  for (let i = 0; i < grid.length; i++) {
+    if (Math.random() < 0.24) {
+      grid[i] = 1;
+      colorGrid[i] = Math.floor(Math.random() * roleList.length);
+    }
   }
+  popHistory = [];
 }
 
-function drawFish(f, t) {
-  const wag = Math.sin(t * 4 + f.turnPhase) * 0.3;
-  ctx.save();
-  ctx.translate(f.x, f.y);
-  ctx.rotate(f.angle);
-  ctx.beginPath();
-  ctx.moveTo(f.len * 0.55, 0);
-  ctx.quadraticCurveTo(f.len * 0.2, f.len * 0.22, -f.len * 0.35, f.len * 0.12);
-  ctx.quadraticCurveTo(-f.len * 0.55, 0, -f.len * 0.35, -f.len * 0.12);
-  ctx.quadraticCurveTo(f.len * 0.2, -f.len * 0.22, f.len * 0.55, 0);
-  ctx.closePath();
-  ctx.fillStyle = rgba(f.color, 0.75);
-  ctx.fill();
+function countAlive() {
+  let n = 0;
+  for (let i = 0; i < grid.length; i++) n += grid[i];
+  return n;
+}
 
-  ctx.save();
-  ctx.translate(-f.len * 0.5, 0);
-  ctx.rotate(wag);
-  ctx.beginPath();
-  ctx.moveTo(0, 0);
-  ctx.lineTo(-f.len * 0.35, f.len * 0.2);
-  ctx.lineTo(-f.len * 0.35, -f.len * 0.2);
-  ctx.closePath();
-  ctx.fillStyle = rgba(f.color, 0.55);
-  ctx.fill();
-  ctx.restore();
+function step() {
+  const next = new Uint8Array(cols * rows);
+  const nextColor = new Uint8Array(cols * rows);
+  for (let y = 0; y < rows; y++) {
+    for (let x = 0; x < cols; x++) {
+      let neighbors = 0;
+      let colorVotes = [];
+      for (let dy = -1; dy <= 1; dy++) {
+        for (let dx = -1; dx <= 1; dx++) {
+          if (dx === 0 && dy === 0) continue;
+          const nx = (x + dx + cols) % cols;
+          const ny = (y + dy + rows) % rows; // toroidal wraparound — no harsh edge die-off
+          const ni = idx(nx, ny);
+          if (grid[ni]) { neighbors++; colorVotes.push(colorGrid[ni]); }
+        }
+      }
+      const i = idx(x, y);
+      const alive = grid[i];
+      if (alive && (neighbors === 2 || neighbors === 3)) {
+        next[i] = 1;
+        nextColor[i] = colorGrid[i];
+      } else if (!alive && neighbors === 3) {
+        next[i] = 1;
+        nextColor[i] = colorVotes[Math.floor(Math.random() * colorVotes.length)];
+      }
+    }
+  }
+  grid = next;
+  colorGrid = nextColor;
 
-  ctx.restore();
+  const pop = countAlive();
+  popHistory.push(pop);
+  if (popHistory.length > 50) popHistory.shift();
+
+  const stale = popHistory.length >= 40 && popHistory.every(p => p === popHistory[0]);
+  if (pop === 0 || stale) seedGrid();
 }
 
 let start = performance.now();
-let lastT = 0;
+let lastStep = 0;
 
 function frame(now) {
-  const t = ((now - start) / 1000) * speedMul;
-  const dt = Math.min(0.05, t - lastT);
-  lastT = t;
+  const t = now - start;
 
-  ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
-  const water = ctx.createRadialGradient(W / 2, H / 2, 0, W / 2, H / 2, Math.max(W, H) * 0.7);
-  water.addColorStop(0, `rgb(${(theme.primaryContainer || [10, 40, 60]).map((v,i)=>Math.round(v*0.5+theme.surface[i]*0.5)).join(',')})`);
-  water.addColorStop(1, `rgb(${(theme.surface || [12,20,27]).join(',')})`);
-  ctx.fillStyle = water;
-  ctx.fillRect(0, 0, W, H);
-
-  ripples = ripples.filter(r => (t - r.start) < r.duration);
-  for (const r of ripples) {
-    const p = (t - r.start) / r.duration;
-    ctx.beginPath();
-    ctx.arc(r.x, r.y, r.maxR * p, 0, Math.PI * 2);
-    ctx.strokeStyle = rgba(theme.outline, (1 - p) * 0.3);
-    ctx.lineWidth = 1;
-    ctx.stroke();
+  if (t - lastStep >= STEP_MS) {
+    step();
+    lastStep = t;
   }
 
-  for (const f of fish) {
-    f.angle += Math.sin(t * f.turnSpeed + f.turnPhase) * dt * 0.6;
-    f.x += Math.cos(f.angle) * f.speed * dt;
-    f.y += Math.sin(f.angle) * f.speed * dt;
+  ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+  ctx.fillStyle = `rgb(${(theme.surface || [12, 20, 27]).join(',')})`;
+  ctx.fillRect(0, 0, W, H);
 
-    if (f.x < 0) { f.x = 0; f.angle = Math.PI - f.angle; }
-    if (f.x > W) { f.x = W; f.angle = Math.PI - f.angle; }
-    if (f.y < 0) { f.y = 0; f.angle = -f.angle; }
-    if (f.y > H) { f.y = H; f.angle = -f.angle; }
+  const pad = cellSize * 0.12;
+  const size = cellSize - pad * 2;
+  const radius = size * 0.28;
 
-    if (t >= f.nextRipple) {
-      ripples.push({ x: f.x, y: f.y, start: t, duration: 3.5, maxR: 30 + Math.random() * 20 });
-      f.nextRipple = t + 1.2 + Math.random() * 1.5;
+  for (let y = 0; y < rows; y++) {
+    for (let x = 0; x < cols; x++) {
+      const i = idx(x, y);
+      const target = grid[i] ? 1 : 0;
+      displayAlpha[i] += (target - displayAlpha[i]) * 0.22;
+      if (displayAlpha[i] < 0.02) continue;
+
+      const px = x * cellSize + pad;
+      const py = y * cellSize + pad;
+      const color = roleList[colorGrid[i]] || theme.primary;
+
+      ctx.beginPath();
+      ctx.roundRect ? ctx.roundRect(px, py, size, size, radius) :
+        ctx.rect(px, py, size, size);
+      ctx.fillStyle = rgba(color, displayAlpha[i] * 0.8);
+      ctx.fill();
     }
-
-    drawFish(f, t);
   }
 
   requestAnimationFrame(frame);
@@ -176,7 +191,7 @@ hintEl.classList.add('show');
 setTimeout(() => hintEl.classList.remove('show'), 4000);
 
 window.addEventListener('load', () => {
-  makeFish();
+  resize();
   loadTheme();
   startClock(clockEl, dateEl);
   requestAnimationFrame(frame);

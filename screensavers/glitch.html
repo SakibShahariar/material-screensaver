@@ -2,11 +2,12 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<title>Material Screensaver — Koi Pond</title>
+<title>Material Screensaver — Glitch</title>
 <style>
   :root {
-    --primary_rgb: 138 206 255; --secondary_rgb: 180 199 233; --tertiary_rgb: 186 196 250;
-    --primary_container_rgb: 0 75 111; --secondary_container_rgb: 53 72 99; --tertiary_container_rgb: 58 68 114;
+    --primary_rgb: 138 206 255; --primary_container_rgb: 0 75 111;
+    --secondary_rgb: 180 199 233; --secondary_container_rgb: 53 72 99;
+    --tertiary_rgb: 186 196 250; --tertiary_container_rgb: 58 68 114;
     --surface_rgb: 12 20 27; --outline_rgb: 137 146 154;
   }
   html, body { margin: 0; padding: 0; width: 100%; height: 100%; overflow: hidden; background: rgb(var(--surface_rgb)); cursor: none; }
@@ -21,12 +22,15 @@
 <link rel="stylesheet" href="file:///home/sakib/.config/matugen/matugen-colors.css">
 </head>
 <body>
+<canvas id="art"></canvas>
 <canvas id="c"></canvas>
 <div id="clock">00:00</div>
 <div id="date">Mon, Jan 1</div>
 <div id="hint">press C to toggle clock</div>
 <script src="clock-shared.js"></script>
 <script>
+const artCanvas = document.getElementById('art');
+const actx = artCanvas.getContext('2d');
 const canvas = document.getElementById('c');
 const ctx = canvas.getContext('2d');
 const clockEl = document.getElementById('clock');
@@ -37,14 +41,15 @@ let dpr = Math.min(window.devicePixelRatio || 1, 2);
 let W, H;
 function resize() {
   W = window.innerWidth; H = window.innerHeight;
-  canvas.width = W * dpr; canvas.height = H * dpr;
-  ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+  for (const cv of [artCanvas, canvas]) {
+    cv.width = W * dpr; cv.height = H * dpr;
+    cv.getContext('2d').setTransform(dpr, 0, 0, dpr, 0, 0);
+  }
+  composeArt();
 }
 window.addEventListener('resize', resize);
-resize();
 
 const reduceMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
-const speedMul = reduceMotion ? 0.25 : 1;
 
 function readRGB(name) {
   const raw = getComputedStyle(document.documentElement).getPropertyValue(name).trim();
@@ -67,98 +72,112 @@ function loadTheme() {
   clockEl.style.color = rgba(theme.primary, 0.92);
   dateEl.style.color = rgba(theme.secondary, 0.85);
   hintEl.style.color = rgba(theme.outline, 0.9);
-  fish.forEach((f, i) => { f.color = roleList[i % roleList.length]; });
 }
 
-let fish = [];
-let ripples = [];
-
-function makeFish() {
-  fish = [];
-  for (let i = 0; i < 6; i++) {
-    fish.push({
+let shapes = [];
+function composeArt() {
+  shapes = [];
+  const shapeCount = 9 + Math.floor(Math.random() * 6);
+  for (let i = 0; i < shapeCount; i++) {
+    const color = roleList[Math.floor(Math.random() * roleList.length)] || [150, 150, 150];
+    const kind = Math.random() < 0.4 ? 'rect' : Math.random() < 0.75 ? 'circle' : 'diamond';
+    shapes.push({
       x: Math.random() * W, y: Math.random() * H,
-      angle: Math.random() * Math.PI * 2,
-      turnPhase: Math.random() * Math.PI * 2,
-      turnSpeed: 0.15 + Math.random() * 0.2,
-      speed: 22 + Math.random() * 18,
-      len: 20 + Math.random() * 14,
-      color: [200, 200, 200],
-      nextRipple: Math.random() * 2,
+      vx: (Math.random() - 0.5) * 14, vy: (Math.random() - 0.5) * 14,
+      size: 30 + Math.random() * Math.min(W, H) * 0.28,
+      w: 40 + Math.random() * W * 0.3, h: 8 + Math.random() * H * 0.2,
+      rot: Math.random() * Math.PI * 2, rotSpeed: (Math.random() - 0.5) * 0.3,
+      kind, color, alpha: 0.55 + Math.random() * 0.3,
     });
   }
 }
 
-function drawFish(f, t) {
-  const wag = Math.sin(t * 4 + f.turnPhase) * 0.3;
-  ctx.save();
-  ctx.translate(f.x, f.y);
-  ctx.rotate(f.angle);
-  ctx.beginPath();
-  ctx.moveTo(f.len * 0.55, 0);
-  ctx.quadraticCurveTo(f.len * 0.2, f.len * 0.22, -f.len * 0.35, f.len * 0.12);
-  ctx.quadraticCurveTo(-f.len * 0.55, 0, -f.len * 0.35, -f.len * 0.12);
-  ctx.quadraticCurveTo(f.len * 0.2, -f.len * 0.22, f.len * 0.55, 0);
-  ctx.closePath();
-  ctx.fillStyle = rgba(f.color, 0.75);
-  ctx.fill();
+function drawArt(dt) {
+  actx.fillStyle = `rgb(${(theme.surface || [12, 20, 27]).join(',')})`;
+  actx.fillRect(0, 0, W, H);
+  for (const s of shapes) {
+    s.x += s.vx * dt; s.y += s.vy * dt;
+    s.rot += s.rotSpeed * dt;
+    if (s.x < -100) s.x = W + 100; if (s.x > W + 100) s.x = -100;
+    if (s.y < -100) s.y = H + 100; if (s.y > H + 100) s.y = -100;
 
-  ctx.save();
-  ctx.translate(-f.len * 0.5, 0);
-  ctx.rotate(wag);
-  ctx.beginPath();
-  ctx.moveTo(0, 0);
-  ctx.lineTo(-f.len * 0.35, f.len * 0.2);
-  ctx.lineTo(-f.len * 0.35, -f.len * 0.2);
-  ctx.closePath();
-  ctx.fillStyle = rgba(f.color, 0.55);
-  ctx.fill();
-  ctx.restore();
+    actx.save();
+    actx.translate(s.x, s.y);
+    actx.rotate(s.rot);
+    actx.fillStyle = rgba(s.color, s.alpha);
+    if (s.kind === 'rect') {
+      actx.fillRect(-s.w / 2, -s.h / 2, s.w, s.h);
+    } else if (s.kind === 'circle') {
+      actx.beginPath();
+      actx.arc(0, 0, s.size / 2, 0, Math.PI * 2);
+      actx.fill();
+    } else {
+      const sz = s.size / 2;
+      actx.beginPath();
+      actx.moveTo(0, -sz); actx.lineTo(sz, 0); actx.lineTo(0, sz); actx.lineTo(-sz, 0);
+      actx.closePath();
+      actx.fill();
+    }
+    actx.restore();
+  }
+}
 
-  ctx.restore();
+let nextCompose = 10 + Math.random() * 8;
+let nextGlitch = 4 + Math.random() * 5;
+let glitchUntil = 0;
+let glitchSlices = [];
+
+function triggerGlitch(t) {
+  glitchUntil = t + 0.16 + Math.random() * 0.1;
+  glitchSlices = [];
+  const sliceCount = 3 + Math.floor(Math.random() * 4);
+  for (let i = 0; i < sliceCount; i++) {
+    glitchSlices.push({
+      y: Math.random() * H,
+      h: 6 + Math.random() * 40,
+      shift: (Math.random() - 0.5) * 60,
+    });
+  }
 }
 
 let start = performance.now();
 let lastT = 0;
 
 function frame(now) {
-  const t = ((now - start) / 1000) * speedMul;
+  const t = (now - start) / 1000;
   const dt = Math.min(0.05, t - lastT);
   lastT = t;
 
-  ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
-  const water = ctx.createRadialGradient(W / 2, H / 2, 0, W / 2, H / 2, Math.max(W, H) * 0.7);
-  water.addColorStop(0, `rgb(${(theme.primaryContainer || [10, 40, 60]).map((v,i)=>Math.round(v*0.5+theme.surface[i]*0.5)).join(',')})`);
-  water.addColorStop(1, `rgb(${(theme.surface || [12,20,27]).join(',')})`);
-  ctx.fillStyle = water;
-  ctx.fillRect(0, 0, W, H);
+  if (t >= nextCompose) {
+    composeArt();
+    nextCompose = t + 16 + Math.random() * 12;
+  }
+  drawArt(dt);
 
-  ripples = ripples.filter(r => (t - r.start) < r.duration);
-  for (const r of ripples) {
-    const p = (t - r.start) / r.duration;
-    ctx.beginPath();
-    ctx.arc(r.x, r.y, r.maxR * p, 0, Math.PI * 2);
-    ctx.strokeStyle = rgba(theme.outline, (1 - p) * 0.3);
-    ctx.lineWidth = 1;
-    ctx.stroke();
+  if (!reduceMotion && t >= nextGlitch) {
+    triggerGlitch(t);
+    nextGlitch = t + 5 + Math.random() * 7;
   }
 
-  for (const f of fish) {
-    f.angle += Math.sin(t * f.turnSpeed + f.turnPhase) * dt * 0.6;
-    f.x += Math.cos(f.angle) * f.speed * dt;
-    f.y += Math.sin(f.angle) * f.speed * dt;
+  ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+  ctx.clearRect(0, 0, W, H);
 
-    if (f.x < 0) { f.x = 0; f.angle = Math.PI - f.angle; }
-    if (f.x > W) { f.x = W; f.angle = Math.PI - f.angle; }
-    if (f.y < 0) { f.y = 0; f.angle = -f.angle; }
-    if (f.y > H) { f.y = H; f.angle = -f.angle; }
+  if (t < glitchUntil) {
+    // brief chromatic-aberration + slice-shift burst, kept short and infrequent by design
+    ctx.globalCompositeOperation = 'lighter';
+    ctx.globalAlpha = 0.55;
+    ctx.drawImage(artCanvas, -3, 0, W, H);
+    ctx.globalAlpha = 0.55;
+    ctx.drawImage(artCanvas, 3, 0, W, H);
+    ctx.globalAlpha = 1;
+    ctx.globalCompositeOperation = 'source-over';
+    ctx.drawImage(artCanvas, 0, 0, W, H);
 
-    if (t >= f.nextRipple) {
-      ripples.push({ x: f.x, y: f.y, start: t, duration: 3.5, maxR: 30 + Math.random() * 20 });
-      f.nextRipple = t + 1.2 + Math.random() * 1.5;
+    for (const s of glitchSlices) {
+      ctx.drawImage(artCanvas, 0, s.y, W, s.h, s.shift, s.y, W, s.h);
     }
-
-    drawFish(f, t);
+  } else {
+    ctx.drawImage(artCanvas, 0, 0, W, H);
   }
 
   requestAnimationFrame(frame);
@@ -176,8 +195,8 @@ hintEl.classList.add('show');
 setTimeout(() => hintEl.classList.remove('show'), 4000);
 
 window.addEventListener('load', () => {
-  makeFish();
   loadTheme();
+  resize();
   startClock(clockEl, dateEl);
   requestAnimationFrame(frame);
 });

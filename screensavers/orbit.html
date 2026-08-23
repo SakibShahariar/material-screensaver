@@ -2,7 +2,6 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Material Screensaver — Orbit</title>
 <style>
   :root {
@@ -21,77 +20,45 @@
   }
   html, body {
     margin: 0; padding: 0; width: 100%; height: 100%;
-    overflow: hidden; background: #0c141b;
-    font-family: "Google Sans", "Segoe UI", Roboto, system-ui, sans-serif;
-    user-select: none;
+    overflow: hidden; background: rgb(var(--surface_rgb)); cursor: none;
   }
-
-  body { cursor: none; }
-  body.show-cursor { cursor: default; }
-
   canvas { display: block; width: 100vw; height: 100vh; }
-
-  #ui-container {
-    position: fixed; inset: 0; pointer-events: none; z-index: 10;
-    display: flex; flex-direction: column; justify-content: space-between;
-    padding: 36px; box-sizing: border-box;
-    transition: opacity 0.8s ease;
-  }
-  #ui-container.hidden { opacity: 0; }
-
-  .vignette-glass {
-    background: radial-gradient(circle at center, rgba(12, 20, 27, 0.55) 0%, rgba(12, 20, 27, 0) 80%);
-    backdrop-filter: blur(12px);
-    -webkit-backdrop-filter: blur(12px);
-    padding: 28px 40px;
-    width: fit-content;
-    border-radius: 24px;
-  }
-
   #clock {
-    font-size: clamp(32px, 4.5vw, 64px);
-    font-weight: 300;
-    font-variant-numeric: tabular-nums;
-    letter-spacing: -0.5px;
-    line-height: 1;
-    text-shadow: 0 2px 14px rgba(0, 0, 0, 0.6);
+    position: fixed; left: 32px; bottom: 28px;
+    font-family: "Google Sans", "Segoe UI", Roboto, system-ui, sans-serif;
+    font-weight: 400; font-variant-numeric: tabular-nums; letter-spacing: 0.5px;
+    font-size: clamp(28px, 4vw, 56px);
+    text-shadow: 0 0 24px rgba(0,0,0,0.4);
+    pointer-events: none; transition: opacity 0.6s ease;
   }
   #clock .ampm {
-    font-size: 0.35em;
-    margin-left: 8px;
-    opacity: 0.8;
-    font-weight: 400;
-    text-transform: uppercase;
+    font-size: 0.36em;
+    margin-left: 6px;
+    opacity: 0.82;
+    vertical-align: middle;
   }
   #date {
-    font-size: clamp(12px, 1.2vw, 15px);
-    letter-spacing: 2px;
-    text-transform: uppercase;
-    margin-top: 8px;
-    opacity: 0.85;
-    text-shadow: 0 2px 10px rgba(0, 0, 0, 0.6);
+    position: fixed; left: 34px; bottom: 14px;
+    font-family: "Google Sans", "Segoe UI", Roboto, system-ui, sans-serif;
+    font-size: clamp(12px, 1.2vw, 16px); letter-spacing: 1.5px; text-transform: uppercase;
+    pointer-events: none; transition: opacity 0.6s ease;
   }
   #hint {
-    position: fixed; right: 36px; bottom: 36px;
-    font-size: 12px; letter-spacing: 0.8px;
-    opacity: 0; transition: opacity 0.8s ease;
-    text-shadow: 0 2px 10px rgba(0, 0, 0, 0.6);
+    position: fixed; right: 28px; bottom: 26px;
+    font-family: "Google Sans", "Segoe UI", Roboto, system-ui, sans-serif;
+    font-size: 13px; letter-spacing: 0.5px;
+    pointer-events: none; opacity: 0; transition: opacity 0.8s ease;
   }
-  #hint.show { opacity: 0.75; }
+  #hint.show { opacity: 1; }
+  #clock.hidden, #date.hidden { opacity: 0; }
 </style>
 <link rel="stylesheet" href="file:///home/sakib/.config/matugen/matugen-colors.css">
 </head>
 <body>
-
 <canvas id="c"></canvas>
-
-<div id="ui-container">
-  <div class="vignette-glass">
-    <div id="clock">00:00</div>
-    <div id="date">Mon, Jan 1</div>
-  </div>
-  <div id="hint">Press <b>C</b> to toggle UI</div>
-</div>
+<div id="clock">00:00</div>
+<div id="date">Mon, Jan 1</div>
+<div id="hint">press C to toggle clock</div>
 
 <script src="clock-shared.js"></script>
 <script>
@@ -100,29 +67,16 @@ const ctx = canvas.getContext('2d');
 const clockEl = document.getElementById('clock');
 const dateEl = document.getElementById('date');
 const hintEl = document.getElementById('hint');
-const uiContainer = document.getElementById('ui-container');
 
-let cursorTimeout;
-function triggerCursor() {
-  document.body.classList.add('show-cursor');
-  clearTimeout(cursorTimeout);
-  cursorTimeout = setTimeout(() => {
-    document.body.classList.remove('show-cursor');
-  }, 2500);
-}
-
-window.addEventListener('pointermove', triggerCursor);
-window.addEventListener('pointerdown', triggerCursor);
-
-let W = window.innerWidth;
-let H = window.innerHeight;
-
+let dpr = Math.min(window.devicePixelRatio || 1, 2);
+let W, H;
 function resize() {
   W = window.innerWidth;
   H = window.innerHeight;
-  canvas.width = W;
-  canvas.height = H;
-  ctx.fillStyle = rgba(theme.surface || [12, 20, 27], 1);
+  canvas.width = W * dpr;
+  canvas.height = H * dpr;
+  ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+  ctx.fillStyle = 'rgb(12, 20, 27)';
   ctx.fillRect(0, 0, W, H);
   layoutCenters();
 }
@@ -131,33 +85,31 @@ window.addEventListener('resize', resize);
 const reduceMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
 const speedMul = reduceMotion ? 0.15 : 1;
 
-function readRGB(name, fallback) {
+function readRGB(name) {
   const raw = getComputedStyle(document.documentElement).getPropertyValue(name).trim();
   const parts = raw.split(/\s+/).map(Number);
-  return (parts.length === 3 && parts.every(n => !isNaN(n))) ? parts : fallback;
+  if (parts.length === 3 && parts.every(n => !isNaN(n))) return parts;
+  return [200, 200, 200];
 }
-function rgba(rgb, a) {
-  const c = rgb || [200, 200, 200];
-  return `rgba(${c[0]}, ${c[1]}, ${c[2]}, ${a})`;
-}
+function rgba(rgb, a) { return `rgba(${rgb[0]}, ${rgb[1]}, ${rgb[2]}, ${a})`; }
 
 let theme = {};
 let roleList = [];
 function loadTheme() {
   theme = {
-    surface: readRGB('--surface_rgb', [12, 20, 27]),
-    primary: readRGB('--primary_rgb', [138, 206, 255]),
-    primaryContainer: readRGB('--primary_container_rgb', [0, 75, 111]),
-    secondary: readRGB('--secondary_rgb', [180, 199, 233]),
-    secondaryContainer: readRGB('--secondary_container_rgb', [53, 72, 99]),
-    tertiary: readRGB('--tertiary_rgb', [186, 196, 250]),
-    tertiaryContainer: readRGB('--tertiary_container_rgb', [58, 68, 114]),
-    inversePrimary: readRGB('--inverse_primary_rgb', [0, 100, 145]),
-    outline: readRGB('--outline_rgb', [137, 146, 154]),
+    surface: readRGB('--surface_rgb'),
+    primary: readRGB('--primary_rgb'),
+    primaryContainer: readRGB('--primary_container_rgb'),
+    secondary: readRGB('--secondary_rgb'),
+    secondaryContainer: readRGB('--secondary_container_rgb'),
+    tertiary: readRGB('--tertiary_rgb'),
+    tertiaryContainer: readRGB('--tertiary_container_rgb'),
+    inversePrimary: readRGB('--inverse_primary_rgb'),
+    outline: readRGB('--outline_rgb'),
   };
   roleList = [theme.primary, theme.secondary, theme.tertiary, theme.primaryContainer, theme.secondaryContainer, theme.tertiaryContainer, theme.inversePrimary];
 
-  clockEl.style.color = rgba(theme.primary, 0.95);
+  clockEl.style.color = rgba(theme.primary, 0.92);
   dateEl.style.color = rgba(theme.secondary, 0.85);
   hintEl.style.color = rgba(theme.outline, 0.9);
 
@@ -206,8 +158,9 @@ let start = performance.now();
 function frame(now) {
   const t = ((now - start) / 1000) * speedMul;
 
+  ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
   ctx.globalCompositeOperation = 'source-over';
-  ctx.fillStyle = rgba(theme.surface, 0.10);
+  ctx.fillStyle = rgba(theme.surface || [12, 20, 27], 0.10);
   ctx.fillRect(0, 0, W, H);
 
   ctx.globalCompositeOperation = 'lighter';
@@ -227,6 +180,9 @@ function frame(now) {
     }
   }
 
+  // glow uses normal (non-additive) blending: it's redrawn at the same fixed
+  // pixels every frame, so additive blending here would accumulate brightness
+  // forever and clip to white — moving particles above don't have that problem
   ctx.globalCompositeOperation = 'source-over';
   for (const c of centers) {
     const breathe = (Math.sin(t * 0.4 + c.glowPhase) + 1) / 2;
@@ -239,31 +195,19 @@ function frame(now) {
     ctx.arc(c.x, c.y, glowR, 0, Math.PI * 2);
     ctx.fill();
   }
+  ctx.globalCompositeOperation = 'source-over';
 
   requestAnimationFrame(frame);
 }
 
-function fallbackClock() {
-  const update = () => {
-    const now = new Date();
-    let hours = now.getHours();
-    const minutes = String(now.getMinutes()).padStart(2, '0');
-    const ampm = hours >= 12 ? 'PM' : 'AM';
-    hours = hours % 12 || 12;
-    clockEl.innerHTML = `${String(hours).padStart(2, '0')}:${minutes}<span class="ampm">${ampm}</span>`;
-    
-    const options = { weekday: 'short', month: 'short', day: 'numeric' };
-    dateEl.textContent = now.toLocaleDateString('en-US', options);
-  };
-  update();
-  setInterval(update, 1000);
-}
+startClock(clockEl, dateEl);
 
-let uiVisible = true;
+let clockVisible = true;
 window.addEventListener('keydown', (e) => {
   if (e.key.toLowerCase() === 'c') {
-    uiVisible = !uiVisible;
-    uiContainer.classList.toggle('hidden', !uiVisible);
+    clockVisible = !clockVisible;
+    clockEl.classList.toggle('hidden', !clockVisible);
+    dateEl.classList.toggle('hidden', !clockVisible);
   }
 });
 
@@ -271,19 +215,8 @@ hintEl.classList.add('show');
 setTimeout(() => hintEl.classList.remove('show'), 4000);
 
 window.addEventListener('load', () => {
-  loadTheme();
   resize();
-
-  try {
-    if (typeof startClock === 'function') {
-      startClock(clockEl, dateEl);
-    } else {
-      fallbackClock();
-    }
-  } catch (err) {
-    fallbackClock();
-  }
-
+  loadTheme();
   requestAnimationFrame(frame);
 });
 </script>

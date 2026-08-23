@@ -2,11 +2,12 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<title>Material Screensaver — Koi Pond</title>
+<title>Material Screensaver — Falling Sand</title>
 <style>
   :root {
-    --primary_rgb: 138 206 255; --secondary_rgb: 180 199 233; --tertiary_rgb: 186 196 250;
-    --primary_container_rgb: 0 75 111; --secondary_container_rgb: 53 72 99; --tertiary_container_rgb: 58 68 114;
+    --primary_rgb: 138 206 255; --primary_container_rgb: 0 75 111;
+    --secondary_rgb: 180 199 233; --secondary_container_rgb: 53 72 99;
+    --tertiary_rgb: 186 196 250; --tertiary_container_rgb: 58 68 114;
     --surface_rgb: 12 20 27; --outline_rgb: 137 146 154;
   }
   html, body { margin: 0; padding: 0; width: 100%; height: 100%; overflow: hidden; background: rgb(var(--surface_rgb)); cursor: none; }
@@ -34,17 +35,22 @@ const dateEl = document.getElementById('date');
 const hintEl = document.getElementById('hint');
 
 let dpr = Math.min(window.devicePixelRatio || 1, 2);
-let W, H;
+let W, H, cols, rows;
+const CELL = 5;
+
 function resize() {
   W = window.innerWidth; H = window.innerHeight;
   canvas.width = W * dpr; canvas.height = H * dpr;
   ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+  cols = Math.ceil(W / CELL);
+  rows = Math.ceil(H / CELL);
+  grid = new Int8Array(cols * rows).fill(-1);
+  colorGrid = new Uint8Array(cols * rows);
 }
 window.addEventListener('resize', resize);
-resize();
 
 const reduceMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
-const speedMul = reduceMotion ? 0.25 : 1;
+const STEP_MS = reduceMotion ? 60 : 26;
 
 function readRGB(name) {
   const raw = getComputedStyle(document.documentElement).getPropertyValue(name).trim();
@@ -67,98 +73,103 @@ function loadTheme() {
   clockEl.style.color = rgba(theme.primary, 0.92);
   dateEl.style.color = rgba(theme.secondary, 0.85);
   hintEl.style.color = rgba(theme.outline, 0.9);
-  fish.forEach((f, i) => { f.color = roleList[i % roleList.length]; });
 }
 
-let fish = [];
-let ripples = [];
+let grid, colorGrid;
+function idx(x, y) { return y * cols + x; }
 
-function makeFish() {
-  fish = [];
-  for (let i = 0; i < 6; i++) {
-    fish.push({
-      x: Math.random() * W, y: Math.random() * H,
-      angle: Math.random() * Math.PI * 2,
-      turnPhase: Math.random() * Math.PI * 2,
-      turnSpeed: 0.15 + Math.random() * 0.2,
-      speed: 22 + Math.random() * 18,
-      len: 20 + Math.random() * 14,
-      color: [200, 200, 200],
-      nextRipple: Math.random() * 2,
-    });
+let emitColorIdx = 0;
+let nextColorSwitch = 4;
+
+function stepSand(t) {
+  if (t >= nextColorSwitch) {
+    emitColorIdx = (emitColorIdx + 1) % roleList.length;
+    nextColorSwitch = t + 4 + Math.random() * 4;
+  }
+
+  // iterate bottom-to-top so a cell that just moved down isn't processed again this step
+  for (let y = rows - 2; y >= 0; y--) {
+    const scanLeftToRight = Math.random() < 0.5;
+    for (let c = 0; c < cols; c++) {
+      const x = scanLeftToRight ? c : cols - 1 - c;
+      const i = idx(x, y);
+      if (grid[i] < 0) continue;
+
+      const below = idx(x, y + 1);
+      const scatter = Math.random() < 0.12; // small chance to drift diagonally even when a clear drop is available
+      if (!scatter && grid[below] < 0) {
+        grid[below] = grid[i]; colorGrid[below] = colorGrid[i];
+        grid[i] = -1;
+        continue;
+      }
+      const dir = Math.random() < 0.5 ? -1 : 1;
+      const x1 = x + dir, x2 = x - dir;
+      if (x1 >= 0 && x1 < cols && grid[idx(x1, y + 1)] < 0) {
+        const t2 = idx(x1, y + 1);
+        grid[t2] = grid[i]; colorGrid[t2] = colorGrid[i];
+        grid[i] = -1;
+      } else if (x2 >= 0 && x2 < cols && grid[idx(x2, y + 1)] < 0) {
+        const t2 = idx(x2, y + 1);
+        grid[t2] = grid[i]; colorGrid[t2] = colorGrid[i];
+        grid[i] = -1;
+      } else if (grid[below] < 0) {
+        grid[below] = grid[i]; colorGrid[below] = colorGrid[i];
+        grid[i] = -1;
+      }
+    }
+  }
+
+  // spawn across a broad swath of the top, not a narrow band — a tight
+  // emitter with no lateral scatter during free-fall reads as a rigid
+  // straight line rather than natural falling sand
+  const spawnCount = 3 + Math.floor(Math.random() * 3);
+  for (let k = 0; k < spawnCount; k++) {
+    const x = Math.floor(cols * 0.15 + Math.random() * cols * 0.7);
+    const i = idx(x, 0);
+    if (grid[i] < 0 && Math.random() < 0.85) {
+      grid[i] = 1;
+      colorGrid[i] = emitColorIdx;
+    }
   }
 }
 
-function drawFish(f, t) {
-  const wag = Math.sin(t * 4 + f.turnPhase) * 0.3;
-  ctx.save();
-  ctx.translate(f.x, f.y);
-  ctx.rotate(f.angle);
-  ctx.beginPath();
-  ctx.moveTo(f.len * 0.55, 0);
-  ctx.quadraticCurveTo(f.len * 0.2, f.len * 0.22, -f.len * 0.35, f.len * 0.12);
-  ctx.quadraticCurveTo(-f.len * 0.55, 0, -f.len * 0.35, -f.len * 0.12);
-  ctx.quadraticCurveTo(f.len * 0.2, -f.len * 0.22, f.len * 0.55, 0);
-  ctx.closePath();
-  ctx.fillStyle = rgba(f.color, 0.75);
-  ctx.fill();
-
-  ctx.save();
-  ctx.translate(-f.len * 0.5, 0);
-  ctx.rotate(wag);
-  ctx.beginPath();
-  ctx.moveTo(0, 0);
-  ctx.lineTo(-f.len * 0.35, f.len * 0.2);
-  ctx.lineTo(-f.len * 0.35, -f.len * 0.2);
-  ctx.closePath();
-  ctx.fillStyle = rgba(f.color, 0.55);
-  ctx.fill();
-  ctx.restore();
-
-  ctx.restore();
+function fillCount() {
+  let n = 0;
+  for (let i = 0; i < grid.length; i++) if (grid[i] >= 0) n++;
+  return n;
 }
 
 let start = performance.now();
-let lastT = 0;
+let lastStep = 0;
+let lastReset = 0;
 
 function frame(now) {
-  const t = ((now - start) / 1000) * speedMul;
-  const dt = Math.min(0.05, t - lastT);
-  lastT = t;
+  const t = now - start;
 
-  ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
-  const water = ctx.createRadialGradient(W / 2, H / 2, 0, W / 2, H / 2, Math.max(W, H) * 0.7);
-  water.addColorStop(0, `rgb(${(theme.primaryContainer || [10, 40, 60]).map((v,i)=>Math.round(v*0.5+theme.surface[i]*0.5)).join(',')})`);
-  water.addColorStop(1, `rgb(${(theme.surface || [12,20,27]).join(',')})`);
-  ctx.fillStyle = water;
-  ctx.fillRect(0, 0, W, H);
-
-  ripples = ripples.filter(r => (t - r.start) < r.duration);
-  for (const r of ripples) {
-    const p = (t - r.start) / r.duration;
-    ctx.beginPath();
-    ctx.arc(r.x, r.y, r.maxR * p, 0, Math.PI * 2);
-    ctx.strokeStyle = rgba(theme.outline, (1 - p) * 0.3);
-    ctx.lineWidth = 1;
-    ctx.stroke();
+  if (t - lastStep >= STEP_MS) {
+    stepSand(t / 1000);
+    lastStep = t;
   }
 
-  for (const f of fish) {
-    f.angle += Math.sin(t * f.turnSpeed + f.turnPhase) * dt * 0.6;
-    f.x += Math.cos(f.angle) * f.speed * dt;
-    f.y += Math.sin(f.angle) * f.speed * dt;
+  if (t - lastReset > 100000 || fillCount() > cols * rows * 0.62) {
+    grid.fill(-1);
+    lastReset = t;
+  }
 
-    if (f.x < 0) { f.x = 0; f.angle = Math.PI - f.angle; }
-    if (f.x > W) { f.x = W; f.angle = Math.PI - f.angle; }
-    if (f.y < 0) { f.y = 0; f.angle = -f.angle; }
-    if (f.y > H) { f.y = H; f.angle = -f.angle; }
+  ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+  ctx.fillStyle = `rgb(${(theme.surface || [12, 20, 27]).join(',')})`;
+  ctx.fillRect(0, 0, W, H);
 
-    if (t >= f.nextRipple) {
-      ripples.push({ x: f.x, y: f.y, start: t, duration: 3.5, maxR: 30 + Math.random() * 20 });
-      f.nextRipple = t + 1.2 + Math.random() * 1.5;
+  for (let y = 0; y < rows; y++) {
+    for (let x = 0; x < cols; x++) {
+      const i = idx(x, y);
+      if (grid[i] < 0) continue;
+      ctx.fillStyle = rgba(roleList[colorGrid[i]] || theme.primary, 0.85);
+      const gx = x * CELL + CELL / 2, gy = y * CELL + CELL / 2;
+      ctx.beginPath();
+      ctx.arc(gx, gy, CELL * 0.52, 0, Math.PI * 2);
+      ctx.fill();
     }
-
-    drawFish(f, t);
   }
 
   requestAnimationFrame(frame);
@@ -176,7 +187,7 @@ hintEl.classList.add('show');
 setTimeout(() => hintEl.classList.remove('show'), 4000);
 
 window.addEventListener('load', () => {
-  makeFish();
+  resize();
   loadTheme();
   startClock(clockEl, dateEl);
   requestAnimationFrame(frame);

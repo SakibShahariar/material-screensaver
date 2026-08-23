@@ -2,11 +2,13 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<title>Material Screensaver — Koi Pond</title>
+<title>Material Screensaver — Voronoi</title>
 <style>
   :root {
-    --primary_rgb: 138 206 255; --secondary_rgb: 180 199 233; --tertiary_rgb: 186 196 250;
-    --primary_container_rgb: 0 75 111; --secondary_container_rgb: 53 72 99; --tertiary_container_rgb: 58 68 114;
+    --primary_rgb: 138 206 255; --primary_container_rgb: 0 75 111;
+    --secondary_rgb: 180 199 233; --secondary_container_rgb: 53 72 99;
+    --tertiary_rgb: 186 196 250; --tertiary_container_rgb: 58 68 114;
+    --inverse_primary_rgb: 0 100 145;
     --surface_rgb: 12 20 27; --outline_rgb: 137 146 154;
   }
   html, body { margin: 0; padding: 0; width: 100%; height: 100%; overflow: hidden; background: rgb(var(--surface_rgb)); cursor: none; }
@@ -39,12 +41,12 @@ function resize() {
   W = window.innerWidth; H = window.innerHeight;
   canvas.width = W * dpr; canvas.height = H * dpr;
   ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+  makeSeeds();
 }
 window.addEventListener('resize', resize);
-resize();
 
 const reduceMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
-const speedMul = reduceMotion ? 0.25 : 1;
+const speedMul = reduceMotion ? 0.2 : 1;
 
 function readRGB(name) {
   const raw = getComputedStyle(document.documentElement).getPropertyValue(name).trim();
@@ -53,6 +55,9 @@ function readRGB(name) {
   return [200, 200, 200];
 }
 function rgba(rgb, a) { return `rgba(${rgb[0]}, ${rgb[1]}, ${rgb[2]}, ${a})`; }
+function blendColor(a, b, t) {
+  return [a[0] + (b[0] - a[0]) * t, a[1] + (b[1] - a[1]) * t, a[2] + (b[2] - a[2]) * t];
+}
 
 let theme = {};
 let roleList = [];
@@ -61,61 +66,68 @@ function loadTheme() {
     surface: readRGB('--surface_rgb'), primary: readRGB('--primary_rgb'), secondary: readRGB('--secondary_rgb'),
     tertiary: readRGB('--tertiary_rgb'), primaryContainer: readRGB('--primary_container_rgb'),
     secondaryContainer: readRGB('--secondary_container_rgb'), tertiaryContainer: readRGB('--tertiary_container_rgb'),
-    outline: readRGB('--outline_rgb'),
+    inversePrimary: readRGB('--inverse_primary_rgb'), outline: readRGB('--outline_rgb'),
   };
-  roleList = [theme.primary, theme.secondary, theme.tertiary, theme.primaryContainer, theme.secondaryContainer, theme.tertiaryContainer];
+  roleList = [theme.primary, theme.secondary, theme.tertiary, theme.primaryContainer, theme.secondaryContainer, theme.tertiaryContainer, theme.inversePrimary];
   clockEl.style.color = rgba(theme.primary, 0.92);
   dateEl.style.color = rgba(theme.secondary, 0.85);
   hintEl.style.color = rgba(theme.outline, 0.9);
-  fish.forEach((f, i) => { f.color = roleList[i % roleList.length]; });
+  seeds.forEach((s, i) => {
+    const scaled = (i / seeds.length) * roleList.length;
+    const idx0 = Math.floor(scaled) % roleList.length;
+    const idx1 = (idx0 + 1) % roleList.length;
+    s.color = blendColor(roleList[idx0], roleList[idx1], scaled - Math.floor(scaled));
+  });
 }
 
-let fish = [];
-let ripples = [];
-
-function makeFish() {
-  fish = [];
-  for (let i = 0; i < 6; i++) {
-    fish.push({
+let seeds = [];
+function makeSeeds() {
+  const count = 14;
+  seeds = [];
+  for (let i = 0; i < count; i++) {
+    const dir = Math.random() * Math.PI * 2;
+    seeds.push({
       x: Math.random() * W, y: Math.random() * H,
-      angle: Math.random() * Math.PI * 2,
-      turnPhase: Math.random() * Math.PI * 2,
-      turnSpeed: 0.15 + Math.random() * 0.2,
-      speed: 22 + Math.random() * 18,
-      len: 20 + Math.random() * 14,
+      vx: Math.cos(dir) * 7, vy: Math.sin(dir) * 7,
       color: [200, 200, 200],
-      nextRipple: Math.random() * 2,
     });
   }
 }
 
-function drawFish(f, t) {
-  const wag = Math.sin(t * 4 + f.turnPhase) * 0.3;
-  ctx.save();
-  ctx.translate(f.x, f.y);
-  ctx.rotate(f.angle);
-  ctx.beginPath();
-  ctx.moveTo(f.len * 0.55, 0);
-  ctx.quadraticCurveTo(f.len * 0.2, f.len * 0.22, -f.len * 0.35, f.len * 0.12);
-  ctx.quadraticCurveTo(-f.len * 0.55, 0, -f.len * 0.35, -f.len * 0.12);
-  ctx.quadraticCurveTo(f.len * 0.2, -f.len * 0.22, f.len * 0.55, 0);
-  ctx.closePath();
-  ctx.fillStyle = rgba(f.color, 0.75);
-  ctx.fill();
+// --- true polygon Voronoi via half-plane clipping (Sutherland-Hodgman) ---
+// gives crisp, mathematically exact cell edges instead of a coarse pixel mosaic
+function clipHalfPlane(polygon, si, sj) {
+  const mx = (si.x + sj.x) / 2, my = (si.y + sj.y) / 2;
+  const dx = sj.x - si.x, dy = sj.y - si.y;
+  const inside = (p) => (p[0] - mx) * dx + (p[1] - my) * dy < 0;
+  const intersect = (p1, p2) => {
+    const v1 = (p1[0] - mx) * dx + (p1[1] - my) * dy;
+    const v2 = (p2[0] - mx) * dx + (p2[1] - my) * dy;
+    const t = v1 / (v1 - v2);
+    return [p1[0] + t * (p2[0] - p1[0]), p1[1] + t * (p2[1] - p1[1])];
+  };
+  const result = [];
+  for (let k = 0; k < polygon.length; k++) {
+    const curr = polygon[k], prev = polygon[(k - 1 + polygon.length) % polygon.length];
+    const currIn = inside(curr), prevIn = inside(prev);
+    if (currIn) {
+      if (!prevIn) result.push(intersect(prev, curr));
+      result.push(curr);
+    } else if (prevIn) {
+      result.push(intersect(prev, curr));
+    }
+  }
+  return result;
+}
 
-  ctx.save();
-  ctx.translate(-f.len * 0.5, 0);
-  ctx.rotate(wag);
-  ctx.beginPath();
-  ctx.moveTo(0, 0);
-  ctx.lineTo(-f.len * 0.35, f.len * 0.2);
-  ctx.lineTo(-f.len * 0.35, -f.len * 0.2);
-  ctx.closePath();
-  ctx.fillStyle = rgba(f.color, 0.55);
-  ctx.fill();
-  ctx.restore();
-
-  ctx.restore();
+function computeCell(i) {
+  const margin = Math.max(W, H) * 0.5;
+  let poly = [[-margin, -margin], [W + margin, -margin], [W + margin, H + margin], [-margin, H + margin]];
+  for (let j = 0; j < seeds.length; j++) {
+    if (j === i || poly.length === 0) continue;
+    poly = clipHalfPlane(poly, seeds[i], seeds[j]);
+  }
+  return poly;
 }
 
 let start = performance.now();
@@ -126,39 +138,50 @@ function frame(now) {
   const dt = Math.min(0.05, t - lastT);
   lastT = t;
 
+  for (const s of seeds) {
+    s.x += s.vx * dt; s.y += s.vy * dt;
+    if (s.x < 0) { s.x = 0; s.vx *= -1; }
+    if (s.x > W) { s.x = W; s.vx *= -1; }
+    if (s.y < 0) { s.y = 0; s.vy *= -1; }
+    if (s.y > H) { s.y = H; s.vy *= -1; }
+  }
+
   ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
-  const water = ctx.createRadialGradient(W / 2, H / 2, 0, W / 2, H / 2, Math.max(W, H) * 0.7);
-  water.addColorStop(0, `rgb(${(theme.primaryContainer || [10, 40, 60]).map((v,i)=>Math.round(v*0.5+theme.surface[i]*0.5)).join(',')})`);
-  water.addColorStop(1, `rgb(${(theme.surface || [12,20,27]).join(',')})`);
-  ctx.fillStyle = water;
+  ctx.fillStyle = `rgb(${theme.surface.join(',')})`;
   ctx.fillRect(0, 0, W, H);
 
-  ripples = ripples.filter(r => (t - r.start) < r.duration);
-  for (const r of ripples) {
-    const p = (t - r.start) / r.duration;
+  for (let i = 0; i < seeds.length; i++) {
+    const poly = computeCell(i);
+    if (poly.length < 3) continue;
+    const s = seeds[i];
+
+    let maxR = 0;
+    for (const p of poly) {
+      const d = Math.hypot(p[0] - s.x, p[1] - s.y);
+      if (d > maxR) maxR = d;
+    }
+
     ctx.beginPath();
-    ctx.arc(r.x, r.y, r.maxR * p, 0, Math.PI * 2);
-    ctx.strokeStyle = rgba(theme.outline, (1 - p) * 0.3);
-    ctx.lineWidth = 1;
+    ctx.moveTo(poly[0][0], poly[0][1]);
+    for (let k = 1; k < poly.length; k++) ctx.lineTo(poly[k][0], poly[k][1]);
+    ctx.closePath();
+
+    const grad = ctx.createRadialGradient(s.x, s.y, 0, s.x, s.y, maxR);
+    grad.addColorStop(0, rgba(s.color, 0.85));
+    grad.addColorStop(1, rgba(s.color, 0.4));
+    ctx.fillStyle = grad;
+    ctx.fill();
+
+    ctx.strokeStyle = rgba(theme.surface, 0.85);
+    ctx.lineWidth = 2;
     ctx.stroke();
   }
 
-  for (const f of fish) {
-    f.angle += Math.sin(t * f.turnSpeed + f.turnPhase) * dt * 0.6;
-    f.x += Math.cos(f.angle) * f.speed * dt;
-    f.y += Math.sin(f.angle) * f.speed * dt;
-
-    if (f.x < 0) { f.x = 0; f.angle = Math.PI - f.angle; }
-    if (f.x > W) { f.x = W; f.angle = Math.PI - f.angle; }
-    if (f.y < 0) { f.y = 0; f.angle = -f.angle; }
-    if (f.y > H) { f.y = H; f.angle = -f.angle; }
-
-    if (t >= f.nextRipple) {
-      ripples.push({ x: f.x, y: f.y, start: t, duration: 3.5, maxR: 30 + Math.random() * 20 });
-      f.nextRipple = t + 1.2 + Math.random() * 1.5;
-    }
-
-    drawFish(f, t);
+  for (const s of seeds) {
+    ctx.beginPath();
+    ctx.arc(s.x, s.y, 2.5, 0, Math.PI * 2);
+    ctx.fillStyle = rgba(s.color, 0.95);
+    ctx.fill();
   }
 
   requestAnimationFrame(frame);
@@ -176,7 +199,7 @@ hintEl.classList.add('show');
 setTimeout(() => hintEl.classList.remove('show'), 4000);
 
 window.addEventListener('load', () => {
-  makeFish();
+  resize();
   loadTheme();
   startClock(clockEl, dateEl);
   requestAnimationFrame(frame);

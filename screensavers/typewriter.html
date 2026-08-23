@@ -2,124 +2,71 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Material Screensaver — Typewriter</title>
 <style>
   :root {
     --primary_rgb: 138 206 255;
-    --primary_container_rgb: 0 75 111;
     --secondary_rgb: 180 199 233;
-    --tertiary_rgb: 186 196 250;
     --surface_rgb: 12 20 27;
-    --surface_bright_rgb: 50 58 65;
     --on_surface_variant_rgb: 191 199 209;
     --outline_rgb: 137 146 154;
   }
   html, body {
     margin: 0; padding: 0; width: 100%; height: 100%;
-    overflow: hidden; background: rgb(var(--surface_rgb));
-    font-family: "Google Sans", "Segoe UI", Roboto, system-ui, sans-serif;
-    user-select: none;
+    overflow: hidden; background: rgb(var(--surface_rgb)); cursor: none;
     display: flex; align-items: center; justify-content: center;
   }
-
-  body { cursor: none; }
-  body.show-cursor { cursor: default; }
-
-  /* Subtle background ambient vignette glow */
-  body::before {
-    content: '';
-    position: absolute; inset: 0; pointer-events: none;
-    background: radial-gradient(circle at center, rgba(255,255,255,0.03) 0%, rgba(0,0,0,0.4) 100%);
-  }
-
   #stage {
+    font-family: "Google Sans", "Segoe UI", Roboto, system-ui, sans-serif;
     font-size: clamp(28px, 4.2vw, 64px);
     font-weight: 400;
     text-align: center;
     padding: 0 8vw;
     max-width: 80vw;
-    letter-spacing: -0.5px;
-    line-height: 1.4;
-    text-shadow: 0 4px 24px rgba(0, 0, 0, 0.4);
-    z-index: 2;
   }
   #cursor {
     display: inline-block;
-    width: 0.06em;
-    height: 0.85em;
-    vertical-align: -0.1em;
-    margin-left: 6px;
-    border-radius: 2px;
-    animation: blink 1.05s ease-in-out infinite;
+    width: 0.05em;
+    margin-left: 4px;
+    animation: blink 1s steps(1) infinite;
   }
-  @keyframes blink { 
-    0%, 100% { opacity: 1; } 
-    50% { opacity: 0.15; } 
-  }
-
-  #ui-container {
-    position: fixed; inset: 0; pointer-events: none; z-index: 10;
-    display: flex; flex-direction: column; justify-content: flex-end;
-    padding: 36px; box-sizing: border-box;
-    transition: opacity 0.6s ease;
-  }
-  #ui-container.hidden { opacity: 0; }
-
-  .vignette-card {
-    background: radial-gradient(circle at center, rgba(12, 20, 27, 0.65) 0%, rgba(12, 20, 27, 0) 80%);
-    backdrop-filter: blur(10px);
-    -webkit-backdrop-filter: blur(10px);
-    padding: 24px 32px;
-    width: fit-content;
-    border-radius: 20px;
-  }
-
+  @keyframes blink { 50% { opacity: 0; } }
   #clock {
-    font-size: clamp(32px, 4.5vw, 64px);
-    font-weight: 300;
-    font-variant-numeric: tabular-nums;
-    letter-spacing: -0.5px;
-    line-height: 1;
-    text-shadow: 0 2px 16px rgba(0, 0, 0, 0.7);
+    position: fixed; left: 32px; bottom: 28px;
+    font-family: "Google Sans", "Segoe UI", Roboto, system-ui, sans-serif;
+    font-weight: 400; font-variant-numeric: tabular-nums; letter-spacing: 0.5px;
+    font-size: clamp(22px, 3vw, 40px);
+    text-shadow: 0 0 24px rgba(0,0,0,0.4);
+    pointer-events: none; transition: opacity 0.6s ease;
   }
   #clock .ampm {
-    font-size: 0.35em;
-    margin-left: 8px;
-    opacity: 0.8;
-    font-weight: 400;
-    text-transform: uppercase;
+    font-size: 0.36em;
+    margin-left: 6px;
+    opacity: 0.82;
     vertical-align: middle;
   }
   #date {
-    font-size: clamp(12px, 1.2vw, 15px);
-    letter-spacing: 2px;
-    text-transform: uppercase;
-    margin-top: 8px;
-    opacity: 0.85;
-    text-shadow: 0 2px 10px rgba(0, 0, 0, 0.7);
+    position: fixed; left: 34px; bottom: 14px;
+    font-family: "Google Sans", "Segoe UI", Roboto, system-ui, sans-serif;
+    font-size: clamp(11px, 1vw, 14px); letter-spacing: 1.5px; text-transform: uppercase;
+    pointer-events: none; transition: opacity 0.6s ease;
   }
   #hint {
-    position: fixed; right: 36px; bottom: 36px;
-    font-size: 12px; letter-spacing: 0.8px;
-    opacity: 0; transition: opacity 0.8s ease;
-    text-shadow: 0 2px 10px rgba(0, 0, 0, 0.7);
+    position: fixed; right: 28px; bottom: 26px;
+    font-family: "Google Sans", "Segoe UI", Roboto, system-ui, sans-serif;
+    font-size: 13px; letter-spacing: 0.5px;
+    pointer-events: none; opacity: 0; transition: opacity 0.8s ease;
   }
-  #hint.show { opacity: 0.75; }
+  #hint.show { opacity: 1; }
+  #clock.hidden, #date.hidden { opacity: 0; }
 </style>
 <link rel="stylesheet" href="file:///home/sakib/.config/matugen/matugen-colors.css">
 </head>
 <body>
-
-<div id="stage"><span id="text"></span><span id="cursor"></span></div>
-
-<div id="ui-container">
-  <div class="vignette-card">
-    <div id="clock">00:00</div>
-    <div id="date">Mon, Jan 1</div>
-  </div>
-  <div id="hint">Press <b>C</b> to toggle UI</div>
-</div>
+<div id="stage"><span id="text"></span><span id="cursor">|</span></div>
+<div id="clock">00:00</div>
+<div id="date">Mon, Jan 1</div>
+<div id="hint">press C to toggle clock</div>
 
 <script src="clock-shared.js"></script>
 <script>
@@ -129,50 +76,28 @@ const cursorEl = document.getElementById('cursor');
 const clockEl = document.getElementById('clock');
 const dateEl = document.getElementById('date');
 const hintEl = document.getElementById('hint');
-const uiContainer = document.getElementById('ui-container');
 
-let cursorTimeout;
-function triggerCursor() {
-  document.body.classList.add('show-cursor');
-  clearTimeout(cursorTimeout);
-  cursorTimeout = setTimeout(() => {
-    document.body.classList.remove('show-cursor');
-  }, 2500);
-}
-window.addEventListener('pointermove', triggerCursor);
-
-function readRGB(name, fallback) {
+function readRGB(name) {
   const raw = getComputedStyle(document.documentElement).getPropertyValue(name).trim();
   const parts = raw.split(/\s+/).map(Number);
-  return (parts.length === 3 && parts.every(n => !isNaN(n))) ? parts : fallback;
+  if (parts.length === 3 && parts.every(n => !isNaN(n))) return parts;
+  return [200, 200, 200];
 }
-function rgba(rgb, a) {
-  const c = rgb || [200, 200, 200];
-  return `rgba(${c[0]}, ${c[1]}, ${c[2]}, ${a})`;
-}
+function rgbCss(rgb) { return `rgb(${rgb[0]}, ${rgb[1]}, ${rgb[2]})`; }
 
-let theme = {};
-function loadTheme() {
-  theme = {
-    surface: readRGB('--surface_rgb', [12, 20, 27]),
-    surfaceBright: readRGB('--surface_bright_rgb', [50, 58, 65]),
-    primary: readRGB('--primary_rgb', [138, 206, 255]),
-    primaryContainer: readRGB('--primary_container_rgb', [0, 75, 111]),
-    secondary: readRGB('--secondary_rgb', [180, 199, 233]),
-    tertiary: readRGB('--tertiary_rgb', [186, 196, 250]),
-    outline: readRGB('--outline_rgb', [137, 146, 154]),
-  };
+const theme = {
+  primary: readRGB('--primary_rgb'),
+  secondary: readRGB('--secondary_rgb'),
+  onSurfaceVariant: readRGB('--on_surface_variant_rgb'),
+  outline: readRGB('--outline_rgb'),
+};
+textEl.style.color = rgbCss(theme.primary);
+cursorEl.style.background = rgbCss(theme.primary);
+clockEl.style.color = rgbCss(theme.secondary);
+dateEl.style.color = rgbCss(theme.onSurfaceVariant);
+hintEl.style.color = rgbCss(theme.outline);
 
-  document.body.style.backgroundColor = rgba(theme.surface, 1);
-  textEl.style.color = rgba(theme.primary, 0.95);
-  cursorEl.style.backgroundColor = rgba(theme.primary, 0.85);
-  
-  clockEl.style.color = rgba(theme.primary, 0.95);
-  dateEl.style.color = rgba(theme.secondary, 0.85);
-  hintEl.style.color = rgba(theme.outline, 0.9);
-}
-
-// Expanded library of thoughtful, inspiring, and mindful phrases
+// original phrases — no quoted or attributed material
 const PHRASES = [
   "Take a slow breath.",
   "Good things take time.",
@@ -184,21 +109,12 @@ const PHRASES = [
   "You've got this.",
   "Quiet moments count.",
   "Tomorrow is unwritten.",
-  "In the middle of difficulty lies opportunity.",
-  "Focus on progress, not perfection.",
-  "Let your mind wander somewhere pleasant.",
-  "A calm mind brings inner strength.",
-  "Enjoy the beauty of a quiet pause.",
-  "Your potential is endless.",
-  "Create your own sunshine today.",
-  "Breathe in clarity, breathe out stress.",
-  "Every moment is a fresh beginning.",
-  "Keep your face to the sunshine and shadows will fall behind you."
 ];
 
 const reduceMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
-// Increased HOLD_MS from 3200ms to 5500ms so text stays visible much longer
-const HOLD_MS = 5500;
+const TYPE_MS = reduceMotion ? 90 : 55;
+const HOLD_MS = 3200;
+const ERASE_MS = reduceMotion ? 45 : 28;
 
 let order = [];
 function shuffledOrder() {
@@ -218,22 +134,13 @@ function nextPhrase() {
   return phrase;
 }
 
-// Organic mechanical typing delay simulation
-function getTypingDelay(char) {
-  if (reduceMotion) return 70;
-  if (char === '.' || char === ',') return 250;
-  if (char === ' ') return 120;
-  return 45 + Math.random() * 35;
-}
-
 function typeText(str, onDone) {
   let i = 0;
   const step = () => {
     if (i <= str.length) {
       textEl.textContent = str.slice(0, i);
-      const delay = i < str.length ? getTypingDelay(str[i]) : HOLD_MS;
       i++;
-      setTimeout(step, delay);
+      setTimeout(step, TYPE_MS);
     } else {
       onDone();
     }
@@ -247,7 +154,7 @@ function eraseText(str, onDone) {
     if (i >= 0) {
       textEl.textContent = str.slice(0, i);
       i--;
-      setTimeout(step, reduceMotion ? 30 : 22);
+      setTimeout(step, ERASE_MS);
     } else {
       onDone();
     }
@@ -258,31 +165,18 @@ function eraseText(str, onDone) {
 function cycle() {
   const phrase = nextPhrase();
   typeText(phrase, () => {
-    eraseText(phrase, cycle);
+    setTimeout(() => {
+      eraseText(phrase, cycle);
+    }, HOLD_MS);
   });
 }
 
-function fallbackClock() {
-  const update = () => {
-    const now = new Date();
-    let hours = now.getHours();
-    const minutes = String(now.getMinutes()).padStart(2, '0');
-    const ampm = hours >= 12 ? 'PM' : 'AM';
-    hours = hours % 12 || 12;
-    clockEl.innerHTML = `${String(hours).padStart(2, '0')}:${minutes}<span class="ampm">${ampm}</span>`;
-
-    const options = { weekday: 'short', month: 'short', day: 'numeric' };
-    dateEl.textContent = now.toLocaleDateString('en-US', options);
-  };
-  update();
-  setInterval(update, 1000);
-}
-
-let uiVisible = true;
+let clockVisible = true;
 window.addEventListener('keydown', (e) => {
   if (e.key.toLowerCase() === 'c') {
-    uiVisible = !uiVisible;
-    uiContainer.classList.toggle('hidden', !uiVisible);
+    clockVisible = !clockVisible;
+    clockEl.classList.toggle('hidden', !clockVisible);
+    dateEl.classList.toggle('hidden', !clockVisible);
   }
 });
 
@@ -290,18 +184,7 @@ hintEl.classList.add('show');
 setTimeout(() => hintEl.classList.remove('show'), 4000);
 
 window.addEventListener('load', () => {
-  loadTheme();
-
-  try {
-    if (typeof startClock === 'function') {
-      startClock(clockEl, dateEl);
-    } else {
-      fallbackClock();
-    }
-  } catch (err) {
-    fallbackClock();
-  }
-
+  startClock(clockEl, dateEl);
   order = shuffledOrder();
   cycle();
 });

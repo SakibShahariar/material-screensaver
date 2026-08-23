@@ -2,10 +2,10 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Material Ambient Screensaver</title>
+<title>Material Screensaver</title>
 <style>
   :root {
+    /* fallback palette — overridden by the matugen stylesheet below if it loads */
     --primary_rgb: 138 206 255;
     --primary_container_rgb: 0 75 111;
     --secondary_rgb: 180 199 233;
@@ -20,145 +20,103 @@
     --outline_rgb: 137 146 154;
   }
   html, body {
-    margin: 0; padding: 0; width: 100%; height: 100%;
-    overflow: hidden; background: rgb(var(--surface_rgb));
+    margin: 0;
+    padding: 0;
+    width: 100%;
+    height: 100%;
+    overflow: hidden;
+    background: rgb(var(--surface_rgb));
     cursor: none;
-    font-family: "Google Sans", "Segoe UI", Roboto, system-ui, sans-serif;
-    user-select: none;
   }
-
-  /* Sharp, distinct liquid blend instead of dynamic smudge */
-  #canvas-container {
-    position: absolute; inset: 0;
-    filter: blur(12px) saturate(115%);
+  canvas {
+    display: block;
+    width: 100vw;
+    height: 100vh;
   }
-  canvas { display: block; width: 100%; height: 100%; }
-
-  /* Subtle noise to prevent color banding without looking fuzzy */
-  #grain {
-    position: fixed; inset: 0;
-    pointer-events: none; z-index: 2;
-    opacity: 0.012;
-    mix-blend-mode: overlay;
-  }
-
-  /* Sleek, clean UI overlay */
-  #ui-container {
-    position: fixed; inset: 0; pointer-events: none; z-index: 10;
-    display: flex; flex-direction: column; justify-content: space-between;
-    padding: 36px; box-sizing: border-box;
-    transition: opacity 0.8s ease;
-  }
-  #ui-container.hidden { opacity: 0; }
-
-  .glass-panel {
-  background: radial-gradient(circle at center, rgba(12, 20, 27, 0.5) 0%, rgba(12, 20, 27, 0) 75%);
-  backdrop-filter: none;
-  -webkit-backdrop-filter: none;
-  border: none;
-  border-radius: 0;
-  padding: 24px 36px;
-  width: fit-content;
-  box-shadow: none;
-  }
-
   #clock {
-    font-size: clamp(32px, 4.5vw, 64px);
-    font-weight: 300;
+    position: fixed;
+    left: 32px;
+    bottom: 28px;
+    font-family: "Google Sans", "Segoe UI", Roboto, system-ui, sans-serif;
+    font-weight: 400;
     font-variant-numeric: tabular-nums;
-    letter-spacing: -0.5px;
-    line-height: 1;
+    letter-spacing: 0.5px;
+    color: rgb(var(--primary_rgb) / 0.92);
+    font-size: clamp(28px, 4vw, 56px);
+    text-shadow: 0 0 24px rgba(0,0,0,0.4);
+    pointer-events: none;
+    transition: opacity 0.6s ease;
   }
   #clock .ampm {
-    font-size: 0.35em;
-    margin-left: 8px;
-    opacity: 0.8;
-    font-weight: 400;
-    text-transform: uppercase;
+    font-size: 0.36em;
+    margin-left: 6px;
+    opacity: 0.82;
+    vertical-align: middle;
   }
   #date {
-    font-size: clamp(12px, 1.2vw, 15px);
-    letter-spacing: 2px;
+    position: fixed;
+    left: 34px;
+    bottom: 14px;
+    font-family: "Google Sans", "Segoe UI", Roboto, system-ui, sans-serif;
+    font-size: clamp(12px, 1.2vw, 16px);
+    letter-spacing: 1.5px;
     text-transform: uppercase;
-    margin-top: 8px;
-    opacity: 0.85;
+    color: rgb(var(--secondary_rgb) / 0.85);
+    pointer-events: none;
+    transition: opacity 0.6s ease;
   }
-
   #hint {
-    position: fixed; right: 36px; bottom: 36px;
-    font-size: 12px; letter-spacing: 0.8px;
-    opacity: 0; transition: opacity 0.8s ease;
+    position: fixed;
+    right: 28px;
+    bottom: 26px;
+    font-family: "Google Sans", "Segoe UI", Roboto, system-ui, sans-serif;
+    font-size: 13px;
+    letter-spacing: 0.5px;
+    color: rgb(var(--outline_rgb) / 0.9);
+    pointer-events: none;
+    opacity: 0;
+    transition: opacity 0.8s ease;
   }
-  #hint.show { opacity: 0.75; }
+  #hint.show { opacity: 1; }
+  #clock.hidden, #date.hidden { opacity: 0; }
 </style>
 <link rel="stylesheet" href="file:///home/sakib/.config/matugen/matugen-colors.css">
 </head>
 <body>
-
-<div id="canvas-container">
-  <canvas id="c"></canvas>
-</div>
-<canvas id="grain"></canvas>
-
-<div id="ui-container">
-  <div class="glass-panel">
-    <div id="clock">00:00</div>
-    <div id="date">Mon, Jan 1</div>
-  </div>
-  <div id="hint" class="glass-panel">Press <b>C</b> to toggle UI</div>
-</div>
+<canvas id="c"></canvas>
+<div id="clock">00:00</div>
+<div id="date">Mon, Jan 1</div>
+<div id="hint">press C to toggle clock</div>
 
 <script src="clock-shared.js"></script>
 <script>
 const canvas = document.getElementById('c');
 const ctx = canvas.getContext('2d');
-const grainCanvas = document.getElementById('grain');
-const grainCtx = grainCanvas.getContext('2d');
-
 const clockEl = document.getElementById('clock');
 const dateEl = document.getElementById('date');
 const hintEl = document.getElementById('hint');
-const uiContainer = document.getElementById('ui-container');
 
 let dpr = Math.min(window.devicePixelRatio || 1, 2);
 let W, H;
-
 function resize() {
   W = window.innerWidth;
   H = window.innerHeight;
   canvas.width = W * dpr;
   canvas.height = H * dpr;
   ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
-
-  grainCanvas.width = W * 0.25;
-  grainCanvas.height = H * 0.25;
-  generateGrain();
 }
 window.addEventListener('resize', resize);
-
-function generateGrain() {
-  const w = grainCanvas.width, h = grainCanvas.height;
-  if (w === 0 || h === 0) return;
-  const imgData = grainCtx.createImageData(w, h);
-  const buf = new Uint32Array(imgData.data.buffer);
-  for (let i = 0; i < buf.length; i++) {
-    const v = (Math.random() * 255) | 0;
-    buf[i] = (255 << 24) | (v << 16) | (v << 8) | v;
-  }
-  grainCtx.putImageData(imgData, 0, 0);
-}
+resize();
 
 const reduceMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
 const speedMul = reduceMotion ? 0.12 : 1;
 
+// ---- read matugen theme from computed CSS custom properties ----
 function readRGB(name) {
   const raw = getComputedStyle(document.documentElement).getPropertyValue(name).trim();
   const parts = raw.split(/\s+/).map(Number);
-  return (parts.length === 3 && parts.every(n => !isNaN(n))) ? parts : [200, 200, 200];
-}
-
-function rgba(rgb, a) {
-  return `rgba(${rgb[0]}, ${rgb[1]}, ${rgb[2]}, ${a})`;
+  if (parts.length === 3 && parts.every(n => !isNaN(n))) return parts;
+  return [200, 200, 200];
 }
 
 let theme = {};
@@ -175,42 +133,52 @@ function loadTheme() {
     inversePrimary: readRGB('--inverse_primary_rgb'),
     outline: readRGB('--outline_rgb'),
   };
-  clockEl.style.color = rgba(theme.primary, 0.95);
+  // set text colors directly in JS — sidesteps browsers that don't parse
+  // the CSS Color 4 rgb(r g b / a) slash syntax used in the stylesheet
+  clockEl.style.color = rgba(theme.primary, 0.92);
   dateEl.style.color = rgba(theme.secondary, 0.85);
   hintEl.style.color = rgba(theme.outline, 0.9);
 }
 
+function rgba(rgb, a) {
+  return `rgba(${rgb[0]}, ${rgb[1]}, ${rgb[2]}, ${a})`;
+}
+
+const EASE = t => t < 0.5 ? 2 * t * t : 1 - Math.pow(-2 * t + 2, 2) / 2;
+
+// ---- Blob definition, mapped to matugen roles instead of a rotating hue ----
 function makeBlob(opts) {
   const points = 7 + Math.floor(Math.random() * 3);
   const phases = Array.from({ length: points }, () => Math.random() * Math.PI * 2);
-  const freqs = Array.from({ length: points }, () => 0.15 + Math.random() * 0.2);
+  const freqs = Array.from({ length: points }, () => 0.15 + Math.random() * 0.25);
   return {
     ...opts,
     points,
     phases,
     freqs,
     orbitPhase: Math.random() * Math.PI * 2,
-    orbitFreqX: 0.015 + Math.random() * 0.02,
-    orbitFreqY: 0.012 + Math.random() * 0.02,
-    orbitAmpX: 0.16 + Math.random() * 0.12,
-    orbitAmpY: 0.16 + Math.random() * 0.12,
+    orbitFreqX: 0.02 + Math.random() * 0.03,
+    orbitFreqY: 0.017 + Math.random() * 0.03,
+    orbitAmpX: 0.14 + Math.random() * 0.12,
+    orbitAmpY: 0.14 + Math.random() * 0.12,
   };
 }
 
 const roleDefs = [
-  { role: 'primary',           r: 0.26 },
-  { role: 'primaryContainer',   r: 0.22 },
-  { role: 'secondary',         r: 0.20 },
-  { role: 'secondaryContainer', r: 0.18 },
-  { role: 'tertiary',           r: 0.19 },
-  { role: 'tertiaryContainer',  r: 0.16 },
+  { role: 'primary',            r: 0.30 },
+  { role: 'primaryContainer',   r: 0.26 },
+  { role: 'secondary',          r: 0.24 },
+  { role: 'secondaryContainer', r: 0.20 },
+  { role: 'tertiary',           r: 0.22 },
+  { role: 'tertiaryContainer',  r: 0.18 },
+  { role: 'inversePrimary',     r: 0.15 },
 ];
 
 const blobs = roleDefs.map((def, i) => makeBlob({
   role: def.role,
   baseR: def.r,
-  cx: 0.25 + Math.random() * 0.5,
-  cy: 0.25 + Math.random() * 0.5,
+  cx: 0.15 + Math.random() * 0.7,
+  cy: 0.15 + Math.random() * 0.7,
   seed: i * 13.7,
 }));
 
@@ -222,7 +190,7 @@ function drawBlob(blob, t) {
   const pts = [];
   for (let i = 0; i < blob.points; i++) {
     const angle = (i / blob.points) * Math.PI * 2;
-    const wob = 1 + 0.2 * Math.sin(t * blob.freqs[i] + blob.phases[i]);
+    const wob = 1 + 0.22 * Math.sin(t * blob.freqs[i] + blob.phases[i]);
     const rad = baseR * wob;
     pts.push([cx + Math.cos(angle) * rad, cy + Math.sin(angle) * rad]);
   }
@@ -238,9 +206,9 @@ function drawBlob(blob, t) {
   ctx.closePath();
 
   const rgb = theme[blob.role] || [200, 200, 200];
-  const grad = ctx.createRadialGradient(cx, cy, 0, cx, cy, baseR * 1.2);
-  grad.addColorStop(0, rgba(rgb, 0.75));
-  grad.addColorStop(0.7, rgba(rgb, 0.25));
+  const grad = ctx.createRadialGradient(cx, cy, 0, cx, cy, baseR * 1.35);
+  grad.addColorStop(0, rgba(rgb, 0.85));
+  grad.addColorStop(0.65, rgba(rgb, 0.4));
   grad.addColorStop(1, rgba(rgb, 0));
   ctx.fillStyle = grad;
   ctx.fill();
@@ -251,11 +219,14 @@ let start = performance.now();
 function frame(now) {
   const t = ((now - start) / 1000) * speedMul;
 
-  const bg = theme.surface || [12, 20, 27];
+  const breathe = (Math.sin(t * 0.05) + 1) / 2;
+  const bg = theme.surface || [23, 17, 26];
+  const bgBright = theme.surfaceBright || bg;
+  const bgMix = bg.map((c, i) => Math.round(c + (bgBright[i] - c) * breathe * 0.15));
 
   ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
   ctx.globalCompositeOperation = 'source-over';
-  ctx.fillStyle = `rgb(${bg[0]}, ${bg[1]}, ${bg[2]})`;
+  ctx.fillStyle = `rgb(${bgMix[0]}, ${bgMix[1]}, ${bgMix[2]})`;
   ctx.fillRect(0, 0, W, H);
 
   ctx.globalCompositeOperation = 'screen';
@@ -265,15 +236,15 @@ function frame(now) {
   requestAnimationFrame(frame);
 }
 
-if (typeof startClock === 'function') {
-  startClock(clockEl, dateEl);
-}
+// ---- Clock ----
+startClock(clockEl, dateEl);
 
-let uiVisible = true;
+let clockVisible = true;
 window.addEventListener('keydown', (e) => {
   if (e.key.toLowerCase() === 'c') {
-    uiVisible = !uiVisible;
-    uiContainer.classList.toggle('hidden', !uiVisible);
+    clockVisible = !clockVisible;
+    clockEl.classList.toggle('hidden', !clockVisible);
+    dateEl.classList.toggle('hidden', !clockVisible);
   }
 });
 
@@ -281,7 +252,6 @@ hintEl.classList.add('show');
 setTimeout(() => hintEl.classList.remove('show'), 4000);
 
 window.addEventListener('load', () => {
-  resize();
   loadTheme();
   requestAnimationFrame(frame);
 });

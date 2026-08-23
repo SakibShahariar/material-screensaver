@@ -2,94 +2,29 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Material Screensaver — Paper Boats</title>
 <style>
   :root {
-    --primary_rgb: 138 206 255;
-    --primary_container_rgb: 0 75 111;
-    --secondary_rgb: 180 199 233;
-    --secondary_container_rgb: 53 72 99;
-    --tertiary_rgb: 186 196 250;
-    --tertiary_container_rgb: 58 68 114;
-    --surface_rgb: 12 20 27;
-    --surface_bright_rgb: 50 58 65;
-    --outline_rgb: 137 146 154;
+    --primary_rgb: 138 206 255; --secondary_rgb: 180 199 233; --tertiary_rgb: 186 196 250;
+    --primary_container_rgb: 0 75 111; --secondary_container_rgb: 53 72 99; --tertiary_container_rgb: 58 68 114;
+    --surface_rgb: 12 20 27; --surface_bright_rgb: 50 58 65; --outline_rgb: 137 146 154;
   }
-  html, body {
-    margin: 0; padding: 0; width: 100%; height: 100%;
-    overflow: hidden; background: #0c141b;
-    font-family: "Google Sans", "Segoe UI", Roboto, system-ui, sans-serif;
-    user-select: none;
-  }
-
-  body { cursor: none; }
-  body.show-cursor { cursor: default; }
-
+  html, body { margin: 0; padding: 0; width: 100%; height: 100%; overflow: hidden; background: rgb(var(--surface_rgb)); cursor: none; }
   canvas { display: block; width: 100vw; height: 100vh; }
-
-  #ui-container {
-    position: fixed; inset: 0; pointer-events: none; z-index: 10;
-    display: flex; flex-direction: column; justify-content: space-between;
-    padding: 36px; box-sizing: border-box;
-    transition: opacity 0.8s ease;
-  }
-  #ui-container.hidden { opacity: 0; }
-
-  .vignette-glass {
-    background: radial-gradient(circle at center, rgba(12, 20, 27, 0.65) 0%, rgba(12, 20, 27, 0) 80%);
-    backdrop-filter: blur(12px);
-    -webkit-backdrop-filter: blur(12px);
-    padding: 28px 40px;
-    width: fit-content;
-    border-radius: 24px;
-  }
-
-  #clock {
-    font-size: clamp(32px, 4.5vw, 64px);
-    font-weight: 300;
-    font-variant-numeric: tabular-nums;
-    letter-spacing: -0.5px;
-    line-height: 1;
-    text-shadow: 0 2px 14px rgba(0, 0, 0, 0.6);
-  }
-  #clock .ampm {
-    font-size: 0.35em;
-    margin-left: 8px;
-    opacity: 0.8;
-    font-weight: 400;
-    text-transform: uppercase;
-  }
-  #date {
-    font-size: clamp(12px, 1.2vw, 15px);
-    letter-spacing: 2px;
-    text-transform: uppercase;
-    margin-top: 8px;
-    opacity: 0.85;
-    text-shadow: 0 2px 10px rgba(0, 0, 0, 0.6);
-  }
-  #hint {
-    position: fixed; right: 36px; bottom: 36px;
-    font-size: 12px; letter-spacing: 0.8px;
-    opacity: 0; transition: opacity 0.8s ease;
-    text-shadow: 0 2px 10px rgba(0, 0, 0, 0.6);
-  }
-  #hint.show { opacity: 0.75; }
+  #clock { position: fixed; left: 32px; bottom: 28px; font-family: "Google Sans","Segoe UI",Roboto,system-ui,sans-serif; font-weight: 400; font-variant-numeric: tabular-nums; letter-spacing: 0.5px; font-size: clamp(28px,4vw,56px); text-shadow: 0 0 24px rgba(0,0,0,0.4); pointer-events: none; transition: opacity 0.6s ease; }
+  #clock .ampm { font-size: 0.36em; margin-left: 6px; opacity: 0.82; vertical-align: middle; }
+  #date { position: fixed; left: 34px; bottom: 14px; font-family: "Google Sans","Segoe UI",Roboto,system-ui,sans-serif; font-size: clamp(12px,1.2vw,16px); letter-spacing: 1.5px; text-transform: uppercase; pointer-events: none; transition: opacity 0.6s ease; }
+  #hint { position: fixed; right: 28px; bottom: 26px; font-family: "Google Sans","Segoe UI",Roboto,system-ui,sans-serif; font-size: 13px; letter-spacing: 0.5px; pointer-events: none; opacity: 0; transition: opacity 0.8s ease; }
+  #hint.show { opacity: 1; }
+  #clock.hidden, #date.hidden { opacity: 0; }
 </style>
 <link rel="stylesheet" href="file:///home/sakib/.config/matugen/matugen-colors.css">
 </head>
 <body>
-
 <canvas id="c"></canvas>
-
-<div id="ui-container">
-  <div class="vignette-glass">
-    <div id="clock">00:00</div>
-    <div id="date">Mon, Jan 1</div>
-  </div>
-  <div id="hint">Press <b>C</b> to toggle UI</div>
-</div>
-
+<div id="clock">00:00</div>
+<div id="date">Mon, Jan 1</div>
+<div id="hint">press C to toggle clock</div>
 <script src="clock-shared.js"></script>
 <script>
 const canvas = document.getElementById('c');
@@ -97,91 +32,64 @@ const ctx = canvas.getContext('2d');
 const clockEl = document.getElementById('clock');
 const dateEl = document.getElementById('date');
 const hintEl = document.getElementById('hint');
-const uiContainer = document.getElementById('ui-container');
 
-let cursorTimeout;
-function triggerCursor() {
-  document.body.classList.add('show-cursor');
-  clearTimeout(cursorTimeout);
-  cursorTimeout = setTimeout(() => {
-    document.body.classList.remove('show-cursor');
-  }, 2500);
-}
-
-window.addEventListener('pointermove', triggerCursor);
-window.addEventListener('pointerdown', triggerCursor);
-
-let W = window.innerWidth;
-let H = window.innerHeight;
-
+let dpr = Math.min(window.devicePixelRatio || 1, 2);
+let W, H;
 function resize() {
-  W = window.innerWidth;
-  H = window.innerHeight;
-  canvas.width = W;
-  canvas.height = H;
+  W = window.innerWidth; H = window.innerHeight;
+  canvas.width = W * dpr; canvas.height = H * dpr;
+  ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
 }
 window.addEventListener('resize', resize);
+resize();
 
 const reduceMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
 const speedMul = reduceMotion ? 0.25 : 1;
 
-function readRGB(name, fallback) {
+function readRGB(name) {
   const raw = getComputedStyle(document.documentElement).getPropertyValue(name).trim();
   const parts = raw.split(/\s+/).map(Number);
-  return (parts.length === 3 && parts.every(n => !isNaN(n))) ? parts : fallback;
+  if (parts.length === 3 && parts.every(n => !isNaN(n))) return parts;
+  return [200, 200, 200];
 }
-function rgba(rgb, a) {
-  const c = rgb || [200, 200, 200];
-  return `rgba(${c[0]}, ${c[1]}, ${c[2]}, ${a})`;
-}
+function rgba(rgb, a) { return `rgba(${rgb[0]}, ${rgb[1]}, ${rgb[2]}, ${a})`; }
 
 let theme = {};
 let roleList = [];
 function loadTheme() {
   theme = {
-    surface: readRGB('--surface_rgb', [12, 20, 27]),
-    surfaceBright: readRGB('--surface_bright_rgb', [32, 40, 48]),
-    primary: readRGB('--primary_rgb', [138, 206, 255]),
-    secondary: readRGB('--secondary_rgb', [180, 199, 233]),
-    tertiary: readRGB('--tertiary_rgb', [186, 196, 250]),
-    primaryContainer: readRGB('--primary_container_rgb', [0, 75, 111]),
-    secondaryContainer: readRGB('--secondary_container_rgb', [53, 72, 99]),
-    tertiaryContainer: readRGB('--tertiary_container_rgb', [58, 68, 114]),
-    outline: readRGB('--outline_rgb', [137, 146, 154]),
+    surface: readRGB('--surface_rgb'), surfaceBright: readRGB('--surface_bright_rgb'),
+    primary: readRGB('--primary_rgb'), secondary: readRGB('--secondary_rgb'), tertiary: readRGB('--tertiary_rgb'),
+    primaryContainer: readRGB('--primary_container_rgb'), secondaryContainer: readRGB('--secondary_container_rgb'),
+    tertiaryContainer: readRGB('--tertiary_container_rgb'), outline: readRGB('--outline_rgb'),
   };
-
   roleList = [theme.primary, theme.secondary, theme.tertiary, theme.primaryContainer, theme.secondaryContainer];
-  
-  clockEl.style.color = rgba(theme.primary, 0.95);
+  boats.forEach((b, i) => { b.color = roleList[i % roleList.length]; });
+  clockEl.style.color = rgba(theme.primary, 0.92);
   dateEl.style.color = rgba(theme.secondary, 0.85);
   hintEl.style.color = rgba(theme.outline, 0.9);
-
-  boats.forEach((b, i) => {
-    b.color = roleList[i % roleList.length];
-  });
 }
 
+// river meanders using a slowly-shifting sine centerline
 function riverCenterY(x, t) {
-  return H * 0.5 + Math.sin(x * 0.002 + t * 0.1) * H * 0.18 + Math.sin(x * 0.0008 - t * 0.06) * H * 0.09;
+  return H * 0.5 + Math.sin(x * 0.0022 + t * 0.05) * H * 0.16 + Math.sin(x * 0.0009 - t * 0.03) * H * 0.08;
 }
+const RIVER_WIDTH = 0; // computed relative to H below
 
 let boats = [];
-
 function spawnBoat(b) {
-  b.x = -80 - Math.random() * 250;
-  b.speed = 28 + Math.random() * 22;
-  b.bobAmp = 2.5 + Math.random() * 3.5;
-  b.bobFreq = 1.2 + Math.random() * 0.8;
+  b.x = -60 - Math.random() * 200;
+  b.speed = 26 + Math.random() * 18;
+  b.bobAmp = 3 + Math.random() * 3;
+  b.bobFreq = 0.8 + Math.random() * 0.6;
   b.phase = Math.random() * Math.PI * 2;
-  b.lateral = (Math.random() - 0.5) * H * 0.22;
-  b.size = 22 + Math.random() * 12;
-  b.color = roleList.length ? roleList[Math.floor(Math.random() * roleList.length)] : [200, 200, 200];
-  b.wakes = [];
+  b.lateral = (Math.random() - 0.5) * H * 0.12;
+  b.size = 14 + Math.random() * 10;
+  b.color = [200, 200, 200];
 }
-
 function initBoats() {
   boats = [];
-  for (let i = 0; i < 6; i++) {
+  for (let i = 0; i < 7; i++) {
     const b = {};
     spawnBoat(b);
     b.x = Math.random() * W;
@@ -189,82 +97,68 @@ function initBoats() {
   }
 }
 
-function drawOrigamiBoat(b, t, y, angle) {
+function drawBoat(b, t, y, heading) {
   const bob = Math.sin(t * b.bobFreq + b.phase) * b.bobAmp;
-  const pitch = Math.cos(t * b.bobFreq * 0.8 + b.phase) * 0.08;
-  const s = b.size;
+
+  // wake: two small fading ellipses trailing behind, along the heading direction
+  for (let i = 1; i <= 2; i++) {
+    const wx = b.x - Math.cos(heading) * b.size * 1.4 * i;
+    const wy = y + bob - Math.sin(heading) * b.size * 1.4 * i;
+    ctx.beginPath();
+    ctx.ellipse(wx, wy, b.size * 0.4 * i, b.size * 0.15 * i, heading, 0, Math.PI * 2);
+    ctx.strokeStyle = rgba(b.color, 0.15 / i);
+    ctx.lineWidth = 1;
+    ctx.stroke();
+  }
 
   ctx.save();
   ctx.translate(b.x, y + bob);
-  ctx.rotate(angle + pitch);
+  ctx.rotate(heading * 0.15); // subtle tilt, not a full turn into the flow
 
-  // Soft Water Shadow underneath
+  // reflection
+  ctx.save();
+  ctx.scale(1, -0.4);
+  ctx.translate(0, -b.size * 0.3);
   ctx.beginPath();
-  ctx.ellipse(0, s * 0.35, s * 0.9, s * 0.25, 0, 0, Math.PI * 2);
-  ctx.fillStyle = 'rgba(0, 0, 0, 0.25)';
-  ctx.fill();
-
-  const c = b.color;
-  const cLight = [Math.min(255, c[0] + 45), Math.min(255, c[1] + 45), Math.min(255, c[2] + 45)];
-  const cDark = [Math.max(0, c[0] - 40), Math.max(0, c[1] - 40), Math.max(0, c[2] - 40)];
-  const cMid = c;
-
-  // 1. Back/Inner Hull Shadow
-  ctx.beginPath();
-  ctx.moveTo(-s * 0.9, 0);
-  ctx.lineTo(0, -s * 0.2);
-  ctx.lineTo(s * 0.9, 0);
-  ctx.lineTo(0, s * 0.15);
+  ctx.moveTo(-b.size, 0);
+  ctx.lineTo(b.size, 0);
+  ctx.lineTo(b.size * 0.5, b.size * 0.4);
+  ctx.lineTo(-b.size * 0.5, b.size * 0.4);
   ctx.closePath();
-  ctx.fillStyle = rgba(cDark, 0.9);
+  ctx.fillStyle = rgba(b.color, 0.18);
   ctx.fill();
+  ctx.restore();
 
-  // 2. Sail - Left Face
   ctx.beginPath();
-  ctx.moveTo(0, -s * 1.15);
-  ctx.lineTo(-s * 0.25, 0);
-  ctx.lineTo(0, 0);
+  ctx.moveTo(-b.size, 0);
+  ctx.lineTo(b.size, 0);
+  ctx.lineTo(b.size * 0.5, b.size * 0.4);
+  ctx.lineTo(-b.size * 0.5, b.size * 0.4);
   ctx.closePath();
-  ctx.fillStyle = rgba(cLight, 0.95);
+  ctx.fillStyle = rgba(b.color, 0.85);
   ctx.fill();
 
-  // 3. Sail - Right Face
+  // fold crease down the hull center
   ctx.beginPath();
-  ctx.moveTo(0, -s * 1.15);
-  ctx.lineTo(s * 0.55, -s * 0.1);
-  ctx.lineTo(0, 0);
-  ctx.closePath();
-  ctx.fillStyle = rgba(cMid, 0.9);
-  ctx.fill();
-
-  // 4. Front Hull - Left Facet
-  ctx.beginPath();
-  ctx.moveTo(-s, -s * 0.05);
-  ctx.lineTo(0, s * 0.45);
-  ctx.lineTo(0, 0);
-  ctx.closePath();
-  ctx.fillStyle = rgba(cMid, 0.95);
-  ctx.fill();
-
-  // 5. Front Hull - Right Facet
-  ctx.beginPath();
-  ctx.moveTo(s, -s * 0.05);
-  ctx.lineTo(0, s * 0.45);
-  ctx.lineTo(0, 0);
-  ctx.closePath();
-  ctx.fillStyle = rgba(cDark, 0.95);
-  ctx.fill();
-
-  // Fold Lines / Outline accent
-  ctx.strokeStyle = 'rgba(255, 255, 255, 0.25)';
+  ctx.moveTo(0, 0);
+  ctx.lineTo(0, b.size * 0.4);
+  ctx.strokeStyle = rgba(theme.surface, 0.4);
   ctx.lineWidth = 1;
-  ctx.beginPath();
-  ctx.moveTo(-s, -s * 0.05);
-  ctx.lineTo(s, -s * 0.05);
-  ctx.moveTo(0, -s * 1.15);
-  ctx.lineTo(0, s * 0.45);
   ctx.stroke();
 
+  ctx.beginPath();
+  ctx.moveTo(0, 0);
+  ctx.lineTo(0, -b.size * 1.1);
+  ctx.lineTo(b.size * 0.55, -b.size * 0.35);
+  ctx.closePath();
+  ctx.fillStyle = rgba(b.color, 0.6);
+  ctx.fill();
+  ctx.beginPath();
+  ctx.moveTo(0, 0);
+  ctx.lineTo(0, -b.size * 1.1);
+  ctx.strokeStyle = rgba(theme.surface, 0.3);
+  ctx.lineWidth = 1;
+  ctx.stroke();
   ctx.restore();
 }
 
@@ -273,14 +167,13 @@ let start = performance.now();
 function frame(now) {
   const t = ((now - start) / 1000) * speedMul;
 
-  ctx.fillStyle = rgba(theme.surfaceBright, 1);
+  ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+  ctx.fillStyle = `rgb(${(theme.surfaceBright || [40, 46, 52]).join(',')})`;
   ctx.fillRect(0, 0, W, H);
 
-  const riverW = H * 0.52;
-  const steps = 80;
-
-  // River Bank / Water Path
+  const riverW = H * 0.5;
   ctx.beginPath();
+  const steps = 60;
   for (let i = 0; i <= steps; i++) {
     const x = (i / steps) * W;
     const y = riverCenterY(x, t) - riverW / 2;
@@ -292,106 +185,52 @@ function frame(now) {
     ctx.lineTo(x, y);
   }
   ctx.closePath();
-
-  const waterGrad = ctx.createLinearGradient(0, H * 0.1, 0, H * 0.9);
-  waterGrad.addColorStop(0, rgba(theme.surface, 1));
-  waterGrad.addColorStop(0.3, rgba(theme.primaryContainer, 0.85));
-  waterGrad.addColorStop(0.7, rgba(theme.secondaryContainer, 0.85));
-  waterGrad.addColorStop(1, rgba(theme.surface, 1));
+  const waterGrad = ctx.createLinearGradient(0, 0, 0, H);
+  waterGrad.addColorStop(0, `rgb(${(theme.primaryContainer || [0,50,80]).join(',')})`);
+  waterGrad.addColorStop(1, `rgb(${(theme.surface || [12,20,27]).join(',')})`);
   ctx.fillStyle = waterGrad;
   ctx.fill();
 
-  // Water Surface Flow Lines & Caustics
+  // subtle flow lines
+  ctx.strokeStyle = 'rgba(255,255,255,0.05)';
+  ctx.lineWidth = 1;
   for (let lane = -2; lane <= 2; lane++) {
     ctx.beginPath();
     for (let i = 0; i <= steps; i++) {
       const x = (i / steps) * W;
-      const y = riverCenterY(x, t) + lane * riverW * 0.16 + Math.sin(x * 0.02 + t * 2.2 + lane) * 5;
+      const y = riverCenterY(x, t) + lane * riverW * 0.15 + Math.sin(x * 0.03 + t * 2 + lane) * 4;
       i === 0 ? ctx.moveTo(x, y) : ctx.lineTo(x, y);
     }
-    ctx.strokeStyle = `rgba(255, 255, 255, ${0.04 + Math.abs(lane) * 0.015})`;
-    ctx.lineWidth = lane === 0 ? 2 : 1;
     ctx.stroke();
   }
 
-  // Render & Update Boats
   for (const b of boats) {
     b.x += b.speed * (1 / 60) * speedMul;
-
+    if (b.x > W + 60) spawnBoat(b);
     const y = riverCenterY(b.x, t) + b.lateral;
-    const yNext = riverCenterY(b.x + 5, t) + b.lateral;
-    const angle = Math.atan2(yNext - y, 5);
-
-    // Wake Ripple Effect
-    if (Math.random() < 0.25) {
-      b.wakes.push({ x: b.x - b.size * 0.6, y: y, radius: 2, alpha: 0.35 });
-    }
-
-    for (let i = b.wakes.length - 1; i >= 0; i--) {
-      const w = b.wakes[i];
-      w.radius += 0.35;
-      w.alpha -= 0.005;
-      if (w.alpha <= 0) {
-        b.wakes.splice(i, 1);
-        continue;
-      }
-      ctx.beginPath();
-      ctx.ellipse(w.x, w.y, w.radius * 2, w.radius * 0.6, 0, 0, Math.PI * 2);
-      ctx.strokeStyle = `rgba(255, 255, 255, ${w.alpha})`;
-      ctx.lineWidth = 1;
-      ctx.stroke();
-    }
-
-    drawOrigamiBoat(b, t, y, angle);
-
-    if (b.x > W + 80) spawnBoat(b);
+    const yAhead = riverCenterY(b.x + 8, t) + b.lateral;
+    const heading = Math.atan2(yAhead - y, 8);
+    drawBoat(b, t, y, heading);
   }
 
   requestAnimationFrame(frame);
 }
 
-function fallbackClock() {
-  const update = () => {
-    const now = new Date();
-    let hours = now.getHours();
-    const minutes = String(now.getMinutes()).padStart(2, '0');
-    const ampm = hours >= 12 ? 'PM' : 'AM';
-    hours = hours % 12 || 12;
-    clockEl.innerHTML = `${String(hours).padStart(2, '0')}:${minutes}<span class="ampm">${ampm}</span>`;
-
-    const options = { weekday: 'short', month: 'short', day: 'numeric' };
-    dateEl.textContent = now.toLocaleDateString('en-US', options);
-  };
-  update();
-  setInterval(update, 1000);
-}
-
-let uiVisible = true;
+let clockVisible = true;
 window.addEventListener('keydown', (e) => {
   if (e.key.toLowerCase() === 'c') {
-    uiVisible = !uiVisible;
-    uiContainer.classList.toggle('hidden', !uiVisible);
+    clockVisible = !clockVisible;
+    clockEl.classList.toggle('hidden', !clockVisible);
+    dateEl.classList.toggle('hidden', !clockVisible);
   }
 });
-
 hintEl.classList.add('show');
 setTimeout(() => hintEl.classList.remove('show'), 4000);
 
 window.addEventListener('load', () => {
   initBoats();
   loadTheme();
-  resize();
-
-  try {
-    if (typeof startClock === 'function') {
-      startClock(clockEl, dateEl);
-    } else {
-      fallbackClock();
-    }
-  } catch (err) {
-    fallbackClock();
-  }
-
+  startClock(clockEl, dateEl);
   requestAnimationFrame(frame);
 });
 </script>

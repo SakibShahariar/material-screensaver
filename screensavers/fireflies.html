@@ -1,0 +1,311 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Material Screensaver — Grass Field Fireflies</title>
+<style>
+  :root {
+    --primary_rgb: 138 206 255; --secondary_rgb: 180 199 233; --tertiary_rgb: 186 196 250;
+    --primary_container_rgb: 0 75 111; --tertiary_container_rgb: 58 68 114;
+    --surface_rgb: 8 14 20; --outline_rgb: 137 146 154;
+  }
+  html, body {
+    margin: 0; padding: 0; width: 100%; height: 100%;
+    overflow: hidden; background: rgb(var(--surface_rgb));
+    cursor: none; font-family: "Google Sans", "Segoe UI", Roboto, system-ui, sans-serif;
+  }
+  canvas { display: block; width: 100vw; height: 100vh; }
+  
+  #clock {
+    position: fixed; left: 36px; bottom: 32px;
+    font-weight: 300; font-variant-numeric: tabular-nums;
+    letter-spacing: -1px; font-size: clamp(36px, 5vw, 64px);
+    text-shadow: 0 4px 24px rgba(0,0,0,0.6);
+    pointer-events: none; transition: opacity 0.6s ease;
+  }
+  #clock .ampm {
+    font-size: 0.3em; margin-left: 8px; opacity: 0.7;
+    vertical-align: super; font-weight: 400; letter-spacing: 1px;
+  }
+  #date {
+    position: fixed; left: 38px; bottom: 16px;
+    font-size: clamp(11px, 1.1vw, 14px); letter-spacing: 3px;
+    text-transform: uppercase;
+    opacity: 0.75; pointer-events: none; transition: opacity 0.6s ease;
+  }
+  #hint {
+    position: fixed; right: 32px; bottom: 32px;
+    font-size: 12px; letter-spacing: 1.5px; text-transform: uppercase;
+    opacity: 0; transition: opacity 0.8s ease;
+    pointer-events: none;
+  }
+  #hint.show { opacity: 0.7; }
+  #clock.hidden, #date.hidden { opacity: 0; }
+</style>
+<link rel="stylesheet" href="file:///home/sakib/.config/matugen/matugen-colors.css">
+</head>
+<body>
+<canvas id="c"></canvas>
+<div id="clock">00:00</div>
+<div id="date">Mon, Jan 1</div>
+<div id="hint">Press C to toggle clock</div>
+<script src="clock-shared.js"></script>
+<script>
+const canvas = document.getElementById('c');
+const ctx = canvas.getContext('2d');
+const clockEl = document.getElementById('clock');
+const dateEl = document.getElementById('date');
+const hintEl = document.getElementById('hint');
+
+let dpr = Math.min(window.devicePixelRatio || 1, 2);
+let W, H;
+function resize() {
+  W = window.innerWidth;
+  H = window.innerHeight;
+  canvas.width = W * dpr;
+  canvas.height = H * dpr;
+  ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+  initGrass();
+}
+window.addEventListener('resize', resize);
+
+const reduceMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+const speedMul = reduceMotion ? 0.2 : 1;
+
+function readRGB(name, fallback) {
+  const raw = getComputedStyle(document.documentElement).getPropertyValue(name).trim();
+  const parts = raw.split(/\s+/).map(Number);
+  return (parts.length === 3 && parts.every(n => !isNaN(n))) ? parts : fallback;
+}
+function rgba(rgb, a) {
+  const c = rgb || [138, 206, 255];
+  return `rgba(${c[0]}, ${c[1]}, ${c[2]}, ${a})`;
+}
+
+function blendColor(a, b, t) {
+  return [a[0] + (b[0] - a[0]) * t, a[1] + (b[1] - a[1]) * t, a[2] + (b[2] - a[2]) * t];
+}
+
+let theme = {};
+let roleList = [];
+let sceneColors = {};
+function loadTheme() {
+  theme = {
+    surface: readRGB('--surface_rgb', [8, 14, 20]),
+    primary: readRGB('--primary_rgb', [138, 206, 255]),
+    secondary: readRGB('--secondary_rgb', [180, 199, 233]),
+    tertiary: readRGB('--tertiary_rgb', [186, 196, 250]),
+    primaryContainer: readRGB('--primary_container_rgb', [0, 75, 111]),
+    secondaryContainer: readRGB('--secondary_container_rgb', [53, 72, 99]),
+    tertiaryContainer: readRGB('--tertiary_container_rgb', [58, 68, 114]),
+    outline: readRGB('--outline_rgb', [137, 146, 154]),
+  };
+  roleList = [theme.tertiary, theme.primary, theme.secondary];
+
+  // scene palette actually derived from theme, instead of the fixed night-blue
+  // hardcoded values this had before — darkened toward black for a twilight feel
+  // while still carrying the theme's real hue rather than a generic blue-grey
+  const darken = (c, f) => c.map(v => Math.round(v * f));
+  sceneColors = {
+    skyMid: darken(theme.primaryContainer, 0.35),
+    skyBottom: darken(theme.surface, 0.5),
+    horizon: darken(theme.tertiaryContainer, 0.55),
+    grassBack: darken(theme.secondaryContainer, 0.45),
+    grassFront: darken(theme.secondaryContainer, 0.22),
+  };
+
+  // real firefly bioluminescence is consistently warm yellow-green — blending
+  // the theme accent into that base keeps them theme-aware but still
+  // recognizable, rather than letting cool wallpaper colors wash them out
+  const warmBase = [235, 215, 120];
+  flies.forEach((f, i) => {
+    const roleColor = roleList[i % roleList.length];
+    f.color = blendColor(warmBase, roleColor, 0.35);
+  });
+  // JS-computed literal colors — proven reliable across browsers, rather than
+  // static CSS var() rules which have silently failed in this setup before
+  clockEl.style.color = rgba(theme.primary, 1);
+  dateEl.style.color = rgba(theme.secondary, 0.75);
+  hintEl.style.color = rgba(theme.outline, 0.7);
+}
+
+let flies = [];
+function makeFlies() {
+  flies = [];
+  for (let i = 0; i < 50; i++) {
+    flies.push({
+      x: Math.random() * W,
+      y: H * 0.4 + Math.random() * (H * 0.5),
+      color: [230, 220, 150],
+      phase: Math.random() * Math.PI * 2,
+      blinkFreq: 0.4 + Math.random() * 0.8,
+      wanderAngle: Math.random() * Math.PI * 2,
+      wanderSpeed: 8 + Math.random() * 12,
+    });
+  }
+}
+
+let stars = [];
+function makeStars() {
+  stars = [];
+  const count = Math.floor((W * H) / 13000);
+  for (let i = 0; i < count; i++) {
+    stars.push({ x: Math.random() * W, y: Math.random() * H * 0.55, r: 0.4 + Math.random() * 1, phase: Math.random() * Math.PI * 2 });
+  }
+}
+
+// Procedural grass blade setup across layers
+let grassBlades = [];
+function initGrass() {
+  grassBlades = [];
+  // Generate multi-layer grass blades for parallax depth
+  const count = Math.floor(W / 4);
+  for (let i = 0; i < count; i++) {
+    grassBlades.push({
+      x: (i / count) * W + (Math.random() - 0.5) * 8,
+      baseY: H + 5,
+      height: 40 + Math.random() * 90,
+      bend: (Math.random() - 0.5) * 20,
+      width: 1.5 + Math.random() * 2,
+      layer: Math.random() > 0.4 ? 1 : 0, // 0 = background grass, 1 = foreground grass
+      swaySpeed: 1.5 + Math.random() * 2,
+      swayOffset: Math.random() * Math.PI * 2
+    });
+  }
+}
+
+let start = performance.now();
+let lastT = 0;
+let nextGust = 5 + Math.random() * 6;
+let gustStrength = 1;
+
+function frame(now) {
+  const t = ((now - start) / 1000) * speedMul;
+  const dt = Math.min(0.04, t - lastT);
+  lastT = t;
+
+  if (t >= nextGust) {
+    gustStrength = 1.8 + Math.random() * 0.8;
+    nextGust = t + 6 + Math.random() * 8;
+  }
+  gustStrength += (1 - gustStrength) * dt * 0.8; // eases back toward calm
+
+  ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+
+  // Twilight sky gradient
+  const sky = ctx.createLinearGradient(0, 0, 0, H);
+  sky.addColorStop(0, rgba(theme.surface, 1));
+  sky.addColorStop(0.5, `rgb(${sceneColors.skyMid.join(',')})`);
+  sky.addColorStop(1, `rgb(${sceneColors.skyBottom.join(',')})`);
+  ctx.fillStyle = sky;
+  ctx.fillRect(0, 0, W, H);
+
+  for (const s of stars) {
+    const tw = 0.35 + 0.65 * Math.abs(Math.sin(t * 0.4 + s.phase));
+    ctx.beginPath();
+    ctx.arc(s.x, s.y, s.r, 0, Math.PI * 2);
+    ctx.fillStyle = `rgba(255,255,255,${tw * 0.7})`;
+    ctx.fill();
+  }
+
+  // Background rolling meadow horizon
+  ctx.fillStyle = `rgb(${sceneColors.horizon.join(',')})`;
+  ctx.beginPath();
+  ctx.moveTo(0, H);
+  ctx.lineTo(0, H * 0.72);
+  for (let x = 0; x <= W; x += 50) {
+    const y = H * 0.72 + Math.sin(x * 0.004) * 30;
+    ctx.lineTo(x, y);
+  }
+  ctx.lineTo(W, H);
+  ctx.closePath();
+  ctx.fill();
+
+  // Background layer grass blades (darker, silhouettes)
+  ctx.fillStyle = `rgb(${sceneColors.grassBack.join(',')})`;
+  for (let g of grassBlades) {
+    if (g.layer === 0) {
+      const sway = Math.sin(t * g.swaySpeed + g.swayOffset) * 8 * gustStrength;
+      ctx.beginPath();
+      ctx.moveTo(g.x, g.baseY);
+      ctx.quadraticCurveTo(g.x + sway * 0.5, g.baseY - g.height * 0.5, g.x + g.bend + sway, g.baseY - g.height);
+      ctx.lineTo(g.x + g.width + g.bend + sway, g.baseY - g.height);
+      ctx.quadraticCurveTo(g.x + sway * 0.5 + g.width, g.baseY - g.height * 0.5, g.x + g.width, g.baseY);
+      ctx.closePath();
+      ctx.fill();
+    }
+  }
+
+  // Fireflies weaving through the field
+  for (const f of flies) {
+    f.wanderAngle += (Math.random() - 0.5) * dt * 3;
+    f.x += Math.cos(f.wanderAngle) * f.wanderSpeed * dt;
+    f.y += Math.sin(f.wanderAngle) * f.wanderSpeed * dt * 0.5;
+
+    if (f.x < -20) f.x = W + 20;
+    if (f.x > W + 20) f.x = -20;
+    if (f.y < H * 0.4) f.y = H * 0.4;
+    if (f.y > H - 15) f.y = H - 15;
+
+    const blink = Math.max(0, Math.sin(t * f.blinkFreq + f.phase));
+    const alpha = Math.pow(blink, 2) * 0.85;
+    if (alpha < 0.01) continue;
+
+    const glowR = 12 + blink * 8;
+    const grad = ctx.createRadialGradient(f.x, f.y, 0, f.x, f.y, glowR);
+    grad.addColorStop(0, rgba(f.color, alpha * 0.6));
+    grad.addColorStop(0.4, rgba(f.color, alpha * 0.15));
+    grad.addColorStop(1, rgba(f.color, 0));
+
+    ctx.fillStyle = grad;
+    ctx.beginPath();
+    ctx.arc(f.x, f.y, glowR, 0, Math.PI * 2);
+    ctx.fill();
+
+    ctx.beginPath();
+    ctx.arc(f.x, f.y, 1.4, 0, Math.PI * 2);
+    ctx.fillStyle = rgba([255, 255, 220], alpha);
+    ctx.fill();
+  }
+
+  // Foreground layer grass blades (crisp, detailed silhouette at the bottom edge)
+  ctx.fillStyle = `rgb(${sceneColors.grassFront.join(',')})`;
+  for (let g of grassBlades) {
+    if (g.layer === 1) {
+      const sway = Math.sin(t * g.swaySpeed + g.swayOffset) * 12 * gustStrength;
+      ctx.beginPath();
+      ctx.moveTo(g.x, g.baseY);
+      ctx.quadraticCurveTo(g.x + sway * 0.6, g.baseY - g.height * 0.5, g.x + g.bend + sway, g.baseY - g.height);
+      ctx.lineTo(g.x + g.width + g.bend + sway, g.baseY - g.height);
+      ctx.quadraticCurveTo(g.x + sway * 0.6 + g.width, g.baseY - g.height * 0.5, g.x + g.width, g.baseY);
+      ctx.closePath();
+      ctx.fill();
+    }
+  }
+
+  requestAnimationFrame(frame);
+}
+
+let clockVisible = true;
+window.addEventListener('keydown', (e) => {
+  if (e.key.toLowerCase() === 'c') {
+    clockVisible = !clockVisible;
+    clockEl.classList.toggle('hidden', !clockVisible);
+    dateEl.classList.toggle('hidden', !clockVisible);
+  }
+});
+
+hintEl.classList.add('show');
+setTimeout(() => hintEl.classList.remove('show'), 4000);
+
+window.addEventListener('load', () => {
+  resize();
+  makeFlies();
+  makeStars();
+  loadTheme();
+  startClock(clockEl, dateEl);
+  requestAnimationFrame(frame);
+});
+</script>
+</body>
+</html>

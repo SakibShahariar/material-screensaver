@@ -2,7 +2,6 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Material Screensaver — Bubbles</title>
 <style>
   :root {
@@ -14,79 +13,48 @@
     --tertiary_container_rgb: 58 68 114;
     --surface_rgb: 12 20 27;
     --outline_rgb: 137 146 154;
-    --on_surface_variant_rgb: 191 199 209;
   }
   html, body {
     margin: 0; padding: 0; width: 100%; height: 100%;
-    overflow: hidden; background: rgb(var(--surface_rgb));
-    cursor: default;
-    font-family: "Google Sans", "Segoe UI", Roboto, system-ui, sans-serif;
-    user-select: none;
+    overflow: hidden; background: rgb(var(--surface_rgb)); cursor: none;
   }
   canvas { display: block; width: 100vw; height: 100vh; }
-
-  /* Glassmorphism UI Container */
-  #ui-container {
-    position: fixed; inset: 0; pointer-events: none; z-index: 10;
-    display: flex; flex-direction: column; justify-content: space-between;
-    padding: 36px; box-sizing: border-box;
-    transition: opacity 0.8s ease;
-  }
-  #ui-container.hidden { opacity: 0; }
-
-  .glass-panel {
-  background: radial-gradient(circle at center, rgba(12, 20, 27, 0.5) 0%, rgba(12, 20, 27, 0) 75%);
-  backdrop-filter: none;
-  -webkit-backdrop-filter: none;
-  border: none;
-  border-radius: 0;
-  padding: 24px 36px;
-  width: fit-content;
-  box-shadow: none;
-  }
-
   #clock {
-    font-size: clamp(32px, 4.5vw, 64px);
-    font-weight: 300;
-    font-variant-numeric: tabular-nums;
-    letter-spacing: -0.5px;
-    line-height: 1;
+    position: fixed; left: 32px; bottom: 28px;
+    font-family: "Google Sans", "Segoe UI", Roboto, system-ui, sans-serif;
+    font-weight: 400; font-variant-numeric: tabular-nums; letter-spacing: 0.5px;
+    font-size: clamp(28px, 4vw, 56px);
+    text-shadow: 0 0 24px rgba(0,0,0,0.4);
+    pointer-events: none; transition: opacity 0.6s ease;
   }
   #clock .ampm {
-    font-size: 0.35em;
-    margin-left: 8px;
-    opacity: 0.8;
-    font-weight: 400;
-    text-transform: uppercase;
+    font-size: 0.36em;
+    margin-left: 6px;
+    opacity: 0.82;
+    vertical-align: middle;
   }
   #date {
-    font-size: clamp(12px, 1.2vw, 15px);
-    letter-spacing: 2px;
-    text-transform: uppercase;
-    margin-top: 8px;
-    opacity: 0.85;
+    position: fixed; left: 34px; bottom: 14px;
+    font-family: "Google Sans", "Segoe UI", Roboto, system-ui, sans-serif;
+    font-size: clamp(12px, 1.2vw, 16px); letter-spacing: 1.5px; text-transform: uppercase;
+    pointer-events: none; transition: opacity 0.6s ease;
   }
-
   #hint {
-    position: fixed; right: 36px; bottom: 36px;
-    font-size: 12px; letter-spacing: 0.8px;
-    opacity: 0; transition: opacity 0.8s ease;
+    position: fixed; right: 28px; bottom: 26px;
+    font-family: "Google Sans", "Segoe UI", Roboto, system-ui, sans-serif;
+    font-size: 13px; letter-spacing: 0.5px;
+    pointer-events: none; opacity: 0; transition: opacity 0.8s ease;
   }
-  #hint.show { opacity: 0.75; }
+  #hint.show { opacity: 1; }
+  #clock.hidden, #date.hidden { opacity: 0; }
 </style>
 <link rel="stylesheet" href="file:///home/sakib/.config/matugen/matugen-colors.css">
 </head>
 <body>
-
 <canvas id="c"></canvas>
-
-<div id="ui-container">
-  <div class="glass-panel">
-    <div id="clock">00:00</div>
-    <div id="date">Mon, Jan 1</div>
-  </div>
-  <div id="hint" class="glass-panel">Press <b>C</b> to toggle UI</div>
-</div>
+<div id="clock">00:00</div>
+<div id="date">Mon, Jan 1</div>
+<div id="hint">press C to toggle clock</div>
 
 <script src="clock-shared.js"></script>
 <script>
@@ -95,7 +63,6 @@ const ctx = canvas.getContext('2d');
 const clockEl = document.getElementById('clock');
 const dateEl = document.getElementById('date');
 const hintEl = document.getElementById('hint');
-const uiContainer = document.getElementById('ui-container');
 
 let dpr = Math.min(window.devicePixelRatio || 1, 2);
 let W, H;
@@ -115,7 +82,8 @@ const speedMul = reduceMotion ? 0.25 : 1;
 function readRGB(name) {
   const raw = getComputedStyle(document.documentElement).getPropertyValue(name).trim();
   const parts = raw.split(/\s+/).map(Number);
-  return (parts.length === 3 && parts.every(n => !isNaN(n))) ? parts : [200, 200, 200];
+  if (parts.length === 3 && parts.every(n => !isNaN(n))) return parts;
+  return [200, 200, 200];
 }
 function rgba(rgb, a) { return `rgba(${rgb[0]}, ${rgb[1]}, ${rgb[2]}, ${a})`; }
 
@@ -133,61 +101,30 @@ function loadTheme() {
     outline: readRGB('--outline_rgb'),
   };
   roleList = [theme.primary, theme.secondary, theme.tertiary, theme.primaryContainer, theme.secondaryContainer, theme.tertiaryContainer];
-  clockEl.style.color = rgba(theme.primary, 0.95);
+  clockEl.style.color = rgba(theme.primary, 0.92);
   dateEl.style.color = rgba(theme.secondary, 0.85);
   hintEl.style.color = rgba(theme.outline, 0.9);
 }
 
-// Mouse Interaction
-const mouse = { x: -1000, y: -1000, active: false };
-window.addEventListener('mousemove', (e) => {
-  mouse.x = e.clientX;
-  mouse.y = e.clientY;
-  mouse.active = true;
-});
-window.addEventListener('mouseleave', () => { mouse.active = false; });
-
 let bubbles = [];
-let droplets = [];
 
 function spawnBubble(b) {
   b.x = Math.random() * W;
-  b.y = H + 30;
-  b.r = 12 + Math.random() * 32;
-  b.vx = 0;
-  b.vy = -(14 + Math.random() * 22);
-  b.wobbleAmp = 12 + Math.random() * 18;
-  b.wobbleFreq = 0.5 + Math.random() * 0.7;
+  b.y = H + 20;
+  b.r = 6 + Math.random() * 26;
+  b.riseSpeed = 18 + Math.random() * 26;
+  b.wobbleAmp = 8 + Math.random() * 18;
+  b.wobbleFreq = 0.4 + Math.random() * 0.6;
   b.phase = Math.random() * Math.PI * 2;
-  b.squishX = 1;
-  b.squishY = 1;
   b.color = roleList.length ? roleList[Math.floor(Math.random() * roleList.length)] : [200, 200, 200];
-  b.popAtY = H * (0.08 + Math.random() * 0.5);
-}
-
-function popBubble(b) {
-  const count = 6 + Math.floor(b.r * 0.3);
-  for (let i = 0; i < count; i++) {
-    const angle = (i / count) * Math.PI * 2 + Math.random() * 0.5;
-    const speed = 20 + Math.random() * 60;
-    droplets.push({
-      x: b.x,
-      y: b.y,
-      vx: Math.cos(angle) * speed,
-      vy: Math.sin(angle) * speed,
-      r: 1.2 + Math.random() * 2,
-      color: b.color,
-      life: 1.0,
-      decay: 1.8 + Math.random() * 1.5
-    });
-  }
-  spawnBubble(b);
+  b.popAtY = H * (0.05 + Math.random() * 0.55);
+  b.popping = false;
+  b.popT = 0;
 }
 
 function initBubbles() {
   bubbles = [];
-  droplets = [];
-  for (let i = 0; i < 30; i++) {
+  for (let i = 0; i < 26; i++) {
     const b = {};
     spawnBubble(b);
     b.y = Math.random() * H;
@@ -207,104 +144,55 @@ function frame(now) {
   ctx.fillStyle = `rgb(${(theme.surface || [12, 20, 27]).join(',')})`;
   ctx.fillRect(0, 0, W, H);
 
-  // Update & Draw Droplets (Pop particles)
-  for (let i = droplets.length - 1; i >= 0; i--) {
-    const d = droplets[i];
-    d.x += d.vx * dt;
-    d.y += d.vy * dt;
-    d.vy += 120 * dt; // Gravity
-    d.life -= d.decay * dt;
-
-    if (d.life <= 0) {
-      droplets.splice(i, 1);
-      continue;
-    }
-
-    ctx.beginPath();
-    ctx.arc(d.x, d.y, d.r, 0, Math.PI * 2);
-    ctx.fillStyle = rgba(d.color, d.life * 0.8);
-    ctx.fill();
-  }
-
-  // Update & Draw Bubbles
   for (const b of bubbles) {
-    // Upward motion & wobble
-    b.y += b.vy * dt;
-    const wobble = Math.sin(t * b.wobbleFreq + b.phase);
-    b.x += wobble * b.wobbleAmp * dt;
-
-    // Mouse Repulsion Physics
-    if (mouse.active) {
-      const dx = b.x - mouse.x;
-      const dy = b.y - mouse.y;
-      const dist = Math.hypot(dx, dy);
-      const minDist = b.r + 80;
-      if (dist < minDist && dist > 0) {
-        const force = (1 - dist / minDist) * 180;
-        b.x += (dx / dist) * force * dt;
-        b.y += (dy / dist) * force * dt;
-        b.squishX = 1.2;
-        b.squishY = 0.8;
-      }
-    }
-
-    // Recover natural shape after squish
-    b.squishX += (1 - b.squishX) * 0.1;
-    b.squishY += (1 - b.squishY) * 0.1;
-
-    // Pop conditions
-    if (b.y <= b.popAtY || b.y < -40) {
-      popBubble(b);
+    if (b.popping) {
+      b.popT += dt * 4;
+      if (b.popT >= 1) { spawnBubble(b); continue; }
+      const popR = b.r * (1 + b.popT * 0.6);
+      const popAlpha = (1 - b.popT) * 0.6;
+      ctx.beginPath();
+      ctx.arc(b.x, b.y, popR, 0, Math.PI * 2);
+      ctx.strokeStyle = rgba(b.color, popAlpha);
+      ctx.lineWidth = 1.5;
+      ctx.stroke();
       continue;
     }
 
-    ctx.save();
-    ctx.translate(b.x, b.y);
-    ctx.scale(b.squishX, b.squishY);
+    b.y -= b.riseSpeed * dt;
+    const x = b.x + Math.sin(t * b.wobbleFreq + b.phase) * b.wobbleAmp * dt * 3;
+    b.x = x;
 
-    // 1. Base Gradient Shell
+    if (b.y <= b.popAtY) { b.popping = true; b.popT = 0; continue; }
+    if (b.y < -40) { spawnBubble(b); continue; }
+
     ctx.beginPath();
-    ctx.arc(0, 0, b.r, 0, Math.PI * 2);
-    const grad = ctx.createRadialGradient(-b.r * 0.3, -b.r * 0.3, b.r * 0.1, 0, 0, b.r);
-    grad.addColorStop(0, rgba(b.color, 0.04));
-    grad.addColorStop(0.7, rgba(b.color, 0.15));
-    grad.addColorStop(1, rgba(b.color, 0.45));
+    ctx.arc(b.x, b.y, b.r, 0, Math.PI * 2);
+    const grad = ctx.createRadialGradient(b.x - b.r * 0.3, b.y - b.r * 0.3, b.r * 0.1, b.x, b.y, b.r);
+    grad.addColorStop(0, rgba(b.color, 0.05));
+    grad.addColorStop(0.7, rgba(b.color, 0.16));
+    grad.addColorStop(1, rgba(b.color, 0.4));
     ctx.fillStyle = grad;
     ctx.fill();
-
-    // 2. Outer Rim Light
-    ctx.lineWidth = 1.2;
-    ctx.strokeStyle = rgba(b.color, 0.55);
+    ctx.strokeStyle = rgba(b.color, 0.5);
+    ctx.lineWidth = 1;
     ctx.stroke();
 
-    // 3. Primary Specular Highlight
+    // specular glint
     ctx.beginPath();
-    ctx.arc(-b.r * 0.35, -b.r * 0.35, b.r * 0.22, 0, Math.PI * 2);
-    ctx.fillStyle = 'rgba(255, 255, 255, 0.65)';
+    ctx.arc(b.x - b.r * 0.35, b.y - b.r * 0.35, b.r * 0.22, 0, Math.PI * 2);
+    ctx.fillStyle = 'rgba(255,255,255,0.5)';
     ctx.fill();
-
-    // 4. Secondary Soft Reflection
-    ctx.beginPath();
-    ctx.arc(b.r * 0.3, b.r * 0.35, b.r * 0.15, 0, Math.PI * 2);
-    ctx.fillStyle = rgba(b.color, 0.25);
-    ctx.fill();
-
-    ctx.restore();
   }
 
   requestAnimationFrame(frame);
 }
 
-// Clock Setup
-if (typeof startClock === 'function') {
-  startClock(clockEl, dateEl);
-}
-
-let uiVisible = true;
+let clockVisible = true;
 window.addEventListener('keydown', (e) => {
   if (e.key.toLowerCase() === 'c') {
-    uiVisible = !uiVisible;
-    uiContainer.classList.toggle('hidden', !uiVisible);
+    clockVisible = !clockVisible;
+    clockEl.classList.toggle('hidden', !clockVisible);
+    dateEl.classList.toggle('hidden', !clockVisible);
   }
 });
 
@@ -314,6 +202,7 @@ setTimeout(() => hintEl.classList.remove('show'), 4000);
 window.addEventListener('load', () => {
   loadTheme();
   initBubbles();
+  startClock(clockEl, dateEl);
   requestAnimationFrame(frame);
 });
 </script>

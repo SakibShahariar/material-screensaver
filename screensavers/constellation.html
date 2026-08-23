@@ -2,8 +2,7 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Material Screensaver — Real Constellations</title>
+<title>Material Screensaver — Constellation</title>
 <style>
   :root {
     --primary_rgb: 138 206 255;
@@ -22,76 +21,44 @@
   html, body {
     margin: 0; padding: 0; width: 100%; height: 100%;
     overflow: hidden; background: rgb(var(--surface_rgb)); cursor: none;
-    font-family: "Google Sans", "Segoe UI", Roboto, system-ui, sans-serif;
-    user-select: none;
   }
   canvas { display: block; width: 100vw; height: 100vh; }
-
-  /* UI Container */
-  #ui-container {
-    position: fixed; inset: 0; pointer-events: none; z-index: 10;
-    display: flex; flex-direction: column; justify-content: space-between;
-    padding: 36px; box-sizing: border-box;
-    transition: opacity 0.8s ease;
-  }
-  #ui-container.hidden { opacity: 0; }
-
-  /* Vignette Glass Lens */
-  .vignette-glass {
-    background: radial-gradient(circle at center, rgba(12, 20, 27, 0.5) 0%, rgba(12, 20, 27, 0) 80%);
-    backdrop-filter: blur(12px);
-    -webkit-backdrop-filter: blur(12px);
-    mask-image: radial-gradient(circle at center, black 40%, transparent 85%);
-    -webkit-mask-image: radial-gradient(circle at center, black 40%, transparent 85%);
-    border: none;
-    padding: 28px 40px;
-    width: fit-content;
-  }
-
   #clock {
-    font-size: clamp(32px, 4.5vw, 64px);
-    font-weight: 300;
-    font-variant-numeric: tabular-nums;
-    letter-spacing: -0.5px;
-    line-height: 1;
-    text-shadow: 0 2px 14px rgba(0, 0, 0, 0.6);
+    position: fixed; left: 32px; bottom: 28px;
+    font-family: "Google Sans", "Segoe UI", Roboto, system-ui, sans-serif;
+    font-weight: 400; font-variant-numeric: tabular-nums; letter-spacing: 0.5px;
+    font-size: clamp(28px, 4vw, 56px);
+    text-shadow: 0 0 24px rgba(0,0,0,0.4);
+    pointer-events: none; transition: opacity 0.6s ease;
   }
   #clock .ampm {
-    font-size: 0.35em;
-    margin-left: 8px;
-    opacity: 0.8;
-    font-weight: 400;
-    text-transform: uppercase;
+    font-size: 0.36em;
+    margin-left: 6px;
+    opacity: 0.82;
+    vertical-align: middle;
   }
   #date {
-    font-size: clamp(12px, 1.2vw, 15px);
-    letter-spacing: 2px;
-    text-transform: uppercase;
-    margin-top: 8px;
-    opacity: 0.85;
-    text-shadow: 0 2px 10px rgba(0, 0, 0, 0.6);
+    position: fixed; left: 34px; bottom: 14px;
+    font-family: "Google Sans", "Segoe UI", Roboto, system-ui, sans-serif;
+    font-size: clamp(12px, 1.2vw, 16px); letter-spacing: 1.5px; text-transform: uppercase;
+    pointer-events: none; transition: opacity 0.6s ease;
   }
   #hint {
-    position: fixed; right: 36px; bottom: 36px;
-    font-size: 12px; letter-spacing: 0.8px;
-    opacity: 0; transition: opacity 0.8s ease;
-    text-shadow: 0 2px 10px rgba(0, 0, 0, 0.6);
+    position: fixed; right: 28px; bottom: 26px;
+    font-family: "Google Sans", "Segoe UI", Roboto, system-ui, sans-serif;
+    font-size: 13px; letter-spacing: 0.5px;
+    pointer-events: none; opacity: 0; transition: opacity 0.8s ease;
   }
-  #hint.show { opacity: 0.75; }
+  #hint.show { opacity: 1; }
+  #clock.hidden, #date.hidden { opacity: 0; }
 </style>
 <link rel="stylesheet" href="file:///home/sakib/.config/matugen/matugen-colors.css">
 </head>
 <body>
-
 <canvas id="c"></canvas>
-
-<div id="ui-container">
-  <div class="vignette-glass">
-    <div id="clock">00:00</div>
-    <div id="date">Mon, Jan 1</div>
-  </div>
-  <div id="hint">Press <b>C</b> to toggle UI</div>
-</div>
+<div id="clock">00:00</div>
+<div id="date">Mon, Jan 1</div>
+<div id="hint">press C to toggle clock</div>
 
 <script src="clock-shared.js"></script>
 <script>
@@ -100,7 +67,6 @@ const ctx = canvas.getContext('2d');
 const clockEl = document.getElementById('clock');
 const dateEl = document.getElementById('date');
 const hintEl = document.getElementById('hint');
-const uiContainer = document.getElementById('ui-container');
 
 let dpr = Math.min(window.devicePixelRatio || 1, 2);
 let W, H;
@@ -110,7 +76,8 @@ function resize() {
   canvas.width = W * dpr;
   canvas.height = H * dpr;
   ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
-  maxDist = Math.min(W, H) * 0.15;
+  ctx.fillStyle = 'rgb(12, 20, 27)';
+  ctx.fillRect(0, 0, W, H);
 }
 window.addEventListener('resize', resize);
 
@@ -120,7 +87,8 @@ const speedMul = reduceMotion ? 0.15 : 1;
 function readRGB(name) {
   const raw = getComputedStyle(document.documentElement).getPropertyValue(name).trim();
   const parts = raw.split(/\s+/).map(Number);
-  return (parts.length === 3 && parts.every(n => !isNaN(n))) ? parts : [200, 200, 200];
+  if (parts.length === 3 && parts.every(n => !isNaN(n))) return parts;
+  return [200, 200, 200];
 }
 function rgba(rgb, a) { return `rgba(${rgb[0]}, ${rgb[1]}, ${rgb[2]}, ${a})`; }
 
@@ -140,88 +108,29 @@ function loadTheme() {
   };
   roleList = [theme.primary, theme.secondary, theme.tertiary, theme.primaryContainer, theme.secondaryContainer, theme.tertiaryContainer, theme.inversePrimary];
 
-  clockEl.style.color = rgba(theme.primary, 0.95);
+  clockEl.style.color = rgba(theme.primary, 0.92);
   dateEl.style.color = rgba(theme.secondary, 0.85);
   hintEl.style.color = rgba(theme.outline, 0.9);
 
   nodes.forEach((n, i) => { n.color = roleList[i % roleList.length]; });
 }
 
-// REAL CONSTELLATIONS DATA (Normalized offsets)
-const REAL_CONSTELLATIONS = [
-  {
-    name: "Big Dipper",
-    stars: [
-      {x: 0, y: 0}, {x: 35, y: -5}, {x: 65, y: 15}, {x: 95, y: 35},
-      {x: 95, y: 75}, {x: 140, y: 75}, {x: 150, y: 30}
-    ],
-    edges: [[0,1], [1,2], [2,3], [3,4], [4,5], [5,6], [6,3]]
-  },
-  {
-    name: "Cassiopeia",
-    stars: [
-      {x: 0, y: 0}, {x: 30, y: -25}, {x: 65, y: -5}, {x: 95, y: -35}, {x: 130, y: -15}
-    ],
-    edges: [[0,1], [1,2], [2,3], [3,4]]
-  },
-  {
-    name: "Orion",
-    stars: [
-      {x: 0, y: -50}, {x: 60, y: -40}, // Betelgeuse & Bellatrix
-      {x: 20, y: 0}, {x: 30, y: 0}, {x: 40, y: 0}, // Belt
-      {x: 10, y: 50}, {x: 50, y: 45} // Saiph & Rigel
-    ],
-    edges: [[0,2], [1,4], [0,1], [2,3], [3,4], [2,5], [4,6], [5,6]]
-  }
-];
-
-const NODE_COUNT = 40;
+const NODE_COUNT = 52;
 let nodes = [];
-let constGroups = [];
 let maxDist = 170;
 
 function makeNodes() {
   nodes = [];
-  constGroups = [];
-
-  // 1. Spawn Real Constellations as Cohesive Group Systems
-  REAL_CONSTELLATIONS.forEach((cData, groupIdx) => {
-    const anchorX = 100 + Math.random() * (W - 300);
-    const anchorY = 100 + Math.random() * (H - 300);
-    const vx = (Math.random() - 0.5) * 8;
-    const vy = (Math.random() - 0.5) * 8;
-
-    const group = { anchorX, anchorY, vx, vy, edges: cData.edges, nodes: [] };
-
-    cData.stars.forEach(s => {
-      const node = {
-        x: anchorX + s.x,
-        y: anchorY + s.y,
-        relX: s.x,
-        relY: s.y,
-        size: 2.2 + Math.random() * 1.5,
-        color: [255, 255, 255],
-        group: group
-      };
-      nodes.push(node);
-      group.nodes.push(node);
-    });
-
-    constGroups.push(group);
-  });
-
-  // 2. Fill background with dynamic ambient stars
   for (let i = 0; i < NODE_COUNT; i++) {
-    const speed = 6 + Math.random() * 10;
+    const speed = 6 + Math.random() * 10; // px/sec
     const dir = Math.random() * Math.PI * 2;
     nodes.push({
       x: Math.random() * W,
       y: Math.random() * H,
       vx: Math.cos(dir) * speed,
       vy: Math.sin(dir) * speed,
-      size: 1.4 + Math.random() * 1.8,
+      size: 1.6 + Math.random() * 2.2,
       color: [200, 200, 200],
-      group: null
     });
   }
 }
@@ -238,26 +147,9 @@ function frame(now) {
   const dt = Math.min(0.05, t - lastT);
   lastT = t;
 
-  // Move Constellation Groups
-  for (const g of constGroups) {
-    g.anchorX += g.vx * dt;
-    g.anchorY += g.vy * dt;
-
-    if (g.anchorX < 50 || g.anchorX > W - 200) g.vx *= -1;
-    if (g.anchorY < 50 || g.anchorY > H - 200) g.vy *= -1;
-
-    g.nodes.forEach(n => {
-      n.x = g.anchorX + n.relX;
-      n.y = g.anchorY + n.relY;
-    });
-  }
-
-  // Move Ambient Stars
   for (const n of nodes) {
-    if (n.group) continue;
     n.x += n.vx * dt;
     n.y += n.vy * dt;
-
     if (n.x < 0) { n.x = 0; n.vx *= -1; }
     if (n.x > W) { n.x = W; n.vx *= -1; }
     if (n.y < 0) { n.y = 0; n.vy *= -1; }
@@ -265,34 +157,19 @@ function frame(now) {
   }
 
   ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
-  ctx.fillStyle = rgba(theme.surface || [12, 20, 27], 0.22);
+  ctx.globalCompositeOperation = 'source-over';
+  ctx.fillStyle = rgba(theme.surface || [12, 20, 27], 0.16);
   ctx.fillRect(0, 0, W, H);
 
-  // 1. Draw Real Constellation Structural Lines
-  for (const g of constGroups) {
-    g.edges.forEach(([i1, i2]) => {
-      const a = g.nodes[i1], b = g.nodes[i2];
-      ctx.strokeStyle = rgba(theme.primary || [138, 206, 255], 0.65);
-      ctx.lineWidth = 1.2;
-      ctx.beginPath();
-      ctx.moveTo(a.x, a.y);
-      ctx.lineTo(b.x, b.y);
-      ctx.stroke();
-    });
-  }
-
-  // 2. Dynamic Ambient Network Lines
   for (let i = 0; i < nodes.length; i++) {
     for (let j = i + 1; j < nodes.length; j++) {
       const a = nodes[i], b = nodes[j];
-      if (a.group && b.group && a.group === b.group) continue; // skip internal structural lines already drawn
-
       const dx = a.x - b.x, dy = a.y - b.y;
-      const dist = Math.hypot(dx, dy);
+      const dist = Math.sqrt(dx * dx + dy * dy);
       if (dist < maxDist) {
-        const alpha = (1 - dist / maxDist) * 0.35;
+        const alpha = (1 - dist / maxDist) * 0.45;
         ctx.strokeStyle = rgba(mixColor(a.color, b.color), alpha);
-        ctx.lineWidth = 0.8;
+        ctx.lineWidth = 1;
         ctx.beginPath();
         ctx.moveTo(a.x, a.y);
         ctx.lineTo(b.x, b.y);
@@ -301,12 +178,11 @@ function frame(now) {
     }
   }
 
-  // 3. Render Stars
   for (const n of nodes) {
     ctx.beginPath();
     ctx.arc(n.x, n.y, n.size, 0, Math.PI * 2);
-    ctx.shadowColor = rgba(n.color, 0.8);
-    ctx.shadowBlur = n.size * 3;
+    ctx.shadowColor = rgba(n.color, 0.7);
+    ctx.shadowBlur = n.size * 2.5;
     ctx.fillStyle = rgba(n.color, 0.95);
     ctx.fill();
     ctx.shadowBlur = 0;
@@ -315,15 +191,14 @@ function frame(now) {
   requestAnimationFrame(frame);
 }
 
-if (typeof startClock === 'function') {
-  startClock(clockEl, dateEl);
-}
+startClock(clockEl, dateEl);
 
-let uiVisible = true;
+let clockVisible = true;
 window.addEventListener('keydown', (e) => {
   if (e.key.toLowerCase() === 'c') {
-    uiVisible = !uiVisible;
-    uiContainer.classList.toggle('hidden', !uiVisible);
+    clockVisible = !clockVisible;
+    clockEl.classList.toggle('hidden', !clockVisible);
+    dateEl.classList.toggle('hidden', !clockVisible);
   }
 });
 
@@ -334,6 +209,7 @@ window.addEventListener('load', () => {
   resize();
   makeNodes();
   loadTheme();
+  maxDist = Math.min(W, H) * 0.13;
   requestAnimationFrame(frame);
 });
 </script>

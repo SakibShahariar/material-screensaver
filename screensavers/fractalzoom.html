@@ -2,13 +2,13 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<title>Material Screensaver — Organic Harmonic Field</title>
+<title>Material Screensaver — Fractal Zoom</title>
 <style>
   :root {
     --primary_rgb: 138 206 255; --primary_container_rgb: 0 75 111;
     --secondary_rgb: 180 199 233; --secondary_container_rgb: 53 72 99;
     --tertiary_rgb: 186 196 250; --tertiary_container_rgb: 58 68 114;
-    --surface_rgb: 8 12 18; --outline_rgb: 137 146 154;
+    --surface_rgb: 6 10 14; --outline_rgb: 137 146 154;
   }
   html, body {
     margin: 0; padding: 0; width: 100%; height: 100%;
@@ -17,34 +17,38 @@
   }
   canvas { display: block; width: 100vw; height: 100vh; }
 
-  #clock {
+  #hud-container {
     position: fixed; left: 40px; bottom: 36px;
+    pointer-events: none; transition: opacity 0.6s ease;
+    display: flex; flex-direction: column; gap: 4px;
+  }
+  #clock {
     font-weight: 300; font-variant-numeric: tabular-nums;
     letter-spacing: -1.5px; font-size: clamp(48px, 6vw, 76px);
     line-height: 1;
     text-shadow: 0 4px 24px rgba(0, 0, 0, 0.8), 0 1px 3px rgba(0, 0, 0, 0.9);
-    pointer-events: none; transition: opacity 0.6s ease;
   }
   #clock .ampm {
     font-size: 0.3em; margin-left: 6px; opacity: 0.8;
     vertical-align: super; font-weight: 400; letter-spacing: 1px;
   }
   #date {
-    position: fixed; left: 42px; bottom: 18px;
     font-size: clamp(11px, 1.2vw, 15px); letter-spacing: 3px;
     text-transform: uppercase;
-    opacity: 0.85; text-shadow: 0 2px 12px rgba(0, 0, 0, 0.8);
-    pointer-events: none; transition: opacity 0.6s ease;
+    text-shadow: 0 2px 12px rgba(0, 0, 0, 0.8), 0 1px 2px rgba(0, 0, 0, 0.9);
   }
   #hint {
     position: fixed; right: 32px; bottom: 32px;
     font-size: 11px; letter-spacing: 1.5px; text-transform: uppercase;
     opacity: 0; transition: opacity 0.8s ease;
-    text-shadow: 0 2px 8px rgba(0,0,0,0.8); pointer-events: none;
+    text-shadow: 0 2px 8px rgba(0,0,0,0.8);
+    pointer-events: none;
   }
   #hint.show { opacity: 0.6; }
-  #clock.hidden, #date.hidden { opacity: 0; }
+  #hud-container.hidden { opacity: 0; }
 
+  /* fallback message if WebGL is unavailable — never a blocking alert() in an
+     unattended kiosk screensaver, since nothing would be there to dismiss it */
   #fallback {
     display: none;
     position: fixed; inset: 0;
@@ -57,15 +61,19 @@
 </head>
 <body>
 <canvas id="c"></canvas>
-<div id="fallback">Organic Harmonic Field needs WebGL, which isn't available in this browser.<br>Try Chromium, Firefox, or another WebGL-capable browser.</div>
+<div id="fallback">Fractal Zoom needs WebGL, which isn't available in this browser.<br>Try Chromium, Firefox, or another WebGL-capable browser.</div>
 
-<div id="clock">00:00</div>
-<div id="date">Mon, Jan 1</div>
+<div id="hud-container">
+  <div id="clock">00:00</div>
+  <div id="date">Mon, Jan 1</div>
+</div>
 <div id="hint">Press C to toggle clock</div>
+
 <script src="clock-shared.js"></script>
 <script>
 const canvas = document.getElementById('c');
 const gl = canvas.getContext('webgl', { preserveDrawingBuffer: false, antialias: false });
+const hudContainer = document.getElementById('hud-container');
 const clockEl = document.getElementById('clock');
 const dateEl = document.getElementById('date');
 const hintEl = document.getElementById('hint');
@@ -74,10 +82,11 @@ const fallbackEl = document.getElementById('fallback');
 function rgba(rgb, a) { return `rgba(${rgb[0]}, ${rgb[1]}, ${rgb[2]}, ${a})`; }
 
 if (!gl) {
-  // no blocking alert() — a stuck dialog would break the unattended kiosk cycle
+  // no blocking alert() — a stuck dialog would break the unattended kiosk cycle.
+  // show an inline message and just let the daemon's own timeout move on.
   canvas.style.display = 'none';
   fallbackEl.style.display = 'flex';
-  console.warn('Organic Harmonic Field: WebGL is not available in this browser.');
+  console.warn('Fractal Zoom: WebGL is not available in this browser.');
 } else {
   let dpr = Math.min(window.devicePixelRatio || 1, 2);
   function resize() {
@@ -100,16 +109,14 @@ if (!gl) {
     const secondary = readRGB('--secondary_rgb', [180, 199, 233]);
     const tertiary = readRGB('--tertiary_rgb', [186, 196, 250]);
     const outline = readRGB('--outline_rgb', [137, 146, 154]);
-    const primaryContainer = readRGB('--primary_container_rgb', [0, 75, 111]);
     theme = {
-      surface: readRGB('--surface_rgb', [8, 12, 18]).map(v => v / 255),
+      surface: readRGB('--surface_rgb', [6, 10, 14]).map(v => v / 255),
       primary: primary.map(v => v / 255),
       secondary: secondary.map(v => v / 255),
       tertiary: tertiary.map(v => v / 255),
-      primaryContainer: primaryContainer.map(v => v / 255),
     };
-    // JS-computed literal colors — proven reliable across browsers, rather than
-    // static CSS var() rules which have silently failed in this setup before
+    // JS-computed literal colors for HUD text — proven reliable across browsers,
+    // rather than static CSS var() rules which have silently failed here before
     clockEl.style.color = rgba(primary, 1);
     dateEl.style.color = rgba(secondary, 0.85);
     hintEl.style.color = rgba(outline, 1);
@@ -126,45 +133,44 @@ if (!gl) {
   const fsSource = `
     precision highp float;
     uniform vec2 u_resolution;
-    uniform float u_time;
+    uniform float u_zoom;
+    uniform vec2 u_target;
     uniform vec3 u_col1;
     uniform vec3 u_col2;
     uniform vec3 u_col3;
-    uniform vec3 u_col4;
     uniform vec3 u_surface;
 
-    // one domain-warp pass: organic flowing offset field at a given scale/speed
-    vec2 warp(vec2 st, float t, float freq, float speed) {
-      vec2 q;
-      q.x = sin(st.x * freq + t * speed) + cos(st.y * freq * 0.8 - t * speed * 0.6);
-      q.y = sin(st.y * freq * 0.9 - t * speed * 0.7) + cos(st.x * freq * 1.1 + t * speed * 0.8);
-      return q;
-    }
-
     void main() {
-      vec2 st = (gl_FragCoord.xy * 2.0 - u_resolution.xy) / min(u_resolution.x, u_resolution.y);
-      float t = u_time * 0.22;
+      vec2 st = (gl_FragCoord.xy - u_resolution * 0.5) / min(u_resolution.x, u_resolution.y);
+      vec2 c = st * (3.0 / u_zoom) + u_target;
 
-      // first warp layer: broad organic flow
-      vec2 q = warp(st, t, 1.5, 0.8);
-      // second warp layer, fed by the first — classic "double domain-warp" technique,
-      // adds richer turbulent detail instead of one repetitive flow pattern
-      vec2 r = warp(st + q * 0.6, t * 1.3, 2.6, 0.5);
+      vec2 z = vec2(0.0);
+      float n = 0.0;
+      float maxIter = 120.0 + min(log(u_zoom) * 25.0, 300.0);
 
-      float f = sin(q.x + q.y + r.x * r.y * 2.0);
-      float f2 = sin(r.x * 1.7 - r.y * 1.3 + t * 0.4);
+      for (float i = 0.0; i < 420.0; i++) {
+        if (i > maxIter) break;
+        if (dot(z, z) > 4.0) {
+          n = i;
+          break;
+        }
+        z = vec2(z.x * z.x - z.y * z.y, 2.0 * z.x * z.y) + c;
+      }
 
-      vec3 col = mix(u_surface, u_col1, clamp(f * 0.5 + 0.5, 0.0, 1.0));
-      col = mix(col, u_col2, clamp(r.x * r.y, 0.0, 1.0));
-      col = mix(col, u_col3, clamp(abs(q.x * 0.3), 0.0, 1.0));
-      col = mix(col, u_col4, clamp(f2 * 0.5 + 0.5, 0.0, 1.0) * 0.35);
+      if (n == 0.0 || dot(z, z) <= 4.0) {
+        gl_FragColor = vec4(u_surface * 0.6, 1.0);
+      } else {
+        float log_zn = log(dot(z, z)) / 2.0;
+        float nu = log(log_zn / 0.693147) / 0.693147;
+        float iter = n + 1.0 - nu;
 
-      vec2 uv = gl_FragCoord.xy / u_resolution.xy;
-      float vignette = uv.x * uv.y * (1.0 - uv.x) * (1.0 - uv.y);
-      vignette = clamp(pow(16.0 * vignette, 0.22), 0.0, 1.0);
-      col = mix(u_surface, col, vignette); // fade to theme surface color at edges, not flat black
+        float t = fract(iter * 0.03 + u_zoom * 0.0001);
+        vec3 col = mix(u_col1, u_col2, sin(t * 3.1415) * 0.5 + 0.5);
+        col = mix(col, u_col3, cos(t * 6.2831) * 0.5 + 0.5);
+        col *= smoothstep(0.0, 1.0, fract(iter * 0.1)) * 0.85 + 0.15;
 
-      gl_FragColor = vec4(col, 1.0);
+        gl_FragColor = vec4(col, 1.0);
+      }
     }
   `;
 
@@ -173,7 +179,7 @@ if (!gl) {
     gl.shaderSource(shader, source);
     gl.compileShader(shader);
     if (!gl.getShaderParameter(shader, gl.COMPILE_STATUS)) {
-      console.error(`Organic Harmonic Field: ${label} shader failed to compile:`, gl.getShaderInfoLog(shader));
+      console.error(`Fractal Zoom: ${label} shader failed to compile:`, gl.getShaderInfoLog(shader));
       return null;
     }
     return shader;
@@ -189,15 +195,16 @@ if (!gl) {
     gl.attachShader(program, fs);
     gl.linkProgram(program);
     if (!gl.getProgramParameter(program, gl.LINK_STATUS)) {
-      console.error('Organic Harmonic Field: shader program failed to link:', gl.getProgramInfoLog(program));
+      console.error('Fractal Zoom: shader program failed to link:', gl.getProgramInfoLog(program));
       program = null;
     }
   }
 
   if (!program) {
+    // shader setup failed on this hardware/driver — same non-blocking fallback as missing WebGL
     canvas.style.display = 'none';
     fallbackEl.style.display = 'flex';
-    fallbackEl.textContent = 'Organic Harmonic Field failed to initialize on this system. Check the browser console for details.';
+    fallbackEl.textContent = 'Fractal Zoom failed to initialize on this system. Check the browser console for details.';
   } else {
     gl.useProgram(program);
 
@@ -213,24 +220,41 @@ if (!gl) {
     gl.vertexAttribPointer(posAttr, 2, gl.FLOAT, false, 0, 0);
 
     const uResLoc = gl.getUniformLocation(program, 'u_resolution');
-    const uTimeLoc = gl.getUniformLocation(program, 'u_time');
+    const uZoomLoc = gl.getUniformLocation(program, 'u_zoom');
+    const uTargetLoc = gl.getUniformLocation(program, 'u_target');
     const uCol1Loc = gl.getUniformLocation(program, 'u_col1');
     const uCol2Loc = gl.getUniformLocation(program, 'u_col2');
     const uCol3Loc = gl.getUniformLocation(program, 'u_col3');
-    const uCol4Loc = gl.getUniformLocation(program, 'u_col4');
     const uSurfaceLoc = gl.getUniformLocation(program, 'u_surface');
 
+    // a few known visually-rich "seahorse valley"-style boundary points
+    const TARGETS = [
+      [-0.743643887037158704752191506114774, 0.131825904205311970493132056385139],
+      [-0.16, 1.0405],
+      [0.2869322288108422, 0.014286697309044],
+      [-1.25066, 0.02012],
+    ];
+
+    let targetIdx = 0;
     let startTime = performance.now();
 
     function frame(now) {
       const elapsed = (now - startTime) / 1000;
+      // zoom cycles every 30s and tops out around 14,765x — chosen to stay
+      // safely inside 32-bit float precision before visual artifacts appear
+      const zoom = Math.exp((elapsed % 30) * 0.32) + 1.0;
+
+      if ((elapsed % 30) < 0.05) {
+        targetIdx = (targetIdx + 1) % TARGETS.length;
+      }
 
       gl.uniform2f(uResLoc, canvas.width, canvas.height);
-      gl.uniform1f(uTimeLoc, elapsed);
+      gl.uniform1f(uZoomLoc, zoom);
+      gl.uniform2f(uTargetLoc, TARGETS[targetIdx][0], TARGETS[targetIdx][1]);
+
       gl.uniform3fv(uCol1Loc, theme.primary);
       gl.uniform3fv(uCol2Loc, theme.secondary);
       gl.uniform3fv(uCol3Loc, theme.tertiary);
-      gl.uniform3fv(uCol4Loc, theme.primaryContainer);
       gl.uniform3fv(uSurfaceLoc, theme.surface);
 
       gl.drawArrays(gl.TRIANGLES, 0, 6);
@@ -245,8 +269,7 @@ let clockVisible = true;
 window.addEventListener('keydown', (e) => {
   if (e.key.toLowerCase() === 'c') {
     clockVisible = !clockVisible;
-    clockEl.classList.toggle('hidden', !clockVisible);
-    dateEl.classList.toggle('hidden', !clockVisible);
+    hudContainer.classList.toggle('hidden', !clockVisible);
   }
 });
 
