@@ -22,6 +22,7 @@
     margin: 0; padding: 0; width: 100%; height: 100%;
     overflow: hidden; background: rgb(var(--surface_rgb)); cursor: none;
   }
+  body.show-cursor { cursor: default; }
   canvas { display: block; width: 100vw; height: 100vh; }
   #clock {
     position: fixed; left: 32px; bottom: 28px;
@@ -68,6 +69,15 @@ const clockEl = document.getElementById('clock');
 const dateEl = document.getElementById('date');
 const hintEl = document.getElementById('hint');
 
+let cursorTimeout;
+window.addEventListener('pointermove', () => {
+  document.body.classList.add('show-cursor');
+  clearTimeout(cursorTimeout);
+  cursorTimeout = setTimeout(() => {
+    document.body.classList.remove('show-cursor');
+  }, 2500);
+});
+
 let dpr = Math.min(window.devicePixelRatio || 1, 2);
 let W, H;
 function resize() {
@@ -78,39 +88,55 @@ function resize() {
   ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
   ctx.fillStyle = 'rgb(12, 20, 27)';
   ctx.fillRect(0, 0, W, H);
+  maxDist = Math.min(W, H) * 0.13;
 }
 window.addEventListener('resize', resize);
 
 const reduceMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
-const speedMul = reduceMotion ? 0.15 : 1;
+const speedMul = reduceMotion ? 0.2 : 1;
 
-function readRGB(name) {
+function readRGB(name, fallback) {
   const raw = getComputedStyle(document.documentElement).getPropertyValue(name).trim();
   const parts = raw.split(/\s+/).map(Number);
   if (parts.length === 3 && parts.every(n => !isNaN(n))) return parts;
-  return [200, 200, 200];
+  return fallback;
 }
 function rgba(rgb, a) { return `rgba(${rgb[0]}, ${rgb[1]}, ${rgb[2]}, ${a})`; }
 
 let theme = {};
 let roleList = [];
-function loadTheme() {
+
+async function loadMatugenColors() {
+  try {
+    const res = await fetch('file:///home/sakib/.config/matugen/matugen-colors.css');
+    if (res.ok) {
+      const cssText = await res.text();
+      const styleTag = document.createElement('style');
+      styleTag.textContent = cssText;
+      document.head.appendChild(styleTag);
+    }
+  } catch (e) {}
+  applyTheme();
+}
+
+function applyTheme() {
   theme = {
-    surface: readRGB('--surface_rgb'),
-    primary: readRGB('--primary_rgb'),
-    primaryContainer: readRGB('--primary_container_rgb'),
-    secondary: readRGB('--secondary_rgb'),
-    secondaryContainer: readRGB('--secondary_container_rgb'),
-    tertiary: readRGB('--tertiary_rgb'),
-    tertiaryContainer: readRGB('--tertiary_container_rgb'),
-    inversePrimary: readRGB('--inverse_primary_rgb'),
-    outline: readRGB('--outline_rgb'),
+    surface: readRGB('--surface_rgb', [12, 20, 27]),
+    primary: readRGB('--primary_rgb', [138, 206, 255]),
+    primaryContainer: readRGB('--primary_container_rgb', [0, 75, 111]),
+    secondary: readRGB('--secondary_rgb', [180, 199, 233]),
+    secondaryContainer: readRGB('--secondary_container_rgb', [53, 72, 99]),
+    tertiary: readRGB('--tertiary_rgb', [186, 196, 250]),
+    tertiaryContainer: readRGB('--tertiary_container_rgb', [58, 68, 114]),
+    inversePrimary: readRGB('--inverse_primary_rgb', [0, 100, 145]),
+    outline: readRGB('--outline_rgb', [137, 146, 154]),
   };
   roleList = [theme.primary, theme.secondary, theme.tertiary, theme.primaryContainer, theme.secondaryContainer, theme.tertiaryContainer, theme.inversePrimary];
 
   clockEl.style.color = rgba(theme.primary, 0.92);
   dateEl.style.color = rgba(theme.secondary, 0.85);
   hintEl.style.color = rgba(theme.outline, 0.9);
+  document.body.style.backgroundColor = `rgb(${theme.surface.join(',')})`;
 
   nodes.forEach((n, i) => { n.color = roleList[i % roleList.length]; });
 }
@@ -122,7 +148,7 @@ let maxDist = 170;
 function makeNodes() {
   nodes = [];
   for (let i = 0; i < NODE_COUNT; i++) {
-    const speed = 6 + Math.random() * 10; // px/sec
+    const speed = (6 + Math.random() * 10) * speedMul;
     const dir = Math.random() * Math.PI * 2;
     nodes.push({
       x: Math.random() * W,
@@ -130,7 +156,7 @@ function makeNodes() {
       vx: Math.cos(dir) * speed,
       vy: Math.sin(dir) * speed,
       size: 1.6 + Math.random() * 2.2,
-      color: [200, 200, 200],
+      color: roleList.length ? roleList[i % roleList.length] : [200, 200, 200],
     });
   }
 }
@@ -143,7 +169,7 @@ let start = performance.now();
 let lastT = 0;
 
 function frame(now) {
-  const t = ((now - start) / 1000) * speedMul;
+  const t = ((now - start) / 1000);
   const dt = Math.min(0.05, t - lastT);
   lastT = t;
 
@@ -158,7 +184,8 @@ function frame(now) {
 
   ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
   ctx.globalCompositeOperation = 'source-over';
-  ctx.fillStyle = rgba(theme.surface || [12, 20, 27], 0.16);
+  const surf = theme.surface || [12, 20, 27];
+  ctx.fillStyle = rgba(surf, 0.16);
   ctx.fillRect(0, 0, W, H);
 
   for (let i = 0; i < nodes.length; i++) {
@@ -191,8 +218,6 @@ function frame(now) {
   requestAnimationFrame(frame);
 }
 
-startClock(clockEl, dateEl);
-
 let clockVisible = true;
 window.addEventListener('keydown', (e) => {
   if (e.key.toLowerCase() === 'c') {
@@ -205,11 +230,11 @@ window.addEventListener('keydown', (e) => {
 hintEl.classList.add('show');
 setTimeout(() => hintEl.classList.remove('show'), 4000);
 
-window.addEventListener('load', () => {
+window.addEventListener('load', async () => {
   resize();
   makeNodes();
-  loadTheme();
-  maxDist = Math.min(W, H) * 0.13;
+  await loadMatugenColors();
+  startClock(clockEl, dateEl);
   requestAnimationFrame(frame);
 });
 </script>

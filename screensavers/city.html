@@ -17,6 +17,7 @@
     margin: 0; padding: 0; width: 100%; height: 100%;
     overflow: hidden; background: rgb(var(--surface_rgb)); cursor: none;
   }
+  body.show-cursor { cursor: default; }
   canvas { display: block; width: 100vw; height: 100vh; }
   #clock {
     position: fixed; left: 32px; bottom: 28px;
@@ -63,6 +64,15 @@ const clockEl = document.getElementById('clock');
 const dateEl = document.getElementById('date');
 const hintEl = document.getElementById('hint');
 
+let cursorTimeout;
+window.addEventListener('pointermove', () => {
+  document.body.classList.add('show-cursor');
+  clearTimeout(cursorTimeout);
+  cursorTimeout = setTimeout(() => {
+    document.body.classList.remove('show-cursor');
+  }, 2500);
+});
+
 let dpr = Math.min(window.devicePixelRatio || 1, 2);
 let W, H;
 function resize() {
@@ -77,30 +87,46 @@ function resize() {
 window.addEventListener('resize', resize);
 
 const reduceMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+const speedMul = reduceMotion ? 0.3 : 1;
 
-function readRGB(name) {
+function readRGB(name, fallback) {
   const raw = getComputedStyle(document.documentElement).getPropertyValue(name).trim();
   const parts = raw.split(/\s+/).map(Number);
   if (parts.length === 3 && parts.every(n => !isNaN(n))) return parts;
-  return [200, 200, 200];
+  return fallback;
 }
 function rgba(rgb, a) { return `rgba(${rgb[0]}, ${rgb[1]}, ${rgb[2]}, ${a})`; }
 
 let theme = {};
 let windowColors = [];
-function loadTheme() {
+
+async function loadMatugenColors() {
+  try {
+    const res = await fetch('file:///home/sakib/.config/matugen/matugen-colors.css');
+    if (res.ok) {
+      const cssText = await res.text();
+      const styleTag = document.createElement('style');
+      styleTag.textContent = cssText;
+      document.head.appendChild(styleTag);
+    }
+  } catch (e) {}
+  applyTheme();
+}
+
+function applyTheme() {
   theme = {
-    surface: readRGB('--surface_rgb'),
-    surfaceLow: readRGB('--surface_container_lowest_rgb'),
-    primary: readRGB('--primary_rgb'),
-    secondary: readRGB('--secondary_rgb'),
-    tertiary: readRGB('--tertiary_rgb'),
-    outline: readRGB('--outline_rgb'),
+    surface: readRGB('--surface_rgb', [12, 20, 27]),
+    surfaceLow: readRGB('--surface_container_lowest_rgb', [7, 15, 21]),
+    primary: readRGB('--primary_rgb', [138, 206, 255]),
+    secondary: readRGB('--secondary_rgb', [180, 199, 233]),
+    tertiary: readRGB('--tertiary_rgb', [186, 196, 250]),
+    outline: readRGB('--outline_rgb', [137, 146, 154]),
   };
   windowColors = [theme.primary, theme.secondary, theme.tertiary];
   clockEl.style.color = rgba(theme.primary, 0.92);
   dateEl.style.color = rgba(theme.secondary, 0.85);
   hintEl.style.color = rgba(theme.outline, 0.9);
+  document.body.style.backgroundColor = `rgb(${theme.surface.join(',')})`;
 }
 
 let buildings = [];
@@ -169,12 +195,14 @@ function makeStars() {
 let start = performance.now();
 
 function frame(now) {
-  const t = (now - start) / 1000;
+  const t = ((now - start) / 1000) * speedMul;
 
   ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
   const sky = ctx.createLinearGradient(0, 0, 0, H);
-  sky.addColorStop(0, `rgb(${(theme.surfaceLow || [7, 15, 21]).join(',')})`);
-  sky.addColorStop(1, `rgb(${(theme.surface || [12, 20, 27]).join(',')})`);
+  const surfLow = theme.surfaceLow || [7, 15, 21];
+  const surf = theme.surface || [12, 20, 27];
+  sky.addColorStop(0, `rgb(${surfLow.join(',')})`);
+  sky.addColorStop(1, `rgb(${surf.join(',')})`);
   ctx.fillStyle = sky;
   ctx.fillRect(0, 0, W, H);
 
@@ -208,7 +236,7 @@ function frame(now) {
     for (const w of b.windows) {
       if (t >= w.nextToggle) {
         w.on = Math.random() < 0.55;
-        w.nextToggle = t + 4 + Math.random() * 20;
+        w.nextToggle = t + (4 + Math.random() * 20) * speedMul;
       }
       if (w.on) {
         ctx.fillStyle = rgba(windowColors[w.colorIdx], 0.85);
@@ -232,9 +260,9 @@ window.addEventListener('keydown', (e) => {
 hintEl.classList.add('show');
 setTimeout(() => hintEl.classList.remove('show'), 4000);
 
-window.addEventListener('load', () => {
+window.addEventListener('load', async () => {
+  await loadMatugenColors();
   resize();
-  loadTheme();
   startClock(clockEl, dateEl);
   requestAnimationFrame(frame);
 });

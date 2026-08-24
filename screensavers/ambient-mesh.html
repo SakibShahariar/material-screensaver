@@ -1,0 +1,251 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Material Screensaver — Ambient Mesh</title>
+<style>
+  :root {
+    --primary_rgb: 138 206 255;
+    --secondary_rgb: 180 199 233;
+    --tertiary_rgb: 186 196 250;
+    --surface_rgb: 8 12 18;
+    --outline_rgb: 137 146 154;
+  }
+  
+  html, body {
+    margin: 0; padding: 0; width: 100%; height: 100%;
+    overflow: hidden; background: rgb(var(--surface_rgb, 8 12 18));
+    font-family: "Google Sans", "Segoe UI", Roboto, system-ui, sans-serif;
+    -webkit-font-smoothing: antialiased;
+    user-select: none;
+  }
+
+  body { cursor: none; }
+  body.show-cursor { cursor: default; }
+
+  canvas {
+    position: absolute; inset: 0;
+    width: 100vw; height: 100vh;
+    z-index: 1; pointer-events: none;
+  }
+
+  .content-wrapper {
+    position: absolute; inset: 0; z-index: 2;
+    display: flex; flex-direction: column; justify-content: flex-end;
+    padding: 64px 80px;
+    box-sizing: border-box;
+    pointer-events: none;
+    transition: opacity 0.6s cubic-bezier(0.16, 1, 0.3, 1), transform 0.6s cubic-bezier(0.16, 1, 0.3, 1);
+  }
+  .content-wrapper.hidden {
+    opacity: 0;
+    transform: translateY(16px);
+  }
+
+  .vignette-card {
+    background: radial-gradient(circle at bottom left, rgb(var(--surface_rgb) / 0.75) 0%, rgb(var(--surface_rgb) / 0.2) 75%);
+    backdrop-filter: blur(20px);
+    -webkit-backdrop-filter: blur(20px);
+    padding: 32px 42px;
+    width: fit-content;
+    border-radius: 28px;
+    border: 1px solid rgb(var(--outline_rgb) / 0.12);
+    box-shadow: 0 20px 50px rgba(0, 0, 0, 0.5), inset 0 1px 0 rgba(255, 255, 255, 0.04);
+  }
+
+  #clock {
+    font-size: clamp(64px, 9vw, 130px);
+    font-weight: 200;
+    font-variant-numeric: tabular-nums;
+    letter-spacing: -3px;
+    line-height: 0.95;
+    color: rgb(var(--primary_rgb, 138 206 255));
+    text-shadow: 0 2px 16px rgba(0, 0, 0, 0.3);
+  }
+  #clock .ampm {
+    font-size: 0.26em;
+    margin-left: 12px;
+    font-weight: 500;
+    letter-spacing: 2px;
+    vertical-align: super;
+    opacity: 0.7;
+    text-transform: uppercase;
+  }
+
+  #date {
+    font-size: clamp(13px, 1.3vw, 16px);
+    letter-spacing: 4px;
+    text-transform: uppercase;
+    color: rgb(var(--secondary_rgb, 180 199 233));
+    opacity: 0.85;
+    margin-top: 12px;
+    font-weight: 500;
+  }
+
+  #hint {
+    position: fixed; right: 80px; top: 80px; z-index: 10;
+    font-size: 11px; letter-spacing: 2px;
+    color: rgb(var(--outline_rgb, 137 146 154));
+    opacity: 0; transition: opacity 0.6s ease;
+    text-transform: uppercase;
+    pointer-events: none;
+    padding: 10px 18px;
+    background: rgb(var(--surface_rgb) / 0.5);
+    backdrop-filter: blur(10px);
+    border: 1px solid rgb(var(--outline_rgb) / 0.1);
+    border-radius: 12px;
+  }
+  #hint.show { opacity: 0.7; }
+</style>
+<link rel="stylesheet" href="file:///home/sakib/.config/matugen/matugen-colors.css">
+</head>
+<body>
+
+<canvas id="meshCanvas"></canvas>
+
+<div class="content-wrapper">
+  <div class="vignette-card">
+    <div id="clock">00:00</div>
+    <div id="date">Mon, Jan 1</div>
+  </div>
+</div>
+
+<div id="hint">Press <b>C</b> to Toggle UI</div>
+
+<script src="clock-shared.js"></script>
+<script>
+const canvas = document.getElementById('meshCanvas');
+const ctx = canvas.getContext('2d');
+const clockEl = document.getElementById('clock');
+const dateEl = document.getElementById('date');
+const hintEl = document.getElementById('hint');
+const wrapperEl = document.querySelector('.content-wrapper');
+
+let cursorTimeout;
+function triggerCursor() {
+  document.body.classList.add('show-cursor');
+  clearTimeout(cursorTimeout);
+  cursorTimeout = setTimeout(() => {
+    document.body.classList.remove('show-cursor');
+  }, 2500);
+}
+window.addEventListener('pointermove', triggerCursor);
+window.addEventListener('pointerdown', triggerCursor);
+
+let dpr = Math.min(window.devicePixelRatio || 1, 2);
+let W, H;
+function resize() {
+  W = window.innerWidth;
+  H = window.innerHeight;
+  canvas.width = W * dpr;
+  canvas.height = H * dpr;
+  ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+}
+window.addEventListener('resize', resize);
+resize();
+
+function readRGB(name, fallback) {
+  const raw = getComputedStyle(document.documentElement).getPropertyValue(name).trim();
+  const parts = raw.split(/\s+/).map(Number);
+  return (parts.length === 3 && parts.every(n => !isNaN(n))) ? parts : fallback;
+}
+function rgba(rgb, a) {
+  const c = rgb || [138, 206, 255];
+  return `rgba(${c[0]}, ${c[1]}, ${c[2]}, ${a})`;
+}
+
+let theme = {};
+function loadTheme() {
+  theme = {
+    surface: readRGB('--surface_rgb', [8, 12, 18]),
+    primary: readRGB('--primary_rgb', [138, 206, 255]),
+    secondary: readRGB('--secondary_rgb', [180, 199, 233]),
+    tertiary: readRGB('--tertiary_rgb', [186, 196, 250]),
+  };
+  document.body.style.backgroundColor = rgbCss(theme.surface);
+}
+function rgbCss(rgb) { return `rgb(${rgb[0]}, ${rgb[1]}, ${rgb[2]})`; }
+
+// Multi-point fluid mesh gradient with floating organic nodes
+const nodes = [
+  { xRatio: 0.2, yRatio: 0.3, vx: 0.4, vy: 0.3, rMultiplier: 0.7, colorKey: 'primary' },
+  { xRatio: 0.8, yRatio: 0.7, vx: -0.3, vy: -0.4, rMultiplier: 0.8, colorKey: 'secondary' },
+  { xRatio: 0.5, yRatio: 0.5, vx: 0.3, vy: -0.3, rMultiplier: 0.9, colorKey: 'tertiary' },
+];
+
+let start = performance.now();
+
+function frame(now) {
+  const t = (now - start) / 1000 * 0.3;
+
+  ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+  ctx.fillStyle = rgba(theme.surface, 1);
+  ctx.fillRect(0, 0, W, H);
+
+  // Smooth composite blending for glowing mesh appearance
+  ctx.globalCompositeOperation = 'screen';
+
+  nodes.forEach((node, idx) => {
+    const cxCoord = W * node.xRatio + Math.sin(t * node.vx + idx) * (W * 0.25);
+    const cyCoord = H * node.yRatio + Math.cos(t * node.vy + idx) * (H * 0.25);
+    const radius = Math.max(W, H) * node.rMultiplier * (0.8 + 0.2 * Math.sin(t * 0.5 + idx));
+
+    const grad = ctx.createRadialGradient(cxCoord, cyCoord, 0, cxCoord, cyCoord, radius);
+    const col = theme[node.colorKey] || theme.primary;
+    
+    grad.addColorStop(0, rgba(col, 0.15));
+    grad.addColorStop(0.5, rgba(col, 0.05));
+    grad.addColorStop(1, 'rgba(0,0,0,0)');
+
+    ctx.fillStyle = grad;
+    ctx.fillRect(0, 0, W, H);
+  });
+
+  ctx.globalCompositeOperation = 'source-over';
+  requestAnimationFrame(frame);
+}
+
+function fallbackClock() {
+  const update = () => {
+    const now = new Date();
+    let hours = now.getHours();
+    const minutes = String(now.getMinutes()).padStart(2, '0');
+    const ampm = hours >= 12 ? 'PM' : 'AM';
+    hours = hours % 12 || 12;
+    clockEl.innerHTML = `${String(hours).padStart(2, '0')}:${minutes}<span class="ampm">${ampm}</span>`;
+
+    const options = { weekday: 'short', month: 'short', day: 'numeric' };
+    dateEl.textContent = now.toLocaleDateString('en-US', options);
+  };
+  update();
+  setInterval(update, 1000);
+}
+
+let uiVisible = true;
+window.addEventListener('keydown', (e) => {
+  if (e.key.toLowerCase() === 'c') {
+    uiVisible = !uiVisible;
+    wrapperEl.classList.toggle('hidden', !uiVisible);
+  }
+});
+
+hintEl.classList.add('show');
+setTimeout(() => hintEl.classList.remove('show'), 3500);
+
+window.addEventListener('load', () => {
+  loadTheme();
+  try {
+    if (typeof startClock === 'function') {
+      startClock(clockEl, dateEl);
+    } else {
+      fallbackClock();
+    }
+  } catch (err) {
+    fallbackClock();
+  }
+  requestAnimationFrame(frame);
+});
+</script>
+</body>
+</html>

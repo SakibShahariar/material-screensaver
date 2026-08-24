@@ -2,16 +2,15 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<title>Material Screensaver — Bounce</title>
+<title>Material Screensaver — Circuit Board</title>
 <style>
   :root {
     --primary_rgb: 138 206 255; --primary_container_rgb: 0 75 111;
     --secondary_rgb: 180 199 233; --secondary_container_rgb: 53 72 99;
     --tertiary_rgb: 186 196 250; --tertiary_container_rgb: 58 68 114;
-    --inverse_primary_rgb: 0 100 145;
-    --surface_rgb: 12 20 27; --outline_rgb: 137 146 154;
+    --surface_rgb: 10 16 12; --outline_rgb: 137 146 154;
   }
-  html, body { margin: 0; padding: 0; width: 100%; height: 100%; overflow: hidden; background: rgb(var(--surface_rgb)); cursor: none; }
+  html, body { margin: 0; padding: 0; width: 100%; height: 100%; overflow: hidden; background: rgb(var(--surface_rgb, 10 16 12)); cursor: none; }
   body.show-cursor { cursor: default; }
   canvas { display: block; width: 100vw; height: 100vh; }
   #clock { position: fixed; left: 32px; bottom: 28px; font-family: "Google Sans","Segoe UI",Roboto,system-ui,sans-serif; font-weight: 400; font-variant-numeric: tabular-nums; letter-spacing: 0.5px; font-size: clamp(28px,4vw,56px); text-shadow: 0 0 24px rgba(0,0,0,0.4); pointer-events: none; transition: opacity 0.6s ease; }
@@ -36,13 +35,16 @@ const clockEl = document.getElementById('clock');
 const dateEl = document.getElementById('date');
 const hintEl = document.getElementById('hint');
 
+let mouse = { x: -1000, y: -1000 };
 let cursorTimeout;
-window.addEventListener('pointermove', () => {
+window.addEventListener('pointermove', (e) => {
   document.body.classList.add('show-cursor');
   clearTimeout(cursorTimeout);
   cursorTimeout = setTimeout(() => {
     document.body.classList.remove('show-cursor');
   }, 2500);
+  mouse.x = e.clientX;
+  mouse.y = e.clientY;
 });
 
 let dpr = Math.min(window.devicePixelRatio || 1, 2);
@@ -51,14 +53,13 @@ function resize() {
   W = window.innerWidth; H = window.innerHeight;
   canvas.width = W * dpr; canvas.height = H * dpr;
   ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
-  ctx.fillStyle = 'rgb(12,20,27)';
-  ctx.fillRect(0, 0, W, H);
+  makeTraces();
 }
 window.addEventListener('resize', resize);
-resize();
 
 const reduceMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
-const speedMul = reduceMotion ? 0.3 : 1;
+const speedMul = reduceMotion ? 0.25 : 1;
+const GRID = 32;
 
 function readRGB(name, fallback) {
   const raw = getComputedStyle(document.documentElement).getPropertyValue(name).trim();
@@ -66,7 +67,10 @@ function readRGB(name, fallback) {
   if (parts.length === 3 && parts.every(n => !isNaN(n))) return parts;
   return fallback;
 }
-function rgba(rgb, a) { return `rgba(${rgb[0]}, ${rgb[1]}, ${rgb[2]}, ${a})`; }
+function rgba(rgb, a) {
+  const c = rgb || [200, 200, 200];
+  return `rgba(${c[0]}, ${c[1]}, ${c[2]}, ${a})`;
+}
 
 let theme = {};
 let roleList = [];
@@ -86,112 +90,135 @@ async function loadMatugenColors() {
 
 function applyTheme() {
   theme = {
-    surface: readRGB('--surface_rgb', [12, 20, 27]),
+    surface: readRGB('--surface_rgb', [10, 16, 12]),
     primary: readRGB('--primary_rgb', [138, 206, 255]),
     secondary: readRGB('--secondary_rgb', [180, 199, 233]),
     tertiary: readRGB('--tertiary_rgb', [186, 196, 250]),
     primaryContainer: readRGB('--primary_container_rgb', [0, 75, 111]),
     secondaryContainer: readRGB('--secondary_container_rgb', [53, 72, 99]),
-    tertiaryContainer: readRGB('--tertiary_container_rgb', [58, 68, 114]),
-    inversePrimary: readRGB('--inverse_primary_rgb', [0, 100, 145]),
     outline: readRGB('--outline_rgb', [137, 146, 154]),
   };
-  roleList = [theme.primary, theme.secondary, theme.tertiary, theme.primaryContainer, theme.secondaryContainer, theme.tertiaryContainer, theme.inversePrimary];
-  logo.color = roleList[0];
+  roleList = [theme.primary, theme.secondary, theme.tertiary, theme.primaryContainer];
+  
   clockEl.style.color = rgba(theme.primary, 0.92);
   dateEl.style.color = rgba(theme.secondary, 0.85);
   hintEl.style.color = rgba(theme.outline, 0.9);
   document.body.style.backgroundColor = `rgb(${theme.surface.join(',')})`;
 }
 
-const logo = { x: 200, y: 150, vx: 160, vy: 120, size: 48, color: [200, 200, 200], squishX: 1, squishY: 1 };
-let trail = [];
-let bursts = [];
+let traces = [];
+let nodes = [];
+function makeTraces() {
+  traces = [];
+  nodes = [];
+  const cols = Math.ceil(W / GRID), rows = Math.ceil(H / GRID);
+  const traceCount = 30;
 
-function pickNewColor() {
-  let next;
-  do { next = roleList[Math.floor(Math.random() * roleList.length)]; } while (next === logo.color && roleList.length > 1);
-  logo.color = next;
-}
-
-function spawnBurst(x, y, color) {
-  for (let i = 0; i < 24; i++) {
-    const angle = (i / 24) * Math.PI * 2;
-    const speed = 90 + Math.random() * 60;
-    bursts.push({
-      x, y, vx: Math.cos(angle) * speed, vy: Math.sin(angle) * speed,
-      life: 0, maxLife: 0.7, color,
-    });
+  for (let n = 0; n < traceCount; n++) {
+    let gx = Math.floor(Math.random() * cols), gy = Math.floor(Math.random() * rows);
+    const path = [[gx, gy]];
+    let dir = Math.floor(Math.random() * 4);
+    const steps = 6 + Math.floor(Math.random() * 10);
+    for (let s = 0; s < steps; s++) {
+      if (Math.random() < 0.35) dir = (dir + (Math.random() < 0.5 ? 1 : 3)) % 4;
+      const dx = [1, 0, -1, 0][dir], dy = [0, 1, 0, -1][dir];
+      gx = Math.max(0, Math.min(cols - 1, gx + dx));
+      gy = Math.max(0, Math.min(rows - 1, gy + dy));
+      path.push([gx, gy]);
+    }
+    traces.push(path.map(([x, y]) => [x * GRID, y * GRID]));
+    nodes.push([path[0][0] * GRID, path[0][1] * GRID]);
+    nodes.push([path[path.length - 1][0] * GRID, path[path.length - 1][1] * GRID]);
   }
 }
 
-function drawLogoShape(x, y, size, color, alpha, sX = 1, sY = 1) {
-  ctx.save();
-  ctx.translate(x, y);
-  ctx.scale(sX, sY);
-  ctx.beginPath();
-  const r = size * 0.32;
-  const half = size / 2;
-  ctx.moveTo(-half + r, -half);
-  ctx.arcTo(half, -half, half, half, r);
-  ctx.arcTo(half, half, -half, half, r);
-  ctx.arcTo(-half, half, -half, -half, r);
-  ctx.arcTo(-half, -half, half, -half, r);
-  ctx.closePath();
-  ctx.fillStyle = rgba(color, alpha);
-  ctx.fill();
-  ctx.restore();
+function traceLength(path) {
+  let len = 0;
+  for (let i = 1; i < path.length; i++) len += Math.hypot(path[i][0] - path[i - 1][0], path[i][1] - path[i - 1][1]);
+  return len;
+}
+
+function pointAtDistance(path, dist) {
+  let remaining = dist;
+  for (let i = 1; i < path.length; i++) {
+    const segLen = Math.hypot(path[i][0] - path[i - 1][0], path[i][1] - path[i - 1][1]);
+    if (remaining <= segLen) {
+      const u = segLen === 0 ? 0 : remaining / segLen;
+      return [path[i - 1][0] + (path[i][0] - path[i - 1][0]) * u, path[i - 1][1] + (path[i][1] - path[i - 1][1]) * u];
+    }
+    remaining -= segLen;
+  }
+  return path[path.length - 1];
+}
+
+let pulses = [];
+function spawnPulse() {
+  const traceIdx = Math.floor(Math.random() * traces.length);
+  pulses.push({
+    traceIdx, dist: 0, speed: 100 + Math.random() * 70,
+    color: roleList[Math.floor(Math.random() * roleList.length)],
+  });
 }
 
 let start = performance.now();
 let lastT = 0;
+let nextPulse = 0;
 
 function frame(now) {
   const t = ((now - start) / 1000) * speedMul;
   const dt = Math.min(0.05, t - lastT);
   lastT = t;
 
+  if (t >= nextPulse) {
+    spawnPulse();
+    nextPulse = t + 0.12 + Math.random() * 0.28;
+  }
+
   ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
-  const surf = theme.surface || [12, 20, 27];
+  const surf = theme.surface || [10, 16, 12];
   ctx.fillStyle = `rgb(${surf.join(',')})`;
   ctx.fillRect(0, 0, W, H);
 
-  logo.x += logo.vx * dt * speedMul;
-  logo.y += logo.vy * dt * speedMul;
-
-  logo.squishX += (1 - logo.squishX) * 12 * dt;
-  logo.squishY += (1 - logo.squishY) * 12 * dt;
-
-  let hitX = false, hitY = false;
-  const half = logo.size / 2;
-  if (logo.x - half <= 0) { logo.x = half; logo.vx *= -1; hitX = true; logo.squishX = 0.75; logo.squishY = 1.25; }
-  if (logo.x + half >= W) { logo.x = W - half; logo.vx *= -1; hitX = true; logo.squishX = 0.75; logo.squishY = 1.25; }
-  if (logo.y - half <= 0) { logo.y = half; logo.vy *= -1; hitY = true; logo.squishX = 1.25; logo.squishY = 0.75; }
-  if (logo.y + half >= H) { logo.y = H - half; logo.vy *= -1; hitY = true; logo.squishX = 1.25; logo.squishY = 0.75; }
-
-  if (hitX || hitY) {
-    pickNewColor();
-    if (hitX && hitY) spawnBurst(logo.x, logo.y, logo.color);
+  // Draw traces
+  ctx.strokeStyle = rgba(theme.secondaryContainer || [53, 72, 99], 0.6);
+  ctx.lineWidth = 1.8;
+  for (const path of traces) {
+    ctx.beginPath();
+    ctx.moveTo(path[0][0], path[0][1]);
+    for (let i = 1; i < path.length; i++) ctx.lineTo(path[i][0], path[i][1]);
+    ctx.stroke();
   }
 
-  trail.push({ x: logo.x, y: logo.y, color: logo.color, sX: logo.squishX, sY: logo.squishY });
-  if (trail.length > 14) trail.shift();
-
-  trail.forEach((p, i) => {
-    const a = (i / trail.length) * 0.3;
-    drawLogoShape(p.x, p.y, logo.size * (0.7 + (i / trail.length) * 0.3), p.color, a, p.sX, p.sY);
-  });
-  drawLogoShape(logo.x, logo.y, logo.size, logo.color, 0.9, logo.squishX, logo.squishY);
-
-  bursts = bursts.filter(b => {
-    b.life += dt * speedMul;
-    if (b.life >= b.maxLife) return false;
-    b.x += b.vx * dt * speedMul; b.y += b.vy * dt * speedMul;
-    b.vx *= 0.94; b.vy *= 0.94;
-    const fade = 1 - b.life / b.maxLife;
+  // Draw nodes (solder points) with mouse hover highlight
+  for (const n of nodes) {
+    const dist = Math.hypot(n[0] - mouse.x, n[1] - mouse.y);
+    const highlight = dist < 120 ? (1 - dist / 120) * 0.8 : 0;
+    
     ctx.beginPath();
-    ctx.arc(b.x, b.y, 2.5, 0, Math.PI * 2);
-    ctx.fillStyle = rgba(b.color, fade * 0.8);
+    ctx.arc(n[0], n[1], 2.6 + highlight * 2, 0, Math.PI * 2);
+    ctx.fillStyle = rgba(theme.secondaryContainer || [53, 72, 99], 0.8 + highlight);
+    ctx.fill();
+  }
+
+  // Update & draw pulses
+  pulses = pulses.filter(p => {
+    const path = traces[p.traceIdx];
+    const len = traceLength(path);
+    p.dist += p.speed * dt * speedMul;
+    if (p.dist >= len) return false;
+    const [x, y] = pointAtDistance(path, p.dist);
+
+    const grad = ctx.createRadialGradient(x, y, 0, x, y, 14);
+    grad.addColorStop(0, rgba(p.color, 0.95));
+    grad.addColorStop(1, rgba(p.color, 0));
+    ctx.fillStyle = grad;
+    ctx.beginPath();
+    ctx.arc(x, y, 14, 0, Math.PI * 2);
+    ctx.fill();
+
+    ctx.beginPath();
+    ctx.arc(x, y, 2.2, 0, Math.PI * 2);
+    ctx.fillStyle = rgba(p.color, 1);
     ctx.fill();
     return true;
   });
@@ -211,6 +238,7 @@ hintEl.classList.add('show');
 setTimeout(() => hintEl.classList.remove('show'), 4000);
 
 window.addEventListener('load', async () => {
+  resize();
   await loadMatugenColors();
   startClock(clockEl, dateEl);
   requestAnimationFrame(frame);

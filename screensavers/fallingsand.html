@@ -5,17 +5,47 @@
 <title>Material Screensaver — Falling Sand</title>
 <style>
   :root {
-    --primary_rgb: 138 206 255; --primary_container_rgb: 0 75 111;
-    --secondary_rgb: 180 199 233; --secondary_container_rgb: 53 72 99;
-    --tertiary_rgb: 186 196 250; --tertiary_container_rgb: 58 68 114;
-    --surface_rgb: 12 20 27; --outline_rgb: 137 146 154;
+    --primary_rgb: 138 206 255;
+    --primary_container_rgb: 0 75 111;
+    --secondary_rgb: 180 199 233;
+    --secondary_container_rgb: 53 72 99;
+    --tertiary_rgb: 186 196 250;
+    --tertiary_container_rgb: 58 68 114;
+    --surface_rgb: 12 20 27;
+    --outline_rgb: 137 146 154;
   }
-  html, body { margin: 0; padding: 0; width: 100%; height: 100%; overflow: hidden; background: rgb(var(--surface_rgb)); cursor: none; }
+  html, body {
+    margin: 0; padding: 0; width: 100%; height: 100%;
+    overflow: hidden; background: rgb(var(--surface_rgb)); cursor: none;
+  }
+  body.show-cursor { cursor: default; }
   canvas { display: block; width: 100vw; height: 100vh; }
-  #clock { position: fixed; left: 32px; bottom: 28px; font-family: "Google Sans","Segoe UI",Roboto,system-ui,sans-serif; font-weight: 400; font-variant-numeric: tabular-nums; letter-spacing: 0.5px; font-size: clamp(28px,4vw,56px); text-shadow: 0 0 24px rgba(0,0,0,0.4); pointer-events: none; transition: opacity 0.6s ease; }
-  #clock .ampm { font-size: 0.36em; margin-left: 6px; opacity: 0.82; vertical-align: middle; }
-  #date { position: fixed; left: 34px; bottom: 14px; font-family: "Google Sans","Segoe UI",Roboto,system-ui,sans-serif; font-size: clamp(12px,1.2vw,16px); letter-spacing: 1.5px; text-transform: uppercase; pointer-events: none; transition: opacity 0.6s ease; }
-  #hint { position: fixed; right: 28px; bottom: 26px; font-family: "Google Sans","Segoe UI",Roboto,system-ui,sans-serif; font-size: 13px; letter-spacing: 0.5px; pointer-events: none; opacity: 0; transition: opacity 0.8s ease; }
+  #clock {
+    position: fixed; left: 32px; bottom: 28px;
+    font-family: "Google Sans", "Segoe UI", Roboto, system-ui, sans-serif;
+    font-weight: 400; font-variant-numeric: tabular-nums; letter-spacing: 0.5px;
+    font-size: clamp(28px, 4vw, 56px);
+    text-shadow: 0 0 24px rgba(0,0,0,0.4);
+    pointer-events: none; transition: opacity 0.6s ease;
+  }
+  #clock .ampm {
+    font-size: 0.36em;
+    margin-left: 6px;
+    opacity: 0.82;
+    vertical-align: middle;
+  }
+  #date {
+    position: fixed; left: 34px; bottom: 14px;
+    font-family: "Google Sans", "Segoe UI", Roboto, system-ui, sans-serif;
+    font-size: clamp(12px, 1.2vw, 16px); letter-spacing: 1.5px; text-transform: uppercase;
+    pointer-events: none; transition: opacity 0.6s ease;
+  }
+  #hint {
+    position: fixed; right: 28px; bottom: 26px;
+    font-family: "Google Sans", "Segoe UI", Roboto, system-ui, sans-serif;
+    font-size: 13px; letter-spacing: 0.5px;
+    pointer-events: none; opacity: 0; transition: opacity 0.8s ease;
+  }
   #hint.show { opacity: 1; }
   #clock.hidden, #date.hidden { opacity: 0; }
 </style>
@@ -26,6 +56,7 @@
 <div id="clock">00:00</div>
 <div id="date">Mon, Jan 1</div>
 <div id="hint">press C to toggle clock</div>
+
 <script src="clock-shared.js"></script>
 <script>
 const canvas = document.getElementById('c');
@@ -34,13 +65,24 @@ const clockEl = document.getElementById('clock');
 const dateEl = document.getElementById('date');
 const hintEl = document.getElementById('hint');
 
+let cursorTimeout;
+window.addEventListener('pointermove', () => {
+  document.body.classList.add('show-cursor');
+  clearTimeout(cursorTimeout);
+  cursorTimeout = setTimeout(() => {
+    document.body.classList.remove('show-cursor');
+  }, 2500);
+});
+
 let dpr = Math.min(window.devicePixelRatio || 1, 2);
 let W, H, cols, rows;
 const CELL = 5;
 
 function resize() {
-  W = window.innerWidth; H = window.innerHeight;
-  canvas.width = W * dpr; canvas.height = H * dpr;
+  W = window.innerWidth;
+  H = window.innerHeight;
+  canvas.width = W * dpr;
+  canvas.height = H * dpr;
   ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
   cols = Math.ceil(W / CELL);
   rows = Math.ceil(H / CELL);
@@ -52,27 +94,46 @@ window.addEventListener('resize', resize);
 const reduceMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
 const STEP_MS = reduceMotion ? 60 : 26;
 
-function readRGB(name) {
+function readRGB(name, fallback) {
   const raw = getComputedStyle(document.documentElement).getPropertyValue(name).trim();
   const parts = raw.split(/\s+/).map(Number);
   if (parts.length === 3 && parts.every(n => !isNaN(n))) return parts;
-  return [200, 200, 200];
+  return fallback;
 }
 function rgba(rgb, a) { return `rgba(${rgb[0]}, ${rgb[1]}, ${rgb[2]}, ${a})`; }
 
 let theme = {};
 let roleList = [];
-function loadTheme() {
+
+async function loadMatugenColors() {
+  try {
+    const res = await fetch('file:///home/sakib/.config/matugen/matugen-colors.css');
+    if (res.ok) {
+      const cssText = await res.text();
+      const styleTag = document.createElement('style');
+      styleTag.textContent = cssText;
+      document.head.appendChild(styleTag);
+    }
+  } catch (e) {}
+  applyTheme();
+}
+
+function applyTheme() {
   theme = {
-    surface: readRGB('--surface_rgb'), primary: readRGB('--primary_rgb'), secondary: readRGB('--secondary_rgb'),
-    tertiary: readRGB('--tertiary_rgb'), primaryContainer: readRGB('--primary_container_rgb'),
-    secondaryContainer: readRGB('--secondary_container_rgb'), tertiaryContainer: readRGB('--tertiary_container_rgb'),
-    outline: readRGB('--outline_rgb'),
+    surface: readRGB('--surface_rgb', [12, 20, 27]),
+    primary: readRGB('--primary_rgb', [138, 206, 255]),
+    secondary: readRGB('--secondary_rgb', [180, 199, 233]),
+    tertiary: readRGB('--tertiary_rgb', [186, 196, 250]),
+    primaryContainer: readRGB('--primary_container_rgb', [0, 75, 111]),
+    secondaryContainer: readRGB('--secondary_container_rgb', [53, 72, 99]),
+    tertiaryContainer: readRGB('--tertiary_container_rgb', [58, 68, 114]),
+    outline: readRGB('--outline_rgb', [137, 146, 154]),
   };
   roleList = [theme.primary, theme.secondary, theme.tertiary, theme.primaryContainer, theme.secondaryContainer, theme.tertiaryContainer];
   clockEl.style.color = rgba(theme.primary, 0.92);
   dateEl.style.color = rgba(theme.secondary, 0.85);
   hintEl.style.color = rgba(theme.outline, 0.9);
+  document.body.style.backgroundColor = `rgb(${theme.surface.join(',')})`;
 }
 
 let grid, colorGrid;
@@ -87,7 +148,6 @@ function stepSand(t) {
     nextColorSwitch = t + 4 + Math.random() * 4;
   }
 
-  // iterate bottom-to-top so a cell that just moved down isn't processed again this step
   for (let y = rows - 2; y >= 0; y--) {
     const scanLeftToRight = Math.random() < 0.5;
     for (let c = 0; c < cols; c++) {
@@ -96,7 +156,7 @@ function stepSand(t) {
       if (grid[i] < 0) continue;
 
       const below = idx(x, y + 1);
-      const scatter = Math.random() < 0.12; // small chance to drift diagonally even when a clear drop is available
+      const scatter = Math.random() < 0.12;
       if (!scatter && grid[below] < 0) {
         grid[below] = grid[i]; colorGrid[below] = colorGrid[i];
         grid[i] = -1;
@@ -119,9 +179,6 @@ function stepSand(t) {
     }
   }
 
-  // spawn across a broad swath of the top, not a narrow band — a tight
-  // emitter with no lateral scatter during free-fall reads as a rigid
-  // straight line rather than natural falling sand
   const spawnCount = 3 + Math.floor(Math.random() * 3);
   for (let k = 0; k < spawnCount; k++) {
     const x = Math.floor(cols * 0.15 + Math.random() * cols * 0.7);
@@ -157,20 +214,25 @@ function frame(now) {
   }
 
   ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
-  ctx.fillStyle = `rgb(${(theme.surface || [12, 20, 27]).join(',')})`;
+  const surf = theme.surface || [12, 20, 27];
+  ctx.fillStyle = `rgb(${surf.join(',')})`;
   ctx.fillRect(0, 0, W, H);
 
   for (let y = 0; y < rows; y++) {
     for (let x = 0; x < cols; x++) {
       const i = idx(x, y);
       if (grid[i] < 0) continue;
-      ctx.fillStyle = rgba(roleList[colorGrid[i]] || theme.primary, 0.85);
+      const col = roleList[colorGrid[i]] || theme.primary;
+      ctx.fillStyle = rgba(col, 0.9);
+      ctx.shadowColor = rgba(col, 0.4);
+      ctx.shadowBlur = 4;
       const gx = x * CELL + CELL / 2, gy = y * CELL + CELL / 2;
       ctx.beginPath();
-      ctx.arc(gx, gy, CELL * 0.52, 0, Math.PI * 2);
+      ctx.arc(gx, gy, CELL * 0.58, 0, Math.PI * 2);
       ctx.fill();
     }
   }
+  ctx.shadowBlur = 0;
 
   requestAnimationFrame(frame);
 }
@@ -186,9 +248,9 @@ window.addEventListener('keydown', (e) => {
 hintEl.classList.add('show');
 setTimeout(() => hintEl.classList.remove('show'), 4000);
 
-window.addEventListener('load', () => {
+window.addEventListener('load', async () => {
+  await loadMatugenColors();
   resize();
-  loadTheme();
   startClock(clockEl, dateEl);
   requestAnimationFrame(frame);
 });

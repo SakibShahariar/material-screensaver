@@ -28,6 +28,7 @@
     background: rgb(var(--surface_rgb));
     cursor: none;
   }
+  body.show-cursor { cursor: default; }
   canvas {
     display: block;
     width: 100vw;
@@ -93,6 +94,15 @@ const clockEl = document.getElementById('clock');
 const dateEl = document.getElementById('date');
 const hintEl = document.getElementById('hint');
 
+let cursorTimeout;
+window.addEventListener('pointermove', () => {
+  document.body.classList.add('show-cursor');
+  clearTimeout(cursorTimeout);
+  cursorTimeout = setTimeout(() => {
+    document.body.classList.remove('show-cursor');
+  }, 2500);
+});
+
 let dpr = Math.min(window.devicePixelRatio || 1, 2);
 let W, H;
 function resize() {
@@ -101,7 +111,8 @@ function resize() {
   canvas.width = W * dpr;
   canvas.height = H * dpr;
   ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
-  ctx.fillStyle = 'rgb(12, 20, 27)';
+  const surf = theme.surface || [12, 20, 27];
+  ctx.fillStyle = `rgb(${surf.join(',')})`;
   ctx.fillRect(0, 0, W, H);
 }
 window.addEventListener('resize', resize);
@@ -109,33 +120,47 @@ window.addEventListener('resize', resize);
 const reduceMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
 const speedMul = reduceMotion ? 0.15 : 1;
 
-// ---- read matugen theme from computed CSS custom properties ----
-function readRGB(name) {
+function readRGB(name, fallback) {
   const raw = getComputedStyle(document.documentElement).getPropertyValue(name).trim();
   const parts = raw.split(/\s+/).map(Number);
   if (parts.length === 3 && parts.every(n => !isNaN(n))) return parts;
-  return [200, 200, 200];
+  return fallback;
 }
 
 function rgba(rgb, a) {
-  return `rgba(${rgb[0]}, ${rgb[1]}, ${rgb[2]}, ${a})`;
+  const c = rgb || [138, 206, 255];
+  return `rgba(${c[0]}, ${c[1]}, ${c[2]}, ${a})`;
 }
 
 let theme = {};
 let roleList = [];
-function loadTheme() {
+
+async function loadMatugenColors() {
+  try {
+    const res = await fetch('file:///home/sakib/.config/matugen/matugen-colors.css');
+    if (res.ok) {
+      const cssText = await res.text();
+      const styleTag = document.createElement('style');
+      styleTag.textContent = cssText;
+      document.head.appendChild(styleTag);
+    }
+  } catch (e) {}
+  applyTheme();
+}
+
+function applyTheme() {
   theme = {
-    surface: readRGB('--surface_rgb'),
-    primary: readRGB('--primary_rgb'),
-    primaryContainer: readRGB('--primary_container_rgb'),
-    secondary: readRGB('--secondary_rgb'),
-    secondaryContainer: readRGB('--secondary_container_rgb'),
-    tertiary: readRGB('--tertiary_rgb'),
-    tertiaryContainer: readRGB('--tertiary_container_rgb'),
-    inversePrimary: readRGB('--inverse_primary_rgb'),
-    onSurface: readRGB('--on_surface_rgb'),
-    onSurfaceVariant: readRGB('--on_surface_variant_rgb'),
-    outline: readRGB('--outline_rgb'),
+    surface: readRGB('--surface_rgb', [12, 20, 27]),
+    primary: readRGB('--primary_rgb', [138, 206, 255]),
+    primaryContainer: readRGB('--primary_container_rgb', [0, 75, 111]),
+    secondary: readRGB('--secondary_rgb', [180, 199, 233]),
+    secondaryContainer: readRGB('--secondary_container_rgb', [53, 72, 99]),
+    tertiary: readRGB('--tertiary_rgb', [186, 196, 250]),
+    tertiaryContainer: readRGB('--tertiary_container_rgb', [58, 68, 114]),
+    inversePrimary: readRGB('--inverse_primary_rgb', [0, 100, 145]),
+    onSurface: readRGB('--on_surface_rgb', [219, 227, 237]),
+    onSurfaceVariant: readRGB('--on_surface_variant_rgb', [191, 199, 209]),
+    outline: readRGB('--outline_rgb', [137, 146, 154]),
   };
   roleList = [
     theme.primary, theme.secondary, theme.tertiary,
@@ -146,13 +171,13 @@ function loadTheme() {
   clockEl.style.color = rgba(theme.primary, 0.92);
   dateEl.style.color = rgba(theme.secondary, 0.85);
   hintEl.style.color = rgba(theme.outline, 0.9);
+  document.body.style.backgroundColor = `rgb(${theme.surface.join(',')})`;
 
   ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
-  ctx.fillStyle = `rgb(${theme.surface[0]}, ${theme.surface[1]}, ${theme.surface[2]})`;
+  ctx.fillStyle = rgba(theme.surface, 1);
   ctx.fillRect(0, 0, W, H);
 }
 
-// ---- flow field: a cheap organic direction field from layered sine waves ----
 function flowAngle(x, y, t) {
   const a = Math.sin(x * 0.0032 + t * 0.15) * Math.cos(y * 0.0027 - t * 0.11);
   const b = Math.sin((x + y) * 0.0021 + t * 0.08);
@@ -178,7 +203,7 @@ function initParticles() {
   for (let i = 0; i < PARTICLE_COUNT; i++) {
     const p = {};
     spawnParticle(p);
-    p.age = Math.random() * p.life; // stagger so they don't all reset together
+    p.age = Math.random() * p.life;
     particles.push(p);
   }
 }
@@ -188,10 +213,10 @@ let start = performance.now();
 function frame(now) {
   const t = ((now - start) / 1000) * speedMul;
 
-  // fade previous frame slightly instead of clearing — builds trailing streaks
   ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
   ctx.globalCompositeOperation = 'source-over';
-  ctx.fillStyle = rgba(theme.surface || [12, 20, 27], 0.055);
+  const surf = theme.surface || [12, 20, 27];
+  ctx.fillStyle = rgba(surf, 0.055);
   ctx.fillRect(0, 0, W, H);
 
   ctx.globalCompositeOperation = 'lighter';
@@ -223,9 +248,6 @@ function frame(now) {
   requestAnimationFrame(frame);
 }
 
-// ---- Clock ----
-startClock(clockEl, dateEl);
-
 let clockVisible = true;
 window.addEventListener('keydown', (e) => {
   if (e.key.toLowerCase() === 'c') {
@@ -238,10 +260,13 @@ window.addEventListener('keydown', (e) => {
 hintEl.classList.add('show');
 setTimeout(() => hintEl.classList.remove('show'), 4000);
 
-window.addEventListener('load', () => {
+window.addEventListener('load', async () => {
   resize();
-  loadTheme();
+  await loadMatugenColors();
   initParticles();
+  if (typeof startClock === 'function') {
+    startClock(clockEl, dateEl);
+  }
   requestAnimationFrame(frame);
 });
 </script>

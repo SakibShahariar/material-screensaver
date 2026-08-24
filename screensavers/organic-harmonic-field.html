@@ -2,6 +2,7 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Material Screensaver — Organic Harmonic Field</title>
 <style>
   :root {
@@ -13,37 +14,72 @@
   html, body {
     margin: 0; padding: 0; width: 100%; height: 100%;
     overflow: hidden; background: rgb(var(--surface_rgb));
-    cursor: none; font-family: "Google Sans", "Segoe UI", Roboto, system-ui, sans-serif;
+    font-family: "Google Sans", "Segoe UI", Roboto, system-ui, sans-serif;
+    user-select: none;
   }
+
+  body { cursor: none; }
+  body.show-cursor { cursor: default; }
+
   canvas { display: block; width: 100vw; height: 100vh; }
 
+  #ui-container {
+    position: fixed; inset: 0; pointer-events: none; z-index: 10;
+    display: flex; flex-direction: column; justify-content: flex-end;
+    padding: 48px; box-sizing: border-box;
+    transition: opacity 0.6s cubic-bezier(0.16, 1, 0.3, 1), transform 0.6s cubic-bezier(0.16, 1, 0.3, 1);
+  }
+  #ui-container.hidden { opacity: 0; transform: translateY(12px); }
+
+  .vignette-card {
+    background: radial-gradient(circle at bottom left, rgb(var(--surface_rgb) / 0.8) 0%, rgb(var(--surface_rgb) / 0.25) 70%);
+    backdrop-filter: blur(16px);
+    -webkit-backdrop-filter: blur(16px);
+    padding: 28px 36px;
+    width: fit-content;
+    border-radius: 24px;
+    border: 1px solid rgb(var(--outline_rgb) / 0.15);
+    box-shadow: 0 16px 40px rgba(0, 0, 0, 0.6), inset 0 1px 0 rgba(255, 255, 255, 0.05);
+  }
+
   #clock {
-    position: fixed; left: 40px; bottom: 36px;
-    font-weight: 300; font-variant-numeric: tabular-nums;
-    letter-spacing: -1.5px; font-size: clamp(48px, 6vw, 76px);
-    line-height: 1;
-    text-shadow: 0 4px 24px rgba(0, 0, 0, 0.8), 0 1px 3px rgba(0, 0, 0, 0.9);
-    pointer-events: none; transition: opacity 0.6s ease;
+    font-size: clamp(52px, 7vw, 84px);
+    font-weight: 200;
+    font-variant-numeric: tabular-nums;
+    letter-spacing: -2px;
+    line-height: 0.95;
+    text-shadow: 0 2px 12px rgba(0, 0, 0, 0.4);
   }
   #clock .ampm {
-    font-size: 0.3em; margin-left: 6px; opacity: 0.8;
-    vertical-align: super; font-weight: 400; letter-spacing: 1px;
+    font-size: 0.28em;
+    margin-left: 8px;
+    opacity: 0.75;
+    font-weight: 500;
+    text-transform: uppercase;
+    vertical-align: super;
+    letter-spacing: 1.5px;
   }
   #date {
-    position: fixed; left: 42px; bottom: 18px;
-    font-size: clamp(11px, 1.2vw, 15px); letter-spacing: 3px;
+    font-size: clamp(12px, 1.3vw, 15px);
+    letter-spacing: 3.5px;
     text-transform: uppercase;
-    opacity: 0.85; text-shadow: 0 2px 12px rgba(0, 0, 0, 0.8);
-    pointer-events: none; transition: opacity 0.6s ease;
+    margin-top: 10px;
+    opacity: 0.9;
+    font-weight: 500;
   }
   #hint {
-    position: fixed; right: 32px; bottom: 32px;
-    font-size: 11px; letter-spacing: 1.5px; text-transform: uppercase;
+    position: fixed; right: 36px; bottom: 36px;
+    font-size: 11px; letter-spacing: 2px; text-transform: uppercase;
     opacity: 0; transition: opacity 0.8s ease;
-    text-shadow: 0 2px 8px rgba(0,0,0,0.8); pointer-events: none;
+    padding: 10px 18px;
+    background: rgb(var(--surface_rgb) / 0.6);
+    backdrop-filter: blur(8px);
+    border: 1px solid rgb(var(--outline_rgb) / 0.1);
+    border-radius: 12px;
+    pointer-events: none;
+    z-index: 10;
   }
-  #hint.show { opacity: 0.6; }
-  #clock.hidden, #date.hidden { opacity: 0; }
+  #hint.show { opacity: 0.7; }
 
   #fallback {
     display: none;
@@ -59,9 +95,14 @@
 <canvas id="c"></canvas>
 <div id="fallback">Organic Harmonic Field needs WebGL, which isn't available in this browser.<br>Try Chromium, Firefox, or another WebGL-capable browser.</div>
 
-<div id="clock">00:00</div>
-<div id="date">Mon, Jan 1</div>
-<div id="hint">Press C to toggle clock</div>
+<div id="ui-container">
+  <div class="vignette-card">
+    <div id="clock">00:00</div>
+    <div id="date">Mon, Jan 1</div>
+  </div>
+</div>
+<div id="hint">Press <b>C</b> to toggle UI</div>
+
 <script src="clock-shared.js"></script>
 <script>
 const canvas = document.getElementById('c');
@@ -69,12 +110,23 @@ const gl = canvas.getContext('webgl', { preserveDrawingBuffer: false, antialias:
 const clockEl = document.getElementById('clock');
 const dateEl = document.getElementById('date');
 const hintEl = document.getElementById('hint');
+const uiContainer = document.getElementById('ui-container');
 const fallbackEl = document.getElementById('fallback');
+
+let cursorTimeout;
+function triggerCursor() {
+  document.body.classList.add('show-cursor');
+  clearTimeout(cursorTimeout);
+  cursorTimeout = setTimeout(() => {
+    document.body.classList.remove('show-cursor');
+  }, 2500);
+}
+window.addEventListener('pointermove', triggerCursor);
+window.addEventListener('pointerdown', triggerCursor);
 
 function rgba(rgb, a) { return `rgba(${rgb[0]}, ${rgb[1]}, ${rgb[2]}, ${a})`; }
 
 if (!gl) {
-  // no blocking alert() — a stuck dialog would break the unattended kiosk cycle
   canvas.style.display = 'none';
   fallbackEl.style.display = 'flex';
   console.warn('Organic Harmonic Field: WebGL is not available in this browser.');
@@ -101,18 +153,20 @@ if (!gl) {
     const tertiary = readRGB('--tertiary_rgb', [186, 196, 250]);
     const outline = readRGB('--outline_rgb', [137, 146, 154]);
     const primaryContainer = readRGB('--primary_container_rgb', [0, 75, 111]);
+    const surface = readRGB('--surface_rgb', [8, 12, 18]);
+
     theme = {
-      surface: readRGB('--surface_rgb', [8, 12, 18]).map(v => v / 255),
+      surface: surface.map(v => v / 255),
       primary: primary.map(v => v / 255),
       secondary: secondary.map(v => v / 255),
       tertiary: tertiary.map(v => v / 255),
       primaryContainer: primaryContainer.map(v => v / 255),
     };
-    // JS-computed literal colors — proven reliable across browsers, rather than
-    // static CSS var() rules which have silently failed in this setup before
+
     clockEl.style.color = rgba(primary, 1);
-    dateEl.style.color = rgba(secondary, 0.85);
+    dateEl.style.color = rgba(secondary, 0.9);
     hintEl.style.color = rgba(outline, 1);
+    document.body.style.backgroundColor = `rgb(${surface.join(',')})`;
   }
   loadTheme();
 
@@ -133,7 +187,6 @@ if (!gl) {
     uniform vec3 u_col4;
     uniform vec3 u_surface;
 
-    // one domain-warp pass: organic flowing offset field at a given scale/speed
     vec2 warp(vec2 st, float t, float freq, float speed) {
       vec2 q;
       q.x = sin(st.x * freq + t * speed) + cos(st.y * freq * 0.8 - t * speed * 0.6);
@@ -145,10 +198,7 @@ if (!gl) {
       vec2 st = (gl_FragCoord.xy * 2.0 - u_resolution.xy) / min(u_resolution.x, u_resolution.y);
       float t = u_time * 0.22;
 
-      // first warp layer: broad organic flow
       vec2 q = warp(st, t, 1.5, 0.8);
-      // second warp layer, fed by the first — classic "double domain-warp" technique,
-      // adds richer turbulent detail instead of one repetitive flow pattern
       vec2 r = warp(st + q * 0.6, t * 1.3, 2.6, 0.5);
 
       float f = sin(q.x + q.y + r.x * r.y * 2.0);
@@ -162,7 +212,7 @@ if (!gl) {
       vec2 uv = gl_FragCoord.xy / u_resolution.xy;
       float vignette = uv.x * uv.y * (1.0 - uv.x) * (1.0 - uv.y);
       vignette = clamp(pow(16.0 * vignette, 0.22), 0.0, 1.0);
-      col = mix(u_surface, col, vignette); // fade to theme surface color at edges, not flat black
+      col = mix(u_surface, col, vignette);
 
       gl_FragColor = vec4(col, 1.0);
     }
@@ -241,21 +291,32 @@ if (!gl) {
   }
 }
 
-let clockVisible = true;
+let uiVisible = true;
 window.addEventListener('keydown', (e) => {
   if (e.key.toLowerCase() === 'c') {
-    clockVisible = !clockVisible;
-    clockEl.classList.toggle('hidden', !clockVisible);
-    dateEl.classList.toggle('hidden', !clockVisible);
+    uiVisible = !uiVisible;
+    uiContainer.classList.toggle('hidden', !uiVisible);
   }
 });
 
 hintEl.classList.add('show');
 setTimeout(() => hintEl.classList.remove('show'), 4000);
 
-window.addEventListener('load', () => {
+try {
   startClock(clockEl, dateEl);
-});
+} catch (e) {
+  const update = () => {
+    const now = new Date();
+    let hours = now.getHours();
+    const minutes = String(now.getMinutes()).padStart(2, '0');
+    const ampm = hours >= 12 ? 'PM' : 'AM';
+    hours = hours % 12 || 12;
+    clockEl.innerHTML = `${String(hours).padStart(2, '0')}:${minutes}<span class="ampm">${ampm}</span>`;
+    dateEl.textContent = now.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' });
+  };
+  update();
+  setInterval(update, 1000);
+}
 </script>
 </body>
 </html>

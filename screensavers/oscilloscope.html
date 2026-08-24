@@ -2,28 +2,106 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Material Screensaver — Oscilloscope</title>
 <style>
   :root {
-    --primary_rgb: 138 206 255; --secondary_rgb: 180 199 233; --tertiary_rgb: 186 196 250;
-    --surface_rgb: 12 20 27; --outline_rgb: 137 146 154;
+    --primary_rgb: 138 206 255;
+    --secondary_rgb: 180 199 233;
+    --tertiary_rgb: 186 196 250;
+    --surface_rgb: 12 20 27;
+    --outline_rgb: 137 146 154;
   }
-  html, body { margin: 0; padding: 0; width: 100%; height: 100%; overflow: hidden; background: rgb(var(--surface_rgb)); cursor: none; }
+  html, body {
+    margin: 0; padding: 0; width: 100%; height: 100%;
+    overflow: hidden; background: rgb(var(--surface_rgb));
+    font-family: "Google Sans", "Segoe UI", Roboto, system-ui, sans-serif;
+    user-select: none;
+  }
+
+  body { cursor: none; }
+  body.show-cursor { cursor: default; }
+
   canvas { display: block; width: 100vw; height: 100vh; }
-  #clock { position: fixed; left: 32px; bottom: 28px; font-family: "Google Sans","Segoe UI",Roboto,system-ui,sans-serif; font-weight: 400; font-variant-numeric: tabular-nums; letter-spacing: 0.5px; font-size: clamp(28px,4vw,56px); text-shadow: 0 0 24px rgba(0,0,0,0.4); pointer-events: none; transition: opacity 0.6s ease; }
-  #clock .ampm { font-size: 0.36em; margin-left: 6px; opacity: 0.82; vertical-align: middle; }
-  #date { position: fixed; left: 34px; bottom: 14px; font-family: "Google Sans","Segoe UI",Roboto,system-ui,sans-serif; font-size: clamp(12px,1.2vw,16px); letter-spacing: 1.5px; text-transform: uppercase; pointer-events: none; transition: opacity 0.6s ease; }
-  #hint { position: fixed; right: 28px; bottom: 26px; font-family: "Google Sans","Segoe UI",Roboto,system-ui,sans-serif; font-size: 13px; letter-spacing: 0.5px; pointer-events: none; opacity: 0; transition: opacity 0.8s ease; }
-  #hint.show { opacity: 1; }
-  #clock.hidden, #date.hidden { opacity: 0; }
+
+  /* Ambient background depth vignette */
+  body::after {
+    content: '';
+    position: fixed; inset: 0; pointer-events: none; z-index: 5;
+    background: radial-gradient(circle at center, transparent 40%, rgb(var(--surface_rgb) / 0.65) 100%);
+  }
+
+  #ui-container {
+    position: fixed; inset: 0; pointer-events: none; z-index: 10;
+    display: flex; flex-direction: column; justify-content: flex-end;
+    padding: 56px; box-sizing: border-box;
+    transition: opacity 0.5s cubic-bezier(0.16, 1, 0.3, 1), transform 0.5s cubic-bezier(0.16, 1, 0.3, 1);
+  }
+  #ui-container.hidden { opacity: 0; transform: translateY(16px); }
+
+  .vignette-card {
+    background: linear-gradient(135deg, rgb(var(--surface_rgb) / 0.75) 0%, rgb(var(--surface_rgb) / 0.4) 100%);
+    backdrop-filter: blur(20px);
+    -webkit-backdrop-filter: blur(20px);
+    padding: 32px 40px;
+    width: fit-content;
+    border-radius: 28px;
+    border: 1px solid rgb(var(--outline_rgb) / 0.12);
+    box-shadow: 0 24px 60px rgba(0, 0, 0, 0.5), inset 0 1px 0 rgba(255, 255, 255, 0.06);
+  }
+
+  #clock {
+    font-size: clamp(56px, 8vw, 92px);
+    font-weight: 200;
+    font-variant-numeric: tabular-nums;
+    letter-spacing: -3px;
+    line-height: 0.9;
+    text-shadow: 0 4px 24px rgba(0, 0, 0, 0.45);
+  }
+  #clock .ampm {
+    font-size: 0.26em;
+    margin-left: 10px;
+    opacity: 0.7;
+    font-weight: 500;
+    text-transform: uppercase;
+    vertical-align: super;
+    letter-spacing: 2px;
+  }
+  #date {
+    font-size: clamp(13px, 1.4vw, 16px);
+    letter-spacing: 4px;
+    text-transform: uppercase;
+    margin-top: 12px;
+    opacity: 0.85;
+    font-weight: 500;
+  }
+  #hint {
+    position: fixed; right: 40px; bottom: 40px;
+    font-size: 11px; letter-spacing: 2.5px; text-transform: uppercase;
+    opacity: 0; transition: opacity 0.6s ease;
+    padding: 10px 20px;
+    background: rgb(var(--surface_rgb) / 0.5);
+    backdrop-filter: blur(12px);
+    border: 1px solid rgb(var(--outline_rgb) / 0.1);
+    border-radius: 14px;
+    pointer-events: none;
+    z-index: 10;
+  }
+  #hint.show { opacity: 0.65; }
 </style>
 <link rel="stylesheet" href="file:///home/sakib/.config/matugen/matugen-colors.css">
 </head>
 <body>
 <canvas id="c"></canvas>
-<div id="clock">00:00</div>
-<div id="date">Mon, Jan 1</div>
-<div id="hint">press C to toggle clock</div>
+
+<div id="ui-container">
+  <div class="vignette-card">
+    <div id="clock">00:00</div>
+    <div id="date">Mon, Jan 1</div>
+  </div>
+</div>
+<div id="hint">Press <b>C</b> to toggle UI</div>
+
 <script src="clock-shared.js"></script>
 <script>
 const canvas = document.getElementById('c');
@@ -31,15 +109,31 @@ const ctx = canvas.getContext('2d');
 const clockEl = document.getElementById('clock');
 const dateEl = document.getElementById('date');
 const hintEl = document.getElementById('hint');
+const uiContainer = document.getElementById('ui-container');
+
+let cursorTimeout;
+function triggerCursor() {
+  document.body.classList.add('show-cursor');
+  clearTimeout(cursorTimeout);
+  cursorTimeout = setTimeout(() => {
+    document.body.classList.remove('show-cursor');
+  }, 2500);
+}
+window.addEventListener('pointermove', triggerCursor);
+window.addEventListener('pointerdown', triggerCursor);
 
 let dpr = Math.min(window.devicePixelRatio || 1, 2);
 let W, H, cx, cy, scale;
 function resize() {
-  W = window.innerWidth; H = window.innerHeight; cx = W / 2; cy = H / 2;
+  W = window.innerWidth;
+  H = window.innerHeight;
+  cx = W / 2;
+  cy = H / 2;
   scale = Math.min(W, H) * 0.36;
-  canvas.width = W * dpr; canvas.height = H * dpr;
+  canvas.width = W * dpr;
+  canvas.height = H * dpr;
   ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
-  ctx.fillStyle = 'rgb(12,20,27)';
+  ctx.fillStyle = `rgb(${theme.surface ? theme.surface.join(',') : '12,20,27'})`;
   ctx.fillRect(0, 0, W, H);
 }
 window.addEventListener('resize', resize);
@@ -47,24 +141,32 @@ window.addEventListener('resize', resize);
 const reduceMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
 const speedMul = reduceMotion ? 0.15 : 1;
 
-function readRGB(name) {
+function readRGB(name, fallback) {
   const raw = getComputedStyle(document.documentElement).getPropertyValue(name).trim();
   const parts = raw.split(/\s+/).map(Number);
   if (parts.length === 3 && parts.every(n => !isNaN(n))) return parts;
-  return [200, 200, 200];
+  return fallback;
 }
-function rgba(rgb, a) { return `rgba(${rgb[0]}, ${rgb[1]}, ${rgb[2]}, ${a})`; }
+function rgba(rgb, a) {
+  const c = rgb || [200, 200, 200];
+  return `rgba(${c[0]}, ${c[1]}, ${c[2]}, ${a})`;
+}
 
 let theme = {};
 let curves = [];
 function loadTheme() {
   theme = {
-    surface: readRGB('--surface_rgb'), primary: readRGB('--primary_rgb'),
-    secondary: readRGB('--secondary_rgb'), tertiary: readRGB('--tertiary_rgb'), outline: readRGB('--outline_rgb'),
+    surface: readRGB('--surface_rgb', [12, 20, 27]),
+    primary: readRGB('--primary_rgb', [138, 206, 255]),
+    secondary: readRGB('--secondary_rgb', [180, 199, 233]),
+    tertiary: readRGB('--tertiary_rgb', [186, 196, 250]),
+    outline: readRGB('--outline_rgb', [137, 146, 154]),
   };
-  clockEl.style.color = rgba(theme.primary, 0.92);
-  dateEl.style.color = rgba(theme.secondary, 0.85);
-  hintEl.style.color = rgba(theme.outline, 0.9);
+  clockEl.style.color = rgba(theme.primary, 0.98);
+  dateEl.style.color = rgba(theme.secondary, 0.9);
+  hintEl.style.color = rgba(theme.outline, 0.95);
+  document.body.style.backgroundColor = `rgb(${theme.surface.join(',')})`;
+
   curves = [
     { freqA: 3, freqB: 2, color: theme.primary, lag: 0 },
     { freqA: 5, freqB: 4, color: theme.secondary, lag: Math.PI / 3 },
@@ -72,8 +174,9 @@ function loadTheme() {
   ];
 }
 
-// slowly drifting frequency ratios so the pattern never settles into a fixed loop
-function freqDrift(base, t, speed) { return base + Math.sin(t * speed) * 0.4; }
+function freqDrift(base, t, speed) {
+  return base + Math.sin(t * speed) * 0.4;
+}
 
 let start = performance.now();
 
@@ -82,7 +185,7 @@ function frame(now) {
 
   ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
   ctx.globalCompositeOperation = 'source-over';
-  ctx.fillStyle = rgba(theme.surface || [12, 20, 27], 0.26);
+  ctx.fillStyle = rgba(theme.surface || [12, 20, 27], 0.22);
   ctx.fillRect(0, 0, W, H);
 
   ctx.globalCompositeOperation = 'lighter';
@@ -91,15 +194,28 @@ function frame(now) {
     const b = freqDrift(curve.freqB, t, 0.021);
     const phaseShift = t * 0.25 + curve.lag;
 
-    ctx.beginPath();
+    // Generate curve points once
     const steps = 400;
+    const points = [];
     for (let i = 0; i <= steps; i++) {
       const u = (i / steps) * Math.PI * 2;
-      const x = cx + Math.sin(a * u + phaseShift) * scale;
-      const y = cy + Math.sin(b * u) * scale;
-      i === 0 ? ctx.moveTo(x, y) : ctx.lineTo(x, y);
+      points.push({
+        x: cx + Math.sin(a * u + phaseShift) * scale,
+        y: cy + Math.sin(b * u) * scale
+      });
     }
-    ctx.strokeStyle = rgba(curve.color, 0.3);
+
+    // Pass 1: Wide atmospheric glow
+    ctx.beginPath();
+    points.forEach((p, i) => i === 0 ? ctx.moveTo(p.x, p.y) : ctx.lineTo(p.x, p.y));
+    ctx.strokeStyle = rgba(curve.color, 0.12);
+    ctx.lineWidth = 4.5;
+    ctx.stroke();
+
+    // Pass 2: Crisp core line
+    ctx.beginPath();
+    points.forEach((p, i) => i === 0 ? ctx.moveTo(p.x, p.y) : ctx.lineTo(p.x, p.y));
+    ctx.strokeStyle = rgba(curve.color, 0.45);
     ctx.lineWidth = 1.2;
     ctx.stroke();
   }
@@ -108,21 +224,35 @@ function frame(now) {
   requestAnimationFrame(frame);
 }
 
-let clockVisible = true;
+let uiVisible = true;
 window.addEventListener('keydown', (e) => {
   if (e.key.toLowerCase() === 'c') {
-    clockVisible = !clockVisible;
-    clockEl.classList.toggle('hidden', !clockVisible);
-    dateEl.classList.toggle('hidden', !clockVisible);
+    uiVisible = !uiVisible;
+    uiContainer.classList.toggle('hidden', !uiVisible);
   }
 });
+
 hintEl.classList.add('show');
 setTimeout(() => hintEl.classList.remove('show'), 4000);
 
 window.addEventListener('load', () => {
-  resize();
   loadTheme();
-  startClock(clockEl, dateEl);
+  resize();
+  try {
+    startClock(clockEl, dateEl);
+  } catch (e) {
+    const update = () => {
+      const now = new Date();
+      let hours = now.getHours();
+      const minutes = String(now.getMinutes()).padStart(2, '0');
+      const ampm = hours >= 12 ? 'PM' : 'AM';
+      hours = hours % 12 || 12;
+      clockEl.innerHTML = `${String(hours).padStart(2, '0')}:${minutes}<span class="ampm">${ampm}</span>`;
+      dateEl.textContent = now.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' });
+    };
+    update();
+    setInterval(update, 1000);
+  }
   requestAnimationFrame(frame);
 });
 </script>

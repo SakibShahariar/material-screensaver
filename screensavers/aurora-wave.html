@@ -134,7 +134,20 @@ function rgba(rgb, a) {
 }
 
 let theme = {};
-function loadTheme() {
+async function loadMatugenColors() {
+  try {
+    const res = await fetch('file:///home/sakib/.config/matugen/matugen-colors.css');
+    if (res.ok) {
+      const cssText = await res.text();
+      const styleTag = document.createElement('style');
+      styleTag.textContent = cssText;
+      document.head.appendChild(styleTag);
+    }
+  } catch (e) {}
+  applyTheme();
+}
+
+function applyTheme() {
   theme = {
     surface: readRGB('--surface_rgb', [12, 20, 27]),
     primary: readRGB('--primary_rgb', [138, 206, 255]),
@@ -216,8 +229,8 @@ window.addEventListener('keydown', (e) => {
 hintEl.classList.add('show');
 setTimeout(() => hintEl.classList.remove('show'), 4000);
 
-window.addEventListener('load', () => {
-  loadTheme();
+window.addEventListener('load', async () => {
+  await loadMatugenColors();
 
   try {
     if (typeof startClock === 'function') {

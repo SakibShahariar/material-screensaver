@@ -6,19 +6,19 @@
 <title>Material Screensaver — Snow Globe</title>
 <style>
   :root {
+    --surface_rgb: 12 20 27;
     --primary_rgb: 138 206 255;
     --primary_container_rgb: 0 75 111;
     --secondary_rgb: 180 199 233;
     --secondary_container_rgb: 53 72 99;
     --tertiary_rgb: 186 196 250;
     --tertiary_container_rgb: 58 68 114;
-    --surface_rgb: 12 20 27;
     --surface_bright_rgb: 50 58 65;
     --outline_rgb: 137 146 154;
   }
   html, body {
     margin: 0; padding: 0; width: 100%; height: 100%;
-    overflow: hidden; background: #0c141b;
+    overflow: hidden; background: rgb(var(--surface_rgb));
     font-family: "Google Sans", "Segoe UI", Roboto, system-ui, sans-serif;
     user-select: none;
   }
@@ -31,50 +31,55 @@
   #ui-container {
     position: fixed; inset: 0; pointer-events: none; z-index: 10;
     display: flex; flex-direction: column; justify-content: space-between;
-    padding: 36px; box-sizing: border-box;
-    transition: opacity 0.8s ease;
+    padding: 48px; box-sizing: border-box;
+    transition: opacity 0.6s cubic-bezier(0.16, 1, 0.3, 1);
   }
   #ui-container.hidden { opacity: 0; }
 
-  .vignette-glass {
-    background: radial-gradient(circle at center, rgba(12, 20, 27, 0.65) 0%, rgba(12, 20, 27, 0) 80%);
-    backdrop-filter: blur(12px);
-    -webkit-backdrop-filter: blur(12px);
-    padding: 28px 40px;
+  .glass-card {
+    background: rgb(var(--surface_rgb) / 0.55);
+    backdrop-filter: blur(20px);
+    -webkit-backdrop-filter: blur(20px);
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    padding: 28px 36px;
     width: fit-content;
     border-radius: 24px;
+    box-shadow: 0 16px 40px rgba(0, 0, 0, 0.4), inset 0 1px 0 rgba(255, 255, 255, 0.08);
   }
 
   #clock {
-    font-size: clamp(32px, 4.5vw, 64px);
+    font-size: clamp(36px, 5vw, 68px);
     font-weight: 300;
     font-variant-numeric: tabular-nums;
-    letter-spacing: -0.5px;
+    letter-spacing: -1px;
     line-height: 1;
-    text-shadow: 0 2px 14px rgba(0, 0, 0, 0.6);
+    text-shadow: 0 2px 20px rgba(0, 0, 0, 0.6);
   }
   #clock .ampm {
-    font-size: 0.35em;
-    margin-left: 8px;
-    opacity: 0.8;
+    font-size: 0.34em;
+    margin-left: 10px;
+    opacity: 0.75;
     font-weight: 400;
     text-transform: uppercase;
+    vertical-align: middle;
+    letter-spacing: 1px;
   }
   #date {
-    font-size: clamp(12px, 1.2vw, 15px);
-    letter-spacing: 2px;
+    font-size: clamp(13px, 1.3vw, 16px);
+    letter-spacing: 2.5px;
     text-transform: uppercase;
-    margin-top: 8px;
-    opacity: 0.85;
+    margin-top: 10px;
+    opacity: 0.8;
     text-shadow: 0 2px 10px rgba(0, 0, 0, 0.6);
   }
   #hint {
-    position: fixed; right: 36px; bottom: 36px;
-    font-size: 12px; letter-spacing: 0.8px;
+    position: fixed; right: 48px; bottom: 48px;
+    font-size: 12px; letter-spacing: 1px;
     opacity: 0; transition: opacity 0.8s ease;
     text-shadow: 0 2px 10px rgba(0, 0, 0, 0.6);
+    text-transform: uppercase;
   }
-  #hint.show { opacity: 0.75; }
+  #hint.show { opacity: 0.7; }
 </style>
 <link rel="stylesheet" href="file:///home/sakib/.config/matugen/matugen-colors.css">
 </head>
@@ -83,7 +88,7 @@
 <canvas id="c"></canvas>
 
 <div id="ui-container">
-  <div class="vignette-glass">
+  <div class="glass-card">
     <div id="clock">00:00</div>
     <div id="date">Mon, Jan 1</div>
   </div>
@@ -98,9 +103,11 @@ const clockEl = document.getElementById('clock');
 const dateEl = document.getElementById('date');
 const hintEl = document.getElementById('hint');
 const uiContainer = document.getElementById('ui-container');
+const glassCardEl = document.querySelector('.glass-card');
 
 let cursorTimeout;
 let shakeForce = 0;
+let mousePos = { x: -1000, y: -1000 };
 
 function triggerCursor() {
   document.body.classList.add('show-cursor');
@@ -113,15 +120,18 @@ function triggerCursor() {
 function triggerShake() {
   shakeForce = 1.0;
   for (const f of flakes) {
-    f.vy = -(15 + Math.random() * 45);
-    f.vx = (Math.random() - 0.5) * 40;
+    f.vy = -(15 + Math.random() * 50);
+    f.vx = (Math.random() - 0.5) * 50;
   }
 }
 
 window.addEventListener('pointermove', (e) => {
   triggerCursor();
-  if (Math.hypot(e.movementX, e.movementY) > 22) {
-    shakeForce = Math.min(1.0, shakeForce + 0.15);
+  mousePos.x = e.clientX;
+  mousePos.y = e.clientY;
+  const speed = Math.hypot(e.movementX, e.movementY);
+  if (speed > 15) {
+    shakeForce = Math.min(1.0, shakeForce + speed * 0.008);
   }
 });
 
@@ -138,7 +148,7 @@ function resize() {
   H = window.innerHeight;
   cx = W / 2;
   cy = H * 0.44;
-  globeR = Math.min(W, H) * 0.31;
+  globeR = Math.min(W, H) * 0.30;
   canvas.width = W * dpr;
   canvas.height = H * dpr;
   ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
@@ -147,7 +157,7 @@ function resize() {
 window.addEventListener('resize', resize);
 
 const reduceMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
-const speedMul = reduceMotion ? 0.25 : 1;
+const speedMul = reduceMotion ? 0.25 : 0.85;
 
 function readRGB(name, fallback) {
   const raw = getComputedStyle(document.documentElement).getPropertyValue(name).trim();
@@ -170,19 +180,21 @@ function loadTheme() {
     secondaryContainer: readRGB('--secondary_container_rgb', [53, 72, 99]),
     outline: readRGB('--outline_rgb', [137, 146, 154]),
   };
-  clockEl.style.color = rgba(theme.primary, 0.95);
-  dateEl.style.color = rgba(theme.secondary, 0.85);
-  hintEl.style.color = rgba(theme.outline, 0.9);
+  document.body.style.backgroundColor = rgba(theme.surface, 1);
+  glassCardEl.style.backgroundColor = rgba(theme.surface, 0.55);
+  clockEl.style.color = rgba(theme.primary, 0.96);
+  dateEl.style.color = rgba(theme.secondary, 0.88);
+  hintEl.style.color = rgba(theme.outline, 0.85);
 }
 
 let flakes = [];
 let pile = [];
-const PILE_RES = 80;
+const PILE_RES = 90;
 
 function initPile() {
   pile = new Array(PILE_RES).fill(0);
   flakes = [];
-  for (let i = 0; i < 140; i++) {
+  for (let i = 0; i < 160; i++) {
     const f = {};
     spawnFlake(f);
     f.y = cy - globeR + Math.random() * globeR * 1.8;
@@ -192,16 +204,16 @@ function initPile() {
 
 function spawnFlake(f) {
   const ang = Math.random() * Math.PI * 2;
-  const dist = Math.random() * globeR * 0.9;
+  const dist = Math.random() * globeR * 0.85;
   f.x = cx + Math.cos(ang) * dist;
-  f.y = cy - globeR + 4;
-  f.vx = (Math.random() - 0.5) * 4;
-  f.vy = 12 + Math.random() * 18;
-  f.wobAmp = 5 + Math.random() * 10;
-  f.wobFreq = 0.6 + Math.random() * 1.2;
+  f.y = cy - globeR + 6;
+  f.vx = (Math.random() - 0.5) * 3;
+  f.vy = 10 + Math.random() * 16;
+  f.wobAmp = 4 + Math.random() * 12;
+  f.wobFreq = 0.5 + Math.random() * 1.5;
   f.phase = Math.random() * Math.PI * 2;
-  f.r = 1 + Math.random() * 2.2;
-  f.alpha = 0.75 + Math.random() * 0.25;
+  f.r = 1 + Math.random() * 2.4;
+  f.alpha = 0.6 + Math.random() * 0.4;
 }
 
 function pileIndex(x) {
@@ -218,11 +230,10 @@ function addSnowToPile(x) {
   const idx = pileIndex(x);
   if (idx < 0 || idx >= PILE_RES) return;
 
-  // Gaussian smooth distribution across neighboring cells
-  const amount = 0.4;
-  pile[idx] = Math.min(globeR * 1.2, pile[idx] + amount);
-  if (idx > 0) pile[idx - 1] = Math.min(globeR * 1.2, pile[idx - 1] + amount * 0.5);
-  if (idx < PILE_RES - 1) pile[idx + 1] = Math.min(globeR * 1.2, pile[idx + 1] + amount * 0.5);
+  const amount = 0.35;
+  pile[idx] = Math.min(globeR * 1.15, pile[idx] + amount);
+  if (idx > 0) pile[idx - 1] = Math.min(globeR * 1.15, pile[idx - 1] + amount * 0.5);
+  if (idx < PILE_RES - 1) pile[idx + 1] = Math.min(globeR * 1.15, pile[idx + 1] + amount * 0.5);
 }
 
 function drawPineTree(tx, ty, scale) {
@@ -230,36 +241,33 @@ function drawPineTree(tx, ty, scale) {
   ctx.translate(tx, ty);
   ctx.scale(scale, scale);
 
-  ctx.fillStyle = 'rgba(10, 16, 22, 0.92)';
-  // Trunk
-  ctx.fillRect(-2, 0, 4, 12);
+  ctx.fillStyle = 'rgba(14, 22, 32, 0.95)';
+  ctx.fillRect(-2.5, 0, 5, 14);
 
-  // Layered needles
   ctx.beginPath();
-  ctx.moveTo(0, -32); ctx.lineTo(14, -16); ctx.lineTo(-14, -16); ctx.closePath();
-  ctx.moveTo(0, -22); ctx.lineTo(18, -4); ctx.lineTo(-18, -4); ctx.closePath();
-  ctx.moveTo(0, -12); ctx.lineTo(22, 8); ctx.lineTo(-22, 8); ctx.closePath();
+  ctx.moveTo(0, -34); ctx.lineTo(15, -16); ctx.lineTo(-15, -16); ctx.closePath();
+  ctx.moveTo(0, -23); ctx.lineTo(19, -3); ctx.lineTo(-19, -3); ctx.closePath();
+  ctx.moveTo(0, -11); ctx.lineTo(23, 10); ctx.lineTo(-23, 10); ctx.closePath();
   ctx.fill();
 
   ctx.restore();
 }
 
-function drawCabin(bx, by) {
+function drawCabin(bx, by, pulse) {
   ctx.save();
   ctx.translate(bx, by);
 
-  ctx.fillStyle = 'rgba(15, 22, 30, 0.95)';
-  // Main body
-  ctx.fillRect(-18, -14, 36, 14);
-  // Roof
+  ctx.fillStyle = 'rgba(18, 26, 36, 0.96)';
+  ctx.fillRect(-20, -15, 40, 15);
+  
   ctx.beginPath();
-  ctx.moveTo(-22, -14); ctx.lineTo(0, -26); ctx.lineTo(22, -14); ctx.closePath();
+  ctx.moveTo(-24, -15); ctx.lineTo(0, -28); ctx.lineTo(24, -15); ctx.closePath();
   ctx.fill();
 
-  // Cozy Window Glow
-  ctx.fillStyle = rgba(theme.primary, 0.9);
-  ctx.fillRect(-10, -10, 7, 7);
-  ctx.fillRect(3, -10, 7, 7);
+  // Glowing Windows with breathing alpha pulse
+  ctx.fillStyle = rgba(theme.primary, 0.8 + Math.sin(pulse * 3) * 0.15);
+  ctx.fillRect(-11, -11, 7, 7);
+  ctx.fillRect(4, -11, 7, 7);
 
   ctx.restore();
 }
@@ -273,75 +281,72 @@ function frame(now) {
   const dt = Math.min(0.05, t - lastT);
   lastT = t;
 
-  if (t - lastReset > 120) {
+  if (t - lastReset > 150) {
     initPile();
     lastReset = t;
   }
 
-  shakeForce *= 0.96;
+  shakeForce *= 0.95;
 
   ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
   ctx.fillStyle = rgba(theme.surface, 1);
   ctx.fillRect(0, 0, W, H);
 
-  // Globe Shake Offset
-  const shakeX = (Math.random() - 0.5) * shakeForce * 12;
-  const shakeY = (Math.random() - 0.5) * shakeForce * 12;
+  const shakeX = (Math.random() - 0.5) * shakeForce * 14;
+  const shakeY = (Math.random() - 0.5) * shakeForce * 14;
 
   ctx.save();
   ctx.translate(shakeX, shakeY);
 
-  // Metallic Pedestal Base
+  // Modernized Metallic Stand Base
   const baseTopY = cy + globeR * 0.82;
   ctx.beginPath();
-  ctx.ellipse(cx, baseTopY + 28, globeR * 0.68, globeR * 0.16, 0, 0, Math.PI * 2);
+  ctx.ellipse(cx, baseTopY + 32, globeR * 0.72, globeR * 0.18, 0, 0, Math.PI * 2);
   ctx.fillStyle = rgba(theme.tertiaryContainer, 0.95);
   ctx.fill();
 
   ctx.beginPath();
-  ctx.moveTo(cx - globeR * 0.58, baseTopY);
-  ctx.lineTo(cx + globeR * 0.58, baseTopY);
-  ctx.lineTo(cx + globeR * 0.68, baseTopY + 28);
-  ctx.lineTo(cx - globeR * 0.68, baseTopY + 28);
+  ctx.moveTo(cx - globeR * 0.6, baseTopY);
+  ctx.lineTo(cx + globeR * 0.6, baseTopY);
+  ctx.lineTo(cx + globeR * 0.72, baseTopY + 32);
+  ctx.lineTo(cx - globeR * 0.72, baseTopY + 32);
   ctx.closePath();
-  ctx.fillStyle = rgba(theme.secondaryContainer, 0.9);
+  ctx.fillStyle = rgba(theme.secondaryContainer, 0.92);
   ctx.fill();
 
-  // Decorative Metallic Ring on Base
   ctx.beginPath();
-  ctx.ellipse(cx, baseTopY + 8, globeR * 0.6, globeR * 0.08, 0, 0, Math.PI * 2);
-  ctx.strokeStyle = rgba(theme.primary, 0.4);
-  ctx.lineWidth = 3;
+  ctx.ellipse(cx, baseTopY + 10, globeR * 0.62, globeR * 0.08, 0, 0, Math.PI * 2);
+  ctx.strokeStyle = rgba(theme.primary, 0.5);
+  ctx.lineWidth = 3.5;
   ctx.stroke();
 
-  // Glass Globe Clipping Region
+  // Glass Clipping Region
   ctx.save();
   ctx.beginPath();
   ctx.arc(cx, cy, globeR, 0, Math.PI * 2);
   ctx.clip();
 
-  // Inside Atmospheric Gradient
-  const innerGrad = ctx.createRadialGradient(cx, cy - globeR * 0.25, 0, cx, cy, globeR);
-  innerGrad.addColorStop(0, rgba(theme.tertiaryContainer, 0.55));
-  innerGrad.addColorStop(0.7, rgba(theme.surface, 0.9));
+  // Volumetric Inner Atmosphere with interactive cursor glow
+  const innerGrad = ctx.createRadialGradient(cx, cy - globeR * 0.3, 0, cx, cy, globeR);
+  innerGrad.addColorStop(0, rgba(theme.tertiaryContainer, 0.6));
+  innerGrad.addColorStop(0.65, rgba(theme.surface, 0.92));
   innerGrad.addColorStop(1, rgba(theme.surface, 0.98));
   ctx.fillStyle = innerGrad;
   ctx.fillRect(cx - globeR, cy - globeR, globeR * 2, globeR * 2);
 
-  // Background Hills Silhouette
-  ctx.fillStyle = 'rgba(20, 28, 38, 0.85)';
+  // Background Silhouettes
+  ctx.fillStyle = 'rgba(24, 34, 46, 0.9)';
   ctx.beginPath();
-  ctx.arc(cx - globeR * 0.3, cy + globeR * 0.7, globeR * 0.5, 0, Math.PI * 2);
-  ctx.arc(cx + globeR * 0.35, cy + globeR * 0.75, globeR * 0.55, 0, Math.PI * 2);
+  ctx.arc(cx - globeR * 0.32, cy + globeR * 0.68, globeR * 0.52, 0, Math.PI * 2);
+  ctx.arc(cx + globeR * 0.38, cy + globeR * 0.74, globeR * 0.58, 0, Math.PI * 2);
   ctx.fill();
 
-  // Pine Trees & Cabin Scenery
-  drawPineTree(cx - globeR * 0.42, cy + globeR * 0.32, 0.85);
-  drawPineTree(cx - globeR * 0.22, cy + globeR * 0.35, 1.1);
-  drawCabin(cx + globeR * 0.1, cy + globeR * 0.42);
-  drawPineTree(cx + globeR * 0.45, cy + globeR * 0.34, 0.95);
+  drawPineTree(cx - globeR * 0.44, cy + globeR * 0.3, 0.85);
+  drawPineTree(cx - globeR * 0.2, cy + globeR * 0.34, 1.15);
+  drawCabin(cx + globeR * 0.12, cy + globeR * 0.4, t);
+  drawPineTree(cx + globeR * 0.46, cy + globeR * 0.32, 0.95);
 
-  // Accumulated Snow Pile
+  // Snow Accumulation Floor
   ctx.beginPath();
   ctx.moveTo(cx - globeR, cy + globeR);
   for (let i = 0; i < PILE_RES; i++) {
@@ -350,24 +355,33 @@ function frame(now) {
   }
   ctx.lineTo(cx + globeR, cy + globeR);
   ctx.closePath();
-  ctx.fillStyle = 'rgba(235, 245, 255, 0.92)';
+  ctx.fillStyle = 'rgba(240, 248, 255, 0.94)';
   ctx.fill();
 
-  // Falling & Swirling Snowflakes
+  // Snowflakes Simulation
   for (const f of flakes) {
-    if (shakeForce > 0.1) {
-      f.vx += (Math.random() - 0.5) * shakeForce * 15;
-      f.vy += (Math.random() - 0.5) * shakeForce * 15;
+    if (shakeForce > 0.05) {
+      f.vx += (Math.random() - 0.5) * shakeForce * 18;
+      f.vy += (Math.random() - 0.5) * shakeForce * 18;
     }
 
-    f.vy += 8 * dt; // Gravity
-    f.vy = Math.min(f.vy, 40);
+    // Cursor proximity wind attraction
+    const mDistX = f.x - mousePos.x;
+    const mDistY = f.y - mousePos.y;
+    const mDistSq = mDistX * mDistX + mDistY * mDistY;
+    if (mDistSq < 150 * 150 && mDistSq > 1) {
+      const mDist = Math.sqrt(mDistSq);
+      f.vx += (mDistX / mDist) * 12;
+      f.vy += (mDistY / mDist) * 12;
+    }
+
+    f.vy += 7.5 * dt;
+    f.vy = Math.min(f.vy, 38);
     f.y += f.vy * dt;
 
     const sway = Math.sin(t * f.wobFreq + f.phase) * f.wobAmp;
     f.x += (f.vx + sway * 0.2) * dt;
 
-    // Check collision with sphere rim or snow floor
     const distFromCenter = Math.hypot(f.x - cx, f.y - cy);
     const floorY = cy + globeR - pileHeightAt(f.x);
 
@@ -381,33 +395,41 @@ function frame(now) {
     ctx.arc(f.x, f.y, f.r, 0, Math.PI * 2);
     ctx.fillStyle = `rgba(255, 255, 255, ${f.alpha})`;
     ctx.fill();
+
+    // Refractive sparkle glint on larger flakes
+    if (f.r > 2) {
+      ctx.beginPath();
+      ctx.arc(f.x - 0.5, f.y - 0.5, f.r * 0.4, 0, Math.PI * 2);
+      ctx.fillStyle = `rgba(138, 206, 255, ${f.alpha * 0.8})`;
+      ctx.fill();
+    }
   }
 
-  ctx.restore(); // Exit Glass Clipping
+  ctx.restore(); // End Clip
 
-  // Glass Glare Highlights & Outer Rim Refraction
+  // Glass Dome Refraction Rim
   ctx.beginPath();
   ctx.arc(cx, cy, globeR, 0, Math.PI * 2);
-  ctx.strokeStyle = rgba(theme.primary, 0.38);
-  ctx.lineWidth = 2.5;
+  ctx.strokeStyle = rgba(theme.primary, 0.42);
+  ctx.lineWidth = 3;
   ctx.stroke();
 
-  // Top Curved Specular Glare
+  // Primary Specular Highlights
   ctx.beginPath();
   ctx.arc(cx - globeR * 0.35, cy - globeR * 0.45, globeR * 0.32, -0.7, 0.9);
-  ctx.strokeStyle = 'rgba(255, 255, 255, 0.32)';
-  ctx.lineWidth = 7;
+  ctx.strokeStyle = 'rgba(255, 255, 255, 0.38)';
+  ctx.lineWidth = 8;
   ctx.lineCap = 'round';
   ctx.stroke();
 
-  // Secondary Soft Glare
+  // Secondary Soft Ambient Reflection
   ctx.beginPath();
   ctx.arc(cx + globeR * 0.45, cy + globeR * 0.2, globeR * 0.25, 0.8, 2.2);
-  ctx.strokeStyle = 'rgba(255, 255, 255, 0.14)';
+  ctx.strokeStyle = 'rgba(255, 255, 255, 0.16)';
   ctx.lineWidth = 4;
   ctx.stroke();
 
-  ctx.restore(); // Exit Shake Transform
+  ctx.restore(); // End Shake
 
   requestAnimationFrame(frame);
 }

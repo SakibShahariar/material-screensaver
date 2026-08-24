@@ -5,16 +5,46 @@
 <title>Material Screensaver — DNA</title>
 <style>
   :root {
-    --primary_rgb: 138 206 255; --secondary_rgb: 180 199 233; --tertiary_rgb: 186 196 250;
-    --primary_container_rgb: 0 75 111; --tertiary_container_rgb: 58 68 114;
-    --surface_rgb: 12 20 27; --outline_rgb: 137 146 154;
+    --primary_rgb: 138 206 255;
+    --secondary_rgb: 180 199 233;
+    --tertiary_rgb: 186 196 250;
+    --primary_container_rgb: 0 75 111;
+    --tertiary_container_rgb: 58 68 114;
+    --surface_rgb: 12 20 27;
+    --outline_rgb: 137 146 154;
   }
-  html, body { margin: 0; padding: 0; width: 100%; height: 100%; overflow: hidden; background: rgb(var(--surface_rgb)); cursor: none; }
+  html, body {
+    margin: 0; padding: 0; width: 100%; height: 100%;
+    overflow: hidden; background: rgb(var(--surface_rgb)); cursor: none;
+  }
+  body.show-cursor { cursor: default; }
   canvas { display: block; width: 100vw; height: 100vh; }
-  #clock { position: fixed; left: 32px; bottom: 28px; font-family: "Google Sans","Segoe UI",Roboto,system-ui,sans-serif; font-weight: 400; font-variant-numeric: tabular-nums; letter-spacing: 0.5px; font-size: clamp(28px,4vw,56px); text-shadow: 0 0 24px rgba(0,0,0,0.4); pointer-events: none; transition: opacity 0.6s ease; }
-  #clock .ampm { font-size: 0.36em; margin-left: 6px; opacity: 0.82; vertical-align: middle; }
-  #date { position: fixed; left: 34px; bottom: 14px; font-family: "Google Sans","Segoe UI",Roboto,system-ui,sans-serif; font-size: clamp(12px,1.2vw,16px); letter-spacing: 1.5px; text-transform: uppercase; pointer-events: none; transition: opacity 0.6s ease; }
-  #hint { position: fixed; right: 28px; bottom: 26px; font-family: "Google Sans","Segoe UI",Roboto,system-ui,sans-serif; font-size: 13px; letter-spacing: 0.5px; pointer-events: none; opacity: 0; transition: opacity 0.8s ease; }
+  #clock {
+    position: fixed; left: 32px; bottom: 28px;
+    font-family: "Google Sans", "Segoe UI", Roboto, system-ui, sans-serif;
+    font-weight: 400; font-variant-numeric: tabular-nums; letter-spacing: 0.5px;
+    font-size: clamp(28px, 4vw, 56px);
+    text-shadow: 0 0 24px rgba(0,0,0,0.4);
+    pointer-events: none; transition: opacity 0.6s ease;
+  }
+  #clock .ampm {
+    font-size: 0.36em;
+    margin-left: 6px;
+    opacity: 0.82;
+    vertical-align: middle;
+  }
+  #date {
+    position: fixed; left: 34px; bottom: 14px;
+    font-family: "Google Sans", "Segoe UI", Roboto, system-ui, sans-serif;
+    font-size: clamp(12px, 1.2vw, 16px); letter-spacing: 1.5px; text-transform: uppercase;
+    pointer-events: none; transition: opacity 0.6s ease;
+  }
+  #hint {
+    position: fixed; right: 28px; bottom: 26px;
+    font-family: "Google Sans", "Segoe UI", Roboto, system-ui, sans-serif;
+    font-size: 13px; letter-spacing: 0.5px;
+    pointer-events: none; opacity: 0; transition: opacity 0.8s ease;
+  }
   #hint.show { opacity: 1; }
   #clock.hidden, #date.hidden { opacity: 0; }
 </style>
@@ -25,6 +55,7 @@
 <div id="clock">00:00</div>
 <div id="date">Mon, Jan 1</div>
 <div id="hint">press C to toggle clock</div>
+
 <script src="clock-shared.js"></script>
 <script>
 const canvas = document.getElementById('c');
@@ -33,11 +64,24 @@ const clockEl = document.getElementById('clock');
 const dateEl = document.getElementById('date');
 const hintEl = document.getElementById('hint');
 
+let cursorTimeout;
+window.addEventListener('pointermove', () => {
+  document.body.classList.add('show-cursor');
+  clearTimeout(cursorTimeout);
+  cursorTimeout = setTimeout(() => {
+    document.body.classList.remove('show-cursor');
+  }, 2500);
+});
+
 let dpr = Math.min(window.devicePixelRatio || 1, 2);
-let W, H, cx;
+let W, H, cx, cy;
 function resize() {
-  W = window.innerWidth; H = window.innerHeight; cx = W / 2;
-  canvas.width = W * dpr; canvas.height = H * dpr;
+  W = window.innerWidth;
+  H = window.innerHeight;
+  cx = W / 2;
+  cy = H / 2;
+  canvas.width = W * dpr;
+  canvas.height = H * dpr;
   ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
 }
 window.addEventListener('resize', resize);
@@ -46,111 +90,160 @@ resize();
 const reduceMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
 const speedMul = reduceMotion ? 0.2 : 1;
 
-function readRGB(name) {
+function readRGB(name, fallback) {
   const raw = getComputedStyle(document.documentElement).getPropertyValue(name).trim();
   const parts = raw.split(/\s+/).map(Number);
   if (parts.length === 3 && parts.every(n => !isNaN(n))) return parts;
-  return [200, 200, 200];
+  return fallback;
 }
 function rgba(rgb, a) { return `rgba(${rgb[0]}, ${rgb[1]}, ${rgb[2]}, ${a})`; }
 
 let theme = {};
 let rungPairs = [];
-function loadTheme() {
+
+async function loadMatugenColors() {
+  try {
+    const res = await fetch('file:///home/sakib/.config/matugen/matugen-colors.css');
+    if (res.ok) {
+      const cssText = await res.text();
+      const styleTag = document.createElement('style');
+      styleTag.textContent = cssText;
+      document.head.appendChild(styleTag);
+    }
+  } catch (e) {}
+  applyTheme();
+}
+
+function applyTheme() {
   theme = {
-    surface: readRGB('--surface_rgb'), primary: readRGB('--primary_rgb'), secondary: readRGB('--secondary_rgb'),
-    tertiary: readRGB('--tertiary_rgb'), primaryContainer: readRGB('--primary_container_rgb'),
-    tertiaryContainer: readRGB('--tertiary_container_rgb'), outline: readRGB('--outline_rgb'),
+    surface: readRGB('--surface_rgb', [12, 20, 27]),
+    primary: readRGB('--primary_rgb', [138, 206, 255]),
+    secondary: readRGB('--secondary_rgb', [180, 199, 233]),
+    tertiary: readRGB('--tertiary_rgb', [186, 196, 250]),
+    primaryContainer: readRGB('--primary_container_rgb', [0, 75, 111]),
+    tertiaryContainer: readRGB('--tertiary_container_rgb', [58, 68, 114]),
+    outline: readRGB('--outline_rgb', [137, 146, 154]),
   };
   clockEl.style.color = rgba(theme.primary, 0.92);
   dateEl.style.color = rgba(theme.secondary, 0.85);
   hintEl.style.color = rgba(theme.outline, 0.9);
-  rungPairs = [[theme.primary, theme.secondary], [theme.tertiary, theme.primaryContainer], [theme.secondary, theme.tertiaryContainer]];
+  document.body.style.backgroundColor = `rgb(${theme.surface.join(',')})`;
+  rungPairs = [
+    [theme.primary, theme.secondary],
+    [theme.tertiary, theme.primaryContainer],
+    [theme.secondary, theme.tertiaryContainer]
+  ];
 }
 
-const RADIUS_FRAC = 0.12;
-const RUNG_SPACING = 46;      // px between base pairs
-const SAMPLE_STEP = 4;        // px between strand curve samples — dense for smoothness
-const SCROLL_SPEED = 34;      // px/sec — the whole helix flows upward continuously
+const HELIX_RADIUS = 130;
+const TOTAL_POINTS = 75;
+const VERTICAL_SPACING = 24;
 
 let start = performance.now();
 
-function pointAt(yWorld, radius, offset) {
-  const phase = yWorld * 0.045 + offset;
-  return { x: cx + Math.sin(phase) * radius, z: Math.cos(phase) };
-}
-
 function frame(now) {
   const t = ((now - start) / 1000) * speedMul;
-  const radius = Math.min(W, H) * RADIUS_FRAC;
-  const scrollY = t * SCROLL_SPEED;
+  const scrollOffset = (t * 40) % (TOTAL_POINTS * VERTICAL_SPACING);
 
   ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
-  const bg = ctx.createRadialGradient(cx, H / 2, 0, cx, H / 2, Math.max(W, H) * 0.7);
-  bg.addColorStop(0, `rgb(${theme.surface.map((v,i)=>Math.min(255,v+ (i===2?10:6))).join(',')})`);
-  bg.addColorStop(1, `rgb(${theme.surface.join(',')})`);
+  const surf = theme.surface || [12, 20, 27];
+  const bg = ctx.createRadialGradient(cx, cy, 0, cx, cy, Math.max(W, H) * 0.75);
+  bg.addColorStop(0, `rgb(${surf.map((v, i) => Math.min(255, v + (i === 2 ? 14 : 8))).join(',')})`);
+  bg.addColorStop(1, `rgb(${surf.join(',')})`);
   ctx.fillStyle = bg;
   ctx.fillRect(0, 0, W, H);
 
-  // dense sample points along each backbone for smooth, glowing strands
-  const strandA = [], strandB = [];
-  for (let y = -SAMPLE_STEP; y <= H + SAMPLE_STEP; y += SAMPLE_STEP) {
-    const yWorld = y + scrollY;
-    strandA.push({ screenY: y, ...pointAt(yWorld, radius, 0) });
-    strandB.push({ screenY: y, ...pointAt(yWorld, radius, Math.PI) });
+  const tiltX = Math.sin(t * 0.3) * 0.25;
+  const tiltY = Math.cos(t * 0.2) * 0.15;
+  const twistSpeed = t * 1.2;
+
+  // Generate 3D points for strands and rungs
+  let renderQueue = [];
+
+  for (let i = 0; i < TOTAL_POINTS; i++) {
+    const baseY = (i * VERTICAL_SPACING) - scrollOffset + (TOTAL_POINTS * VERTICAL_SPACING / 2);
+    // Wrap around screen seamlessly
+    let screenY = baseY;
+    while (screenY < -100) screenY += TOTAL_POINTS * VERTICAL_SPACING;
+    while (screenY > H + 100) screenY -= TOTAL_POINTS * VERTICAL_SPACING;
+
+    const angle = (i * 0.18) + twistSpeed;
+
+    // Strand A
+    const x1 = Math.sin(angle) * HELIX_RADIUS;
+    const z1 = Math.cos(angle) * HELIX_RADIUS;
+    // Strand B (Pi offset)
+    const x2 = Math.sin(angle + Math.PI) * HELIX_RADIUS;
+    const z2 = Math.cos(angle + Math.PI) * HELIX_RADIUS;
+
+    // Apply 3D rotation / projection
+    const p1 = project3D(x1, screenY - cy, z1, tiltX, tiltY);
+    const p2 = project3D(x2, screenY - cy, z2, tiltX, tiltY);
+
+    const pair = rungPairs[i % rungPairs.length];
+
+    // Push Rung & Nodes to queue for depth sorting
+    renderQueue.push({
+      type: 'rung',
+      z: (p1.z + p2.z) / 2,
+      x1: p1.x + cx, y1: p1.y + cy,
+      x2: p2.x + cx, y2: p2.y + cy,
+      colorA: pair[0], colorB: pair[1],
+      z1: p1.z, z2: p2.z
+    });
+
+    renderQueue.push({
+      type: 'node',
+      z: p1.z,
+      x: p1.x + cx, y: p1.y + cy,
+      color: pair[0],
+      radius: Math.max(2, 4 + p1.z * 0.015)
+    });
+
+    renderQueue.push({
+      type: 'node',
+      z: p2.z,
+      x: p2.x + cx, y: p2.y + cy,
+      color: pair[1],
+      radius: Math.max(2, 4 + p2.z * 0.015)
+    });
   }
 
-  function drawStrand(strand, color) {
-    for (let i = 1; i < strand.length; i++) {
-      const p0 = strand[i - 1], p1 = strand[i];
-      const depth = (p1.z + 1) / 2;
+  // Sort back-to-front (Painter's algorithm)
+  renderQueue.sort((a, b) => a.z - b.z);
+
+  for (const item of renderQueue) {
+    if (item.type === 'rung') {
+      const depthFactor = (item.z + HELIX_RADIUS) / (2 * HELIX_RADIUS);
       ctx.beginPath();
-      ctx.moveTo(p0.x, p0.screenY);
-      ctx.lineTo(p1.x, p1.screenY);
-      ctx.strokeStyle = rgba(color, 0.35 + depth * 0.55);
-      ctx.lineWidth = 1.5 + depth * 2.5;
-      ctx.shadowColor = rgba(color, depth * 0.6);
-      ctx.shadowBlur = 4 + depth * 8;
+      ctx.moveTo(item.x1, item.y1);
+      ctx.lineTo(item.x2, item.y2);
+      ctx.strokeStyle = rgba(item.colorA, 0.15 + depthFactor * 0.3);
+      ctx.lineWidth = 1.5 + depthFactor * 1.5;
       ctx.stroke();
+    } else if (item.type === 'node') {
+      const depthFactor = (item.z + HELIX_RADIUS) / (2 * HELIX_RADIUS);
+      ctx.beginPath();
+      ctx.arc(item.x, item.y, item.radius, 0, Math.PI * 2);
+      ctx.fillStyle = rgba(item.color, 0.4 + depthFactor * 0.6);
+      ctx.shadowColor = rgba(item.color, depthFactor * 0.9);
+      ctx.shadowBlur = depthFactor * 12;
+      ctx.fill();
+      ctx.shadowBlur = 0;
     }
-    ctx.shadowBlur = 0;
   }
-
-  // rungs at regular intervals, behind the strands
-  for (let y = 0; y <= H; y += RUNG_SPACING) {
-    const yWorld = y + scrollY;
-    const a = pointAt(yWorld, radius, 0);
-    const b = pointAt(yWorld, radius, Math.PI);
-    const depth = (a.z + 1) / 2;
-    const pairIdx = Math.round(yWorld / RUNG_SPACING) % rungPairs.length;
-    const pair = rungPairs[((pairIdx % rungPairs.length) + rungPairs.length) % rungPairs.length];
-
-    ctx.beginPath();
-    ctx.moveTo(a.x, y);
-    ctx.lineTo(b.x, y);
-    ctx.strokeStyle = rgba(pair[0], 0.2 + depth * 0.35);
-    ctx.lineWidth = 2 + depth * 1.5;
-    ctx.stroke();
-
-    ctx.beginPath();
-    ctx.arc(a.x, y, 3 + depth * 2.5, 0, Math.PI * 2);
-    ctx.fillStyle = rgba(pair[0], 0.4 + depth * 0.6);
-    ctx.shadowColor = rgba(pair[0], depth * 0.8);
-    ctx.shadowBlur = 10 * depth;
-    ctx.fill();
-    ctx.beginPath();
-    ctx.arc(b.x, y, 3 + (1 - depth) * 2.5, 0, Math.PI * 2);
-    ctx.fillStyle = rgba(pair[1], 0.4 + (1 - depth) * 0.6);
-    ctx.shadowColor = rgba(pair[1], (1 - depth) * 0.8);
-    ctx.shadowBlur = 10 * (1 - depth);
-    ctx.fill();
-    ctx.shadowBlur = 0;
-  }
-
-  drawStrand(strandA, theme.primary);
-  drawStrand(strandB, theme.tertiary);
 
   requestAnimationFrame(frame);
+}
+
+function project3D(x, y, z, rx, ry) {
+  // Rotate around Y
+  const x1 = x * Math.cos(ry) + z * Math.sin(ry);
+  const z1 = -x * Math.sin(ry) + z * Math.cos(ry);
+  // Rotate around X
+  const y2 = y * Math.cos(rx) - z1 * Math.sin(rx);
+  const z2 = y * Math.sin(rx) + z1 * Math.cos(rx);
+  return { x: x1, y: y2, z: z2 };
 }
 
 let clockVisible = true;
@@ -161,11 +254,13 @@ window.addEventListener('keydown', (e) => {
     dateEl.classList.toggle('hidden', !clockVisible);
   }
 });
+
 hintEl.classList.add('show');
 setTimeout(() => hintEl.classList.remove('show'), 4000);
 
-window.addEventListener('load', () => {
-  loadTheme();
+window.addEventListener('load', async () => {
+  await loadMatugenColors();
+  resize();
   startClock(clockEl, dateEl);
   requestAnimationFrame(frame);
 });

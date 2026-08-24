@@ -73,6 +73,7 @@ let pile = [];
 const PILE_RES = 70;
 let nextGust = 4 + Math.random() * 6;
 let gustStrength = 0;
+let interactiveGust = { active: false, x: 0, y: 0, strength: 0 };
 
 function pileIndex(x) { return Math.max(0, Math.min(PILE_RES - 1, Math.floor((x / W) * PILE_RES))); }
 
@@ -104,6 +105,7 @@ function drawPetal(p) {
   ctx.save();
   ctx.translate(p.x, p.y);
   ctx.rotate(p.rot);
+  
   ctx.beginPath();
   ctx.moveTo(0, -p.size);
   ctx.bezierCurveTo(p.size * 0.9, -p.size * 0.6, p.size * 0.9, p.size * 0.5, 0, p.size);
@@ -111,8 +113,25 @@ function drawPetal(p) {
   ctx.closePath();
   ctx.fillStyle = rgba(p.color, 0.75);
   ctx.fill();
+
+  // Subtle interior translucency highlight
+  const grad = ctx.createRadialGradient(0, -p.size * 0.2, 0, 0, 0, p.size);
+  grad.addColorStop(0, rgba([255, 255, 255], 0.3));
+  grad.addColorStop(1, rgba(p.color, 0));
+  ctx.fillStyle = grad;
+  ctx.fill();
+
   ctx.restore();
 }
+
+window.addEventListener('pointerdown', (e) => {
+  interactiveGust = {
+    active: true,
+    x: e.clientX,
+    y: e.clientY,
+    strength: 180
+  };
+});
 
 let start = performance.now();
 let lastT = 0;
@@ -138,6 +157,11 @@ function frame(now) {
   }
   gustStrength *= 0.96;
 
+  if (interactiveGust.active) {
+    interactiveGust.strength *= 0.92;
+    if (interactiveGust.strength < 1) interactiveGust.active = false;
+  }
+
   // accumulated pile along the bottom
   ctx.beginPath();
   ctx.moveTo(0, H);
@@ -151,8 +175,24 @@ function frame(now) {
   ctx.fill();
 
   for (const p of petals) {
-    p.y += p.fallSpeed * dt;
-    p.x += (Math.sin(t * p.swayFreq + p.phase) * p.swayAmp * 0.3 + gustStrength) * dt;
+    let extraX = 0;
+    let extraY = 0;
+
+    if (interactiveGust.active) {
+      const dx = p.x - interactiveGust.x;
+      const dy = p.y - interactiveGust.y;
+      const distSq = dx * dx + dy * dy;
+      const maxDist = 300;
+      if (distSq < maxDist * maxDist && distSq > 1) {
+        const dist = Math.sqrt(distSq);
+        const force = (1 - dist / maxDist) * interactiveGust.strength;
+        extraX += (dx / dist) * force;
+        extraY += (dy / dist) * force * 0.5 - force * 0.3;
+      }
+    }
+
+    p.y += (p.fallSpeed + extraY) * dt;
+    p.x += (Math.sin(t * p.swayFreq + p.phase) * p.swayAmp * 0.3 + gustStrength + extraX) * dt;
     p.rot += p.rotSpeed * dt;
 
     const idx = pileIndex(p.x);

@@ -2,13 +2,11 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<title>Material Screensaver — Bounce</title>
+<title>Material Screensaver — Autumn Leaves</title>
 <style>
   :root {
     --primary_rgb: 138 206 255; --primary_container_rgb: 0 75 111;
-    --secondary_rgb: 180 199 233; --secondary_container_rgb: 53 72 99;
-    --tertiary_rgb: 186 196 250; --tertiary_container_rgb: 58 68 114;
-    --inverse_primary_rgb: 0 100 145;
+    --secondary_rgb: 180 199 233; --tertiary_rgb: 186 196 250; --tertiary_container_rgb: 58 68 114;
     --surface_rgb: 12 20 27; --outline_rgb: 137 146 154;
   }
   html, body { margin: 0; padding: 0; width: 100%; height: 100%; overflow: hidden; background: rgb(var(--surface_rgb)); cursor: none; }
@@ -51,14 +49,12 @@ function resize() {
   W = window.innerWidth; H = window.innerHeight;
   canvas.width = W * dpr; canvas.height = H * dpr;
   ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
-  ctx.fillStyle = 'rgb(12,20,27)';
-  ctx.fillRect(0, 0, W, H);
 }
 window.addEventListener('resize', resize);
 resize();
 
 const reduceMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
-const speedMul = reduceMotion ? 0.3 : 1;
+const speedMul = reduceMotion ? 0.25 : 1;
 
 function readRGB(name, fallback) {
   const raw = getComputedStyle(document.documentElement).getPropertyValue(name).trim();
@@ -67,9 +63,11 @@ function readRGB(name, fallback) {
   return fallback;
 }
 function rgba(rgb, a) { return `rgba(${rgb[0]}, ${rgb[1]}, ${rgb[2]}, ${a})`; }
+function blendColor(a, b, t) { return [a[0]+(b[0]-a[0])*t, a[1]+(b[1]-a[1])*t, a[2]+(b[2]-a[2])*t]; }
 
 let theme = {};
 let roleList = [];
+const AUTUMN_TONES = [[196, 92, 40], [214, 140, 45], [168, 60, 38], [220, 170, 60]];
 
 async function loadMatugenColors() {
   try {
@@ -90,111 +88,126 @@ function applyTheme() {
     primary: readRGB('--primary_rgb', [138, 206, 255]),
     secondary: readRGB('--secondary_rgb', [180, 199, 233]),
     tertiary: readRGB('--tertiary_rgb', [186, 196, 250]),
-    primaryContainer: readRGB('--primary_container_rgb', [0, 75, 111]),
-    secondaryContainer: readRGB('--secondary_container_rgb', [53, 72, 99]),
     tertiaryContainer: readRGB('--tertiary_container_rgb', [58, 68, 114]),
-    inversePrimary: readRGB('--inverse_primary_rgb', [0, 100, 145]),
     outline: readRGB('--outline_rgb', [137, 146, 154]),
   };
-  roleList = [theme.primary, theme.secondary, theme.tertiary, theme.primaryContainer, theme.secondaryContainer, theme.tertiaryContainer, theme.inversePrimary];
-  logo.color = roleList[0];
+  roleList = [theme.primary, theme.secondary, theme.tertiary];
   clockEl.style.color = rgba(theme.primary, 0.92);
   dateEl.style.color = rgba(theme.secondary, 0.85);
   hintEl.style.color = rgba(theme.outline, 0.9);
   document.body.style.backgroundColor = `rgb(${theme.surface.join(',')})`;
+
+  leaves.forEach((l, i) => {
+    const autumnBase = AUTUMN_TONES[i % AUTUMN_TONES.length];
+    l.color = blendColor(autumnBase, roleList[i % roleList.length], 0.3);
+  });
 }
 
-const logo = { x: 200, y: 150, vx: 160, vy: 120, size: 48, color: [200, 200, 200], squishX: 1, squishY: 1 };
-let trail = [];
-let bursts = [];
+let leaves = [];
+let pile = [];
+const PILE_RES = 70;
 
-function pickNewColor() {
-  let next;
-  do { next = roleList[Math.floor(Math.random() * roleList.length)]; } while (next === logo.color && roleList.length > 1);
-  logo.color = next;
+function spawnLeaf(l) {
+  l.x = Math.random() * W * 1.15 - W * 0.075;
+  l.y = -20 - Math.random() * 120;
+  l.size = 9 + Math.random() * 9;
+  l.fallSpeed = 24 + Math.random() * 26;
+  l.swayAmp = 40 + Math.random() * 60;
+  l.swayFreq = 0.5 + Math.random() * 0.7;
+  l.phase = Math.random() * Math.PI * 2;
+  l.rot = Math.random() * Math.PI * 2;
+  l.rotSpeed = (Math.random() - 0.5) * 3.2;
+  l.rotWobble = 0.5 + Math.random() * 1.5;
+  const autumnBase = AUTUMN_TONES[Math.floor(Math.random() * AUTUMN_TONES.length)];
+  l.color = blendColor(autumnBase, roleList[Math.floor(Math.random() * roleList.length)] || [200, 130, 60], 0.3);
 }
 
-function spawnBurst(x, y, color) {
-  for (let i = 0; i < 24; i++) {
-    const angle = (i / 24) * Math.PI * 2;
-    const speed = 90 + Math.random() * 60;
-    bursts.push({
-      x, y, vx: Math.cos(angle) * speed, vy: Math.sin(angle) * speed,
-      life: 0, maxLife: 0.7, color,
-    });
+function initLeaves() {
+  leaves = [];
+  pile = new Array(PILE_RES).fill(0);
+  for (let i = 0; i < 55; i++) {
+    const l = {};
+    spawnLeaf(l);
+    l.y = Math.random() * H;
+    leaves.push(l);
   }
 }
 
-function drawLogoShape(x, y, size, color, alpha, sX = 1, sY = 1) {
+function drawLeaf(l) {
   ctx.save();
-  ctx.translate(x, y);
-  ctx.scale(sX, sY);
+  ctx.translate(l.x, l.y);
+  ctx.rotate(l.rot);
   ctx.beginPath();
-  const r = size * 0.32;
-  const half = size / 2;
-  ctx.moveTo(-half + r, -half);
-  ctx.arcTo(half, -half, half, half, r);
-  ctx.arcTo(half, half, -half, half, r);
-  ctx.arcTo(-half, half, -half, -half, r);
-  ctx.arcTo(-half, -half, half, -half, r);
+  ctx.moveTo(0, -l.size);
+  ctx.bezierCurveTo(l.size * 1.1, -l.size * 0.4, l.size * 0.8, l.size * 0.6, 0, l.size);
+  ctx.bezierCurveTo(-l.size * 0.8, l.size * 0.6, -l.size * 1.1, -l.size * 0.4, 0, -l.size);
   ctx.closePath();
-  ctx.fillStyle = rgba(color, alpha);
+  ctx.fillStyle = rgba(l.color, 0.85);
   ctx.fill();
+  ctx.beginPath();
+  ctx.moveTo(0, -l.size * 0.9);
+  ctx.lineTo(0, l.size * 0.9);
+  ctx.strokeStyle = rgba(l.color.map(v => v * 0.6), 0.6);
+  ctx.lineWidth = 0.8;
+  ctx.stroke();
   ctx.restore();
 }
 
+function pileIndex(x) { return Math.max(0, Math.min(PILE_RES - 1, Math.floor((x / W) * PILE_RES))); }
+
 let start = performance.now();
 let lastT = 0;
+let lastPileReset = 0;
+let nextGust = 3 + Math.random() * 5;
+let gustStrength = 0;
 
 function frame(now) {
   const t = ((now - start) / 1000) * speedMul;
   const dt = Math.min(0.05, t - lastT);
   lastT = t;
 
+  if (t - lastPileReset > 150) {
+    pile = new Array(PILE_RES).fill(0);
+    lastPileReset = t;
+  }
+  if (t >= nextGust) {
+    gustStrength = 70 + Math.random() * 90;
+    nextGust = t + 5 + Math.random() * 8;
+  }
+  gustStrength *= 0.95;
+
   ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
   const surf = theme.surface || [12, 20, 27];
   ctx.fillStyle = `rgb(${surf.join(',')})`;
   ctx.fillRect(0, 0, W, H);
 
-  logo.x += logo.vx * dt * speedMul;
-  logo.y += logo.vy * dt * speedMul;
-
-  logo.squishX += (1 - logo.squishX) * 12 * dt;
-  logo.squishY += (1 - logo.squishY) * 12 * dt;
-
-  let hitX = false, hitY = false;
-  const half = logo.size / 2;
-  if (logo.x - half <= 0) { logo.x = half; logo.vx *= -1; hitX = true; logo.squishX = 0.75; logo.squishY = 1.25; }
-  if (logo.x + half >= W) { logo.x = W - half; logo.vx *= -1; hitX = true; logo.squishX = 0.75; logo.squishY = 1.25; }
-  if (logo.y - half <= 0) { logo.y = half; logo.vy *= -1; hitY = true; logo.squishX = 1.25; logo.squishY = 0.75; }
-  if (logo.y + half >= H) { logo.y = H - half; logo.vy *= -1; hitY = true; logo.squishX = 1.25; logo.squishY = 0.75; }
-
-  if (hitX || hitY) {
-    pickNewColor();
-    if (hitX && hitY) spawnBurst(logo.x, logo.y, logo.color);
+  // Draw bottom leaf pile
+  ctx.beginPath();
+  ctx.moveTo(0, H);
+  for (let i = 0; i < PILE_RES; i++) {
+    const x = (i / (PILE_RES - 1)) * W;
+    ctx.lineTo(x, H - pile[i]);
   }
+  ctx.lineTo(W, H);
+  ctx.closePath();
+  ctx.fillStyle = rgba(theme.tertiaryContainer || [58, 68, 114], 0.55);
+  ctx.fill();
 
-  trail.push({ x: logo.x, y: logo.y, color: logo.color, sX: logo.squishX, sY: logo.squishY });
-  if (trail.length > 14) trail.shift();
+  for (const l of leaves) {
+    l.y += l.fallSpeed * dt * speedMul;
+    l.x += (Math.sin(t * l.swayFreq + l.phase) * l.swayAmp * 0.4 + gustStrength) * dt * speedMul;
+    l.rot += l.rotSpeed * dt * speedMul * (0.6 + Math.sin(t * l.rotWobble + l.phase) * 0.4);
 
-  trail.forEach((p, i) => {
-    const a = (i / trail.length) * 0.3;
-    drawLogoShape(p.x, p.y, logo.size * (0.7 + (i / trail.length) * 0.3), p.color, a, p.sX, p.sY);
-  });
-  drawLogoShape(logo.x, logo.y, logo.size, logo.color, 0.9, logo.squishX, logo.squishY);
-
-  bursts = bursts.filter(b => {
-    b.life += dt * speedMul;
-    if (b.life >= b.maxLife) return false;
-    b.x += b.vx * dt * speedMul; b.y += b.vy * dt * speedMul;
-    b.vx *= 0.94; b.vy *= 0.94;
-    const fade = 1 - b.life / b.maxLife;
-    ctx.beginPath();
-    ctx.arc(b.x, b.y, 2.5, 0, Math.PI * 2);
-    ctx.fillStyle = rgba(b.color, fade * 0.8);
-    ctx.fill();
-    return true;
-  });
+    const idx = pileIndex(l.x);
+    const floorY = H - (pile[idx] || 0);
+    if (l.y >= floorY) {
+      pile[idx] = Math.min(H * 0.12, (pile[idx] || 0) + 0.6);
+      spawnLeaf(l);
+      continue;
+    }
+    if (l.x > W + 40 || l.x < -40) spawnLeaf(l);
+    drawLeaf(l);
+  }
 
   requestAnimationFrame(frame);
 }
@@ -211,6 +224,7 @@ hintEl.classList.add('show');
 setTimeout(() => hintEl.classList.remove('show'), 4000);
 
 window.addEventListener('load', async () => {
+  initLeaves();
   await loadMatugenColors();
   startClock(clockEl, dateEl);
   requestAnimationFrame(frame);

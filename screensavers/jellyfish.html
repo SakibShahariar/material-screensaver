@@ -3,21 +3,21 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Material Screensaver — Koi Pond</title>
+<title>Material Screensaver — Jellyfish</title>
 <style>
   :root {
     --primary_rgb: 138 206 255;
-    --secondary_rgb: 180 199 233;
-    --tertiary_rgb: 186 196 250;
     --primary_container_rgb: 0 75 111;
+    --secondary_rgb: 180 199 233;
     --secondary_container_rgb: 53 72 99;
+    --tertiary_rgb: 186 196 250;
     --tertiary_container_rgb: 58 68 114;
-    --surface_rgb: 12 20 27;
+    --surface_rgb: 6 12 20;
     --outline_rgb: 137 146 154;
   }
   html, body {
     margin: 0; padding: 0; width: 100%; height: 100%;
-    overflow: hidden; background: rgb(var(--surface_rgb));
+    overflow: hidden; background: rgb(var(--surface_rgb, 6 12 20));
     font-family: "Google Sans", "Segoe UI", Roboto, system-ui, sans-serif;
     user-select: none;
   }
@@ -106,15 +106,23 @@ const dateEl = document.getElementById('date');
 const hintEl = document.getElementById('hint');
 const uiContainer = document.getElementById('ui-container');
 
+let mouse = { x: -1000, y: -1000, vx: 0, vy: 0, lastX: -1000, lastY: -1000 };
 let cursorTimeout;
-function triggerCursor() {
+
+window.addEventListener('pointermove', (e) => {
   document.body.classList.add('show-cursor');
   clearTimeout(cursorTimeout);
   cursorTimeout = setTimeout(() => {
     document.body.classList.remove('show-cursor');
   }, 2500);
-}
-window.addEventListener('pointermove', triggerCursor);
+
+  mouse.vx = e.clientX - mouse.lastX;
+  mouse.vy = e.clientY - mouse.lastY;
+  mouse.x = e.clientX;
+  mouse.y = e.clientY;
+  mouse.lastX = e.clientX;
+  mouse.lastY = e.clientY;
+});
 
 let dpr = Math.min(window.devicePixelRatio || 1, 2);
 let W, H;
@@ -127,7 +135,7 @@ window.addEventListener('resize', resize);
 resize();
 
 const reduceMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
-const speedMul = reduceMotion ? 0.25 : 1;
+const speedMul = reduceMotion ? 0.2 : 1;
 
 function readRGB(name, fallback) {
   const raw = getComputedStyle(document.documentElement).getPropertyValue(name).trim();
@@ -158,7 +166,7 @@ async function loadMatugenColors() {
 
 function applyTheme() {
   theme = {
-    surface: readRGB('--surface_rgb', [12, 20, 27]),
+    surface: readRGB('--surface_rgb', [6, 12, 20]),
     primary: readRGB('--primary_rgb', [138, 206, 255]),
     secondary: readRGB('--secondary_rgb', [180, 199, 233]),
     tertiary: readRGB('--tertiary_rgb', [186, 196, 250]),
@@ -168,107 +176,150 @@ function applyTheme() {
     outline: readRGB('--outline_rgb', [137, 146, 154]),
   };
   roleList = [theme.primary, theme.secondary, theme.tertiary, theme.primaryContainer, theme.secondaryContainer, theme.tertiaryContainer];
-
+  
   clockEl.style.color = rgba(theme.primary, 1);
   dateEl.style.color = rgba(theme.secondary, 0.9);
   hintEl.style.color = rgba(theme.outline, 1);
+  
   document.body.style.backgroundColor = `rgb(${theme.surface.join(',')})`;
-
-  fish.forEach((f, i) => { f.color = roleList[i % roleList.length]; });
+  jellies.forEach((j, i) => { j.color = roleList[i % roleList.length]; });
 }
 
-let fish = [];
-let ripples = [];
-
-function makeFish() {
-  fish = [];
-  for (let i = 0; i < 6; i++) {
-    fish.push({
-      x: Math.random() * W, y: Math.random() * H,
-      angle: Math.random() * Math.PI * 2,
-      turnPhase: Math.random() * Math.PI * 2,
-      turnSpeed: 0.15 + Math.random() * 0.2,
-      speed: 22 + Math.random() * 18,
-      len: 20 + Math.random() * 14,
+let jellies = [];
+function makeJellies() {
+  jellies = [];
+  for (let i = 0; i < 9; i++) {
+    const depth = Math.random();
+    jellies.push({
+      x: Math.random() * W,
+      y: H + Math.random() * H * 0.5,
+      depth,
+      bellW: (28 + Math.random() * 22) * (0.5 + depth * 0.7),
+      pulsePhase: Math.random() * Math.PI * 2,
+      pulseFreq: 0.35 + Math.random() * 0.25,
+      driftAmp: 25 + Math.random() * 35,
+      driftFreq: 0.08 + Math.random() * 0.12,
+      driftPhase: Math.random() * Math.PI * 2,
+      tentacleCount: 5 + Math.floor(Math.random() * 3),
       color: [200, 200, 200],
-      nextRipple: Math.random() * 2,
     });
   }
 }
 
-function drawFish(f, t) {
-  const wag = Math.sin(t * 4 + f.turnPhase) * 0.3;
-  ctx.save();
-  ctx.translate(f.x, f.y);
-  ctx.rotate(f.angle);
+function drawJelly(j, t) {
+  const pulse = (Math.sin(t * j.pulseFreq + j.pulsePhase) + 1) / 2;
+  const bellSquash = 1 - pulse * 0.28;
+  const x = j.x + Math.sin(t * j.driftFreq + j.driftPhase) * j.driftAmp;
+  const alpha = 0.35 + j.depth * 0.5;
+
+  const dx = x - mouse.x;
+  const dy = j.y - mouse.y;
+  const dist = Math.sqrt(dx * dx + dy * dy);
+  if (dist < 220) {
+    const force = (1 - dist / 220) * 40;
+    j.x += (dx / dist) * force * 0.04;
+  }
+
+  const glowR = j.bellW * (2.4 + pulse * 0.6);
+  const grad = ctx.createRadialGradient(x, j.y, 0, x, j.y, glowR);
+  grad.addColorStop(0, rgba(j.color, (alpha * 0.55) + (pulse * 0.25)));
+  grad.addColorStop(1, rgba(j.color, 0));
+  ctx.fillStyle = grad;
   ctx.beginPath();
-  ctx.moveTo(f.len * 0.55, 0);
-  ctx.quadraticCurveTo(f.len * 0.2, f.len * 0.22, -f.len * 0.35, f.len * 0.12);
-  ctx.quadraticCurveTo(-f.len * 0.55, 0, -f.len * 0.35, -f.len * 0.12);
-  ctx.quadraticCurveTo(f.len * 0.2, -f.len * 0.22, f.len * 0.55, 0);
-  ctx.closePath();
-  ctx.fillStyle = rgba(f.color, 0.75);
+  ctx.arc(x, j.y, glowR, 0, Math.PI * 2);
   ctx.fill();
 
-  ctx.save();
-  ctx.translate(-f.len * 0.5, 0);
-  ctx.rotate(wag);
+  // Bell dome
   ctx.beginPath();
-  ctx.moveTo(0, 0);
-  ctx.lineTo(-f.len * 0.35, f.len * 0.2);
-  ctx.lineTo(-f.len * 0.35, -f.len * 0.2);
+  ctx.ellipse(x, j.y, j.bellW, j.bellW * 0.65 * bellSquash, 0, Math.PI, 0, false);
+  ctx.quadraticCurveTo(x + j.bellW, j.y + j.bellW * 0.15, x, j.y + j.bellW * 0.1);
+  ctx.quadraticCurveTo(x - j.bellW, j.y + j.bellW * 0.15, x - j.bellW, j.y);
   ctx.closePath();
-  ctx.fillStyle = rgba(f.color, 0.55);
+  ctx.fillStyle = rgba(j.color, alpha + pulse * 0.15);
   ctx.fill();
-  ctx.restore();
 
-  ctx.restore();
+  // Tentacles
+  ctx.strokeStyle = rgba(j.color, alpha * 0.65);
+  ctx.lineWidth = 1.3 * (0.5 + j.depth);
+  for (let k = 0; k < j.tentacleCount; k++) {
+    const tx = x - j.bellW * 0.7 + (k / (j.tentacleCount - 1)) * j.bellW * 1.4;
+    const len = j.bellW * (1.4 + Math.sin(k * 1.7) * 0.3);
+    ctx.beginPath();
+    ctx.moveTo(tx, j.y + j.bellW * 0.15);
+    const wob1 = Math.sin(t * 1.4 + k + j.pulsePhase) * (j.bellW * 0.25 + mouse.vx * 0.2);
+    const wob2 = Math.sin(t * 1.0 + k * 1.5 + j.pulsePhase) * (j.bellW * 0.35 + mouse.vy * 0.2);
+    ctx.quadraticCurveTo(tx + wob1, j.y + len * 0.5, tx + wob2, j.y + len);
+    ctx.stroke();
+  }
+}
+
+let particles = [];
+function makeParticles() {
+  particles = [];
+  for (let i = 0; i < 55; i++) {
+    particles.push({ 
+      x: Math.random() * W, 
+      y: Math.random() * H, 
+      r: 0.4 + Math.random() * 1.4, 
+      speed: 2 + Math.random() * 6,
+      alpha: 0.1 + Math.random() * 0.25
+    });
+  }
 }
 
 let start = performance.now();
-let lastT = 0;
 
 function frame(now) {
   const t = ((now - start) / 1000) * speedMul;
-  const dt = Math.min(0.05, t - lastT);
-  lastT = t;
 
   ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
-  const surf = theme.surface || [12, 20, 27];
-  const pContainer = theme.primaryContainer || [0, 75, 111];
-  const water = ctx.createRadialGradient(W / 2, H / 2, 0, W / 2, H / 2, Math.max(W, H) * 0.7);
-  water.addColorStop(0, `rgb(${pContainer.map((v, i) => Math.round(v * 0.5 + surf[i] * 0.5)).join(',')})`);
-  water.addColorStop(1, `rgb(${surf.join(',')})`);
+  const surf = theme.surface || [6, 12, 20];
+  const water = ctx.createLinearGradient(0, 0, 0, H);
+  water.addColorStop(0, `rgb(${surf.map(v => Math.min(255, v + 12)).join(',')})`);
+  water.addColorStop(1, `rgb(${surf.map(v => Math.max(0, v - 8)).join(',')})`);
   ctx.fillStyle = water;
   ctx.fillRect(0, 0, W, H);
 
-  ripples = ripples.filter(r => (t - r.start) < r.duration);
-  for (const r of ripples) {
-    const p = (t - r.start) / r.duration;
+  // Light rays
+  ctx.globalAlpha = 0.045;
+  for (let i = 0; i < 4; i++) {
+    const rx = W * (0.15 + i * 0.25) + Math.sin(t * 0.2 + i) * 35;
     ctx.beginPath();
-    ctx.arc(r.x, r.y, r.maxR * p, 0, Math.PI * 2);
-    ctx.strokeStyle = rgba(theme.outline, (1 - p) * 0.3);
-    ctx.lineWidth = 1;
-    ctx.stroke();
+    ctx.moveTo(rx - 50, 0);
+    ctx.lineTo(rx + 50, 0);
+    ctx.lineTo(rx + 120, H);
+    ctx.lineTo(rx - 120, H);
+    ctx.closePath();
+    ctx.fillStyle = rgba(theme.primary, 1);
+    ctx.fill();
+  }
+  ctx.globalAlpha = 1;
+
+  // Floating plankton
+  for (const p of particles) {
+    p.y -= p.speed * 0.016 * speedMul;
+    p.x += Math.sin(t + p.y * 0.01) * 0.2;
+    if (p.y < 0) { p.y = H; p.x = Math.random() * W; }
+    ctx.beginPath();
+    ctx.arc(p.x, p.y, p.r, 0, Math.PI * 2);
+    ctx.fillStyle = `rgba(255, 255, 255, ${p.alpha})`;
+    ctx.fill();
   }
 
-  for (const f of fish) {
-    f.angle += Math.sin(t * f.turnSpeed + f.turnPhase) * dt * 0.6;
-    f.x += Math.cos(f.angle) * f.speed * dt;
-    f.y += Math.sin(f.angle) * f.speed * dt;
-
-    if (f.x < 0) { f.x = 0; f.angle = Math.PI - f.angle; }
-    if (f.x > W) { f.x = W; f.angle = Math.PI - f.angle; }
-    if (f.y < 0) { f.y = 0; f.angle = -f.angle; }
-    if (f.y > H) { f.y = H; f.angle = -f.angle; }
-
-    if (t >= f.nextRipple) {
-      ripples.push({ x: f.x, y: f.y, start: t, duration: 3.5, maxR: 30 + Math.random() * 20 });
-      f.nextRipple = t + 1.2 + Math.random() * 1.5;
+  // Jellies
+  jellies.sort((a, b) => a.depth - b.depth);
+  for (const j of jellies) {
+    const pulse = (Math.sin(t * j.pulseFreq + j.pulsePhase) + 1) / 2;
+    j.y -= (0.45 + pulse * 1.9) * (0.5 + j.depth * 0.7) * speedMul;
+    if (j.y < -j.bellW * 3) {
+      j.y = H + j.bellW * 2;
+      j.x = Math.random() * W;
     }
-
-    drawFish(f, t);
+    drawJelly(j, t);
   }
+
+  mouse.vx *= 0.92;
+  mouse.vy *= 0.92;
 
   requestAnimationFrame(frame);
 }
@@ -285,9 +336,10 @@ hintEl.classList.add('show');
 setTimeout(() => hintEl.classList.remove('show'), 4000);
 
 window.addEventListener('load', async () => {
-  makeFish();
+  makeJellies();
+  makeParticles();
   await loadMatugenColors();
-
+  
   try {
     if (typeof startClock === 'function') {
       startClock(clockEl, dateEl);

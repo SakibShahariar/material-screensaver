@@ -10,7 +10,7 @@
     --primary_container_rgb: 0 75 111;
     --secondary_rgb: 180 199 233;
     --tertiary_rgb: 186 196 250;
-    --surface_rgb: 12 20 27;
+    --surface_rgb: 8 13 18;
     --surface_bright_rgb: 50 58 65;
     --on_surface_variant_rgb: 191 199 209;
     --outline_rgb: 137 146 154;
@@ -30,51 +30,59 @@
   #ui-container {
     position: fixed; inset: 0; pointer-events: none; z-index: 10;
     display: flex; flex-direction: column; justify-content: flex-end;
-    padding: 36px; box-sizing: border-box;
-    transition: opacity 0.6s ease;
+    padding: 48px; box-sizing: border-box;
+    transition: opacity 0.6s cubic-bezier(0.16, 1, 0.3, 1), transform 0.6s cubic-bezier(0.16, 1, 0.3, 1);
   }
-  #ui-container.hidden { opacity: 0; }
+  #ui-container.hidden { opacity: 0; transform: translateY(12px); }
 
   .vignette-card {
-    background: radial-gradient(circle at center, rgba(12, 20, 27, 0.65) 0%, rgba(12, 20, 27, 0) 80%);
-    backdrop-filter: blur(10px);
-    -webkit-backdrop-filter: blur(10px);
-    padding: 24px 32px;
+    background: radial-gradient(circle at bottom left, rgb(var(--surface_rgb) / 0.75) 0%, rgb(var(--surface_rgb) / 0.2) 70%);
+    backdrop-filter: blur(16px);
+    -webkit-backdrop-filter: blur(16px);
+    padding: 28px 36px;
     width: fit-content;
-    border-radius: 20px;
+    border-radius: 24px;
+    border: 1px solid rgb(var(--outline_rgb) / 0.15);
+    box-shadow: 0 16px 40px rgba(0, 0, 0, 0.5), inset 0 1px 0 rgba(255, 255, 255, 0.05);
   }
 
   #clock {
-    font-size: clamp(32px, 4.5vw, 64px);
-    font-weight: 300;
+    font-size: clamp(52px, 7vw, 84px);
+    font-weight: 200;
     font-variant-numeric: tabular-nums;
-    letter-spacing: -0.5px;
-    line-height: 1;
-    text-shadow: 0 2px 16px rgba(0, 0, 0, 0.7);
+    letter-spacing: -2px;
+    line-height: 0.95;
+    text-shadow: 0 2px 12px rgba(0, 0, 0, 0.4);
   }
   #clock .ampm {
-    font-size: 0.35em;
+    font-size: 0.28em;
     margin-left: 8px;
-    opacity: 0.8;
-    font-weight: 400;
+    opacity: 0.75;
+    font-weight: 500;
     text-transform: uppercase;
-    vertical-align: middle;
+    vertical-align: super;
+    letter-spacing: 1.5px;
   }
   #date {
-    font-size: clamp(12px, 1.2vw, 15px);
-    letter-spacing: 2px;
+    font-size: clamp(12px, 1.3vw, 15px);
+    letter-spacing: 3.5px;
     text-transform: uppercase;
-    margin-top: 8px;
-    opacity: 0.85;
-    text-shadow: 0 2px 10px rgba(0, 0, 0, 0.7);
+    margin-top: 10px;
+    opacity: 0.9;
+    font-weight: 500;
   }
   #hint {
     position: fixed; right: 36px; bottom: 36px;
-    font-size: 12px; letter-spacing: 0.8px;
+    font-size: 11px; letter-spacing: 2px; text-transform: uppercase;
     opacity: 0; transition: opacity 0.8s ease;
-    text-shadow: 0 2px 10px rgba(0, 0, 0, 0.7);
+    padding: 10px 18px;
+    background: rgb(var(--surface_rgb) / 0.6);
+    backdrop-filter: blur(8px);
+    border: 1px solid rgb(var(--outline_rgb) / 0.1);
+    border-radius: 12px;
+    pointer-events: none;
   }
-  #hint.show { opacity: 0.75; }
+  #hint.show { opacity: 0.7; }
 </style>
 <link rel="stylesheet" href="file:///home/sakib/.config/matugen/matugen-colors.css">
 </head>
@@ -86,8 +94,8 @@
     <div id="clock">00:00</div>
     <div id="date">Mon, Jan 1</div>
   </div>
-  <div id="hint">Press <b>C</b> to toggle UI</div>
 </div>
+<div id="hint">Press <b>C</b> to toggle UI</div>
 
 <script src="clock-shared.js"></script>
 <script>
@@ -136,9 +144,9 @@ function rgba(rgb, a) {
 }
 
 let theme = {};
-function loadTheme() {
+function applyTheme() {
   theme = {
-    surface: readRGB('--surface_rgb', [12, 20, 27]),
+    surface: readRGB('--surface_rgb', [8, 13, 18]),
     primary: readRGB('--primary_rgb', [138, 206, 255]),
     secondary: readRGB('--secondary_rgb', [180, 199, 233]),
     tertiary: readRGB('--tertiary_rgb', [186, 196, 250]),
@@ -146,9 +154,22 @@ function loadTheme() {
   };
 
   document.body.style.backgroundColor = rgba(theme.surface, 1);
-  clockEl.style.color = rgba(theme.primary, 0.95);
-  dateEl.style.color = rgba(theme.secondary, 0.85);
-  hintEl.style.color = rgba(theme.outline, 0.9);
+  clockEl.style.color = rgba(theme.primary, 1);
+  dateEl.style.color = rgba(theme.secondary, 0.9);
+  hintEl.style.color = rgba(theme.outline, 1);
+}
+
+async function loadMatugenColors() {
+  try {
+    const res = await fetch('file:///home/sakib/.config/matugen/matugen-colors.css');
+    if (res.ok) {
+      const cssText = await res.text();
+      const styleTag = document.createElement('style');
+      styleTag.textContent = cssText;
+      document.head.appendChild(styleTag);
+    }
+  } catch (e) {}
+  applyTheme();
 }
 
 // Generate the 16 vertices of a 4D Hypercube (Tesseract)
@@ -179,16 +200,17 @@ for (let i = 0; i < 16; i++) {
 let start = performance.now();
 
 function frame(now) {
-  const t = ((now - start) / 1000) * speedMul * 0.4;
+  const t = ((now - start) / 1000) * speedMul * 0.35;
 
   ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
-  ctx.fillStyle = rgba(theme.surface, 1);
+  const surf = theme.surface || [8, 13, 18];
+  ctx.fillStyle = `rgba(${surf.join(',')}, 0.35)`;
   ctx.fillRect(0, 0, W, H);
 
   // Rotation angles across multiple 4D planes
-  const angleXY = t * 0.8;
-  const angleZW = t * 0.5;
-  const angleXW = t * 0.3;
+  const angleXY = t * 0.7;
+  const angleZW = t * 0.45;
+  const angleXW = t * 0.25;
 
   const projectedVertices = [];
 
@@ -214,7 +236,7 @@ function frame(now) {
     let w2 = x * sin + w * cos;
     x = x2; w = w2;
 
-    // 4D to 3D perspective projection (stereographic projection from 4D space)
+    // 4D to 3D perspective projection
     const distance4D = 2.5;
     let wScale = 1 / (distance4D - w);
     let x3 = x * wScale;
@@ -229,45 +251,44 @@ function frame(now) {
     projectedVertices.push({
       x: cx + x3 * scaleFactor * zScale * 2.2,
       y: cy + y3 * scaleFactor * zScale * 2.2,
-      depth: w + z3 // Combined depth metric for styling
+      depth: w + z3
     });
   });
 
-  // Draw 32 edges with depth-based gradient styling
+  // Draw 32 edges with enhanced depth-based styling
   tesseractEdges.forEach((edge, idx) => {
     const p1 = projectedVertices[edge[0]];
     const p2 = projectedVertices[edge[1]];
 
     const avgDepth = (p1.depth + p2.depth) / 2;
-    const alpha = Math.max(0.08, Math.min(0.85, (avgDepth + 2) * 0.2));
+    const alpha = Math.max(0.1, Math.min(0.85, (avgDepth + 2) * 0.22));
     
-    // Choose color channel dynamically per edge group
     const colKey = idx % 3 === 0 ? 'primary' : (idx % 3 === 1 ? 'secondary' : 'tertiary');
     
     ctx.beginPath();
     ctx.moveTo(p1.x, p1.y);
     ctx.lineTo(p2.x, p2.y);
     ctx.strokeStyle = rgba(theme[colKey], alpha);
-    ctx.lineWidth = 1.5;
+    ctx.lineWidth = 1.8;
     ctx.stroke();
   });
 
   // Draw glowing vertex nodes
   projectedVertices.forEach(p => {
-    const glowAlpha = Math.max(0.1, Math.min(0.9, (p.depth + 2) * 0.25));
+    const glowAlpha = Math.max(0.15, Math.min(0.9, (p.depth + 2) * 0.28));
     
-    const grad = ctx.createRadialGradient(p.x, p.y, 0, p.x, p.y, 12);
+    const grad = ctx.createRadialGradient(p.x, p.y, 0, p.x, p.y, 14);
     grad.addColorStop(0, rgba(theme.primary, glowAlpha));
     grad.addColorStop(1, 'rgba(0,0,0,0)');
     
     ctx.fillStyle = grad;
     ctx.beginPath();
-    ctx.arc(p.x, p.y, 12, 0, Math.PI * 2);
+    ctx.arc(p.x, p.y, 14, 0, Math.PI * 2);
     ctx.fill();
 
     ctx.beginPath();
-    ctx.arc(p.x, p.y, 2.5, 0, Math.PI * 2);
-    ctx.fillStyle = rgba(theme.primary, 0.95);
+    ctx.arc(p.x, p.y, 3, 0, Math.PI * 2);
+    ctx.fillStyle = rgba(theme.primary, 1);
     ctx.fill();
   });
 
@@ -301,8 +322,8 @@ window.addEventListener('keydown', (e) => {
 hintEl.classList.add('show');
 setTimeout(() => hintEl.classList.remove('show'), 4000);
 
-window.addEventListener('load', () => {
-  loadTheme();
+window.addEventListener('load', async () => {
+  await loadMatugenColors();
 
   try {
     if (typeof startClock === 'function') {

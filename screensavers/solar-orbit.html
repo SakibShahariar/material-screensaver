@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Material Screensaver — Strange Attractor Flow</title>
+<title>Material Screensaver — Solar Orbit</title>
 <style>
   :root {
     --primary_rgb: 138 206 255;
@@ -123,7 +123,7 @@ window.addEventListener('resize', resize);
 resize();
 
 const reduceMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
-const speedMul = reduceMotion ? 0.2 : 0.6; // Calmed down speed for an ambient feel
+const speedMul = reduceMotion ? 0.2 : 1;
 
 function readRGB(name, fallback) {
   const raw = getComputedStyle(document.documentElement).getPropertyValue(name).trim();
@@ -151,65 +151,69 @@ function loadTheme() {
   hintEl.style.color = rgba(theme.outline, 0.9);
 }
 
-const PARTICLE_COUNT = 700;
-const particles = [];
-
-function resetParticle(p) {
-  p.x = (Math.random() - 0.5) * 3;
-  p.y = (Math.random() - 0.5) * 3;
-  p.z = (Math.random() - 0.5) * 3;
-  p.colorKey = Math.random() < 0.45 ? 'primary' : (Math.random() < 0.75 ? 'secondary' : 'tertiary');
-}
-
-for (let i = 0; i < PARTICLE_COUNT; i++) {
-  let p = {};
-  resetParticle(p);
-  particles.push(p);
-}
+// Orbit configurations (radius, speed, size, color type)
+const orbits = [
+  { radiusFactor: 0.18, speed: 0.35, size: 4, colorKey: 'tertiary' },
+  { radiusFactor: 0.30, speed: 0.22, size: 7, colorKey: 'primary' },
+  { radiusFactor: 0.44, speed: 0.15, size: 5, colorKey: 'secondary' },
+  { radiusFactor: 0.60, speed: 0.09, size: 9, colorKey: 'primary' },
+  { radiusFactor: 0.78, speed: 0.05, size: 6, colorKey: 'tertiary' }
+];
 
 let start = performance.now();
-let lastT = 0;
 
 function frame(now) {
   const t = ((now - start) / 1000) * speedMul;
-  const dt = Math.min(0.04, t - lastT);
-  lastT = t;
 
   ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
-  
-  // Smooth motion trail persistence layer
-  ctx.fillStyle = rgba(theme.surface, 0.15);
+  ctx.fillStyle = rgba(theme.surface, 1);
   ctx.fillRect(0, 0, W, H);
 
-  const scaleFactor = Math.min(W, H) * 0.14;
+  const baseRadius = Math.min(W, H) * 0.55;
 
-  particles.forEach(p => {
-    // Thomas' cyclically symmetric attractor equations
-    const b = 0.208886;
-    const dx = Math.sin(p.y) - b * p.x;
-    const dy = Math.sin(p.z) - b * p.y;
-    const dz = Math.sin(p.x) - b * p.z;
+  // Draw central star glow
+  const coreGrad = ctx.createRadialGradient(cx, cy, 0, cx, cy, 60);
+  coreGrad.addColorStop(0, rgba(theme.primary, 0.3));
+  coreGrad.addColorStop(0.5, rgba(theme.primary, 0.08));
+  coreGrad.addColorStop(1, 'rgba(0,0,0,0)');
+  ctx.fillStyle = coreGrad;
+  ctx.fillRect(cx - 60, cy - 60, 120, 120);
 
-    p.x += dx * dt * 3.5;
-    p.y += dy * dt * 3.5;
-    p.z += dz * dt * 3.5;
+  ctx.beginPath();
+  ctx.arc(cx, cy, 5, 0, Math.PI * 2);
+  ctx.fillStyle = rgba(theme.primary, 0.95);
+  ctx.fill();
 
-    // Slow ambient rotation around Y axis
-    const rotAngle = t * 0.15;
-    const rotX = p.x * Math.cos(rotAngle) - p.z * Math.sin(rotAngle);
-    const rotZ = p.x * Math.sin(rotAngle) + p.z * Math.cos(rotAngle);
-    
-    const screenX = cx + rotX * scaleFactor;
-    const screenY = cy + p.y * scaleFactor;
+  // Draw orbits and planets
+  orbits.forEach((orbit, index) => {
+    const r = baseRadius * orbit.radiusFactor;
 
-    if (isNaN(screenX) || isNaN(screenY) || Math.abs(rotX) > 8 || Math.abs(p.y) > 8) {
-      resetParticle(p);
-      return;
-    }
-
+    // Orbit path ring
     ctx.beginPath();
-    ctx.arc(screenX, screenY, 1.1, 0, Math.PI * 2);
-    ctx.fillStyle = rgba(theme[p.colorKey], 0.7);
+    ctx.arc(cx, cy, r, 0, Math.PI * 2);
+    ctx.strokeStyle = rgba(theme.outline, 0.12 + index * 0.02);
+    ctx.lineWidth = 1;
+    ctx.stroke();
+
+    // Planet position
+    const angle = t * orbit.speed + (index * 1.8);
+    const x = cx + Math.cos(angle) * r;
+    const y = cy + Math.sin(angle) * r;
+
+    // Planet glow
+    const pColor = theme[orbit.colorKey] || theme.primary;
+    const pGrad = ctx.createRadialGradient(x, y, 0, x, y, orbit.size * 2.5);
+    pGrad.addColorStop(0, rgba(pColor, 0.4));
+    pGrad.addColorStop(1, 'rgba(0,0,0,0)');
+    ctx.fillStyle = pGrad;
+    ctx.beginPath();
+    ctx.arc(x, y, orbit.size * 2.5, 0, Math.PI * 2);
+    ctx.fill();
+
+    // Planet core body
+    ctx.beginPath();
+    ctx.arc(x, y, orbit.size, 0, Math.PI * 2);
+    ctx.fillStyle = rgba(pColor, 0.95);
     ctx.fill();
   });
 

@@ -16,17 +16,21 @@ Blob, Flow, Ripple, Orbit, Kaleidoscope, Constellation, Solar System (3D, Three.
 Lorenz Attractor, Fireworks, Typewriter, Terrain, Vinyl, City, Bubbles, Origami,
 Lanterns, Rain, Koi Pond, DNA, Oscilloscope, Sakura, Paper Boats, Bounce, Fractal Zoom
 (GLSL/WebGL), Falling Sand, Voronoi, Game of Life, Glitch, Organic Harmonic Field
-(GLSL/WebGL), Solar-Orbit, Aurora Wave, Hyper-Tesseract, Metaphysical Horizon,
-Quantum Interference, Starfield, Strange Attractor Flow.
+(GLSL/WebGL), Solar-Orbit, Aurora Wave, Hyper-Tesseract, Ambient Mesh, Quantum
+Interference, Starfield, Strange Attractor Flow, Snow Globe, Lava Lamp, Jellyfish,
+Spirograph, Circuit Board, Autumn Leaves, Radar, Paper Cranes.
 
 All pull their color palette live from a [matugen](https://github.com/InioX/matugen)
 generated stylesheet, so they follow your current wallpaper-derived Material You theme.
 
-Note: Solar-Orbit, Aurora Wave, Hyper-Tesseract, Metaphysical Horizon, Quantum
-Interference, Starfield, and Strange Attractor Flow have only been automated-scanned
-(syntax, matugen linkage, known bug patterns) — not individually deep-reviewed the
-way the rest of the collection has been. They're expected to work but haven't had
-the same scrutiny.
+Note: most files went through a Gemini update pass that reintroduced an invalid CSS
+`rgba(var(--x), alpha)` pattern (mixing space-separated variable expansion with a
+comma-separated alpha argument — invalid per spec, and the same category of bug that
+broke clock text once before). This has been mechanically batch-fixed to valid
+`rgb(var(--x) / alpha)` syntax across all affected files. The *new content* those
+files gained beyond that fix (new panels, features, effects) has not yet been
+individually deep-reviewed the way earlier additions were — only automated syntax
+and known-bug-pattern scanning has been done so far.
 
 ## Requirements
 

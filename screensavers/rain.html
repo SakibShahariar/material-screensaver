@@ -10,24 +10,39 @@
   }
   html, body { margin: 0; padding: 0; width: 100%; height: 100%; overflow: hidden; background: rgb(var(--surface_rgb)); cursor: none; }
   canvas { display: block; width: 100vw; height: 100vh; }
-  #clock { position: fixed; left: 32px; bottom: 28px; font-family: "Google Sans","Segoe UI",Roboto,system-ui,sans-serif; font-weight: 400; font-variant-numeric: tabular-nums; letter-spacing: 0.5px; font-size: clamp(28px,4vw,56px); text-shadow: 0 0 24px rgba(0,0,0,0.4); pointer-events: none; transition: opacity 0.6s ease; }
-  #clock .ampm { font-size: 0.36em; margin-left: 6px; opacity: 0.82; vertical-align: middle; }
-  #date { position: fixed; left: 34px; bottom: 14px; font-family: "Google Sans","Segoe UI",Roboto,system-ui,sans-serif; font-size: clamp(12px,1.2vw,16px); letter-spacing: 1.5px; text-transform: uppercase; pointer-events: none; transition: opacity 0.6s ease; }
-  #hint { position: fixed; right: 28px; bottom: 26px; font-family: "Google Sans","Segoe UI",Roboto,system-ui,sans-serif; font-size: 13px; letter-spacing: 0.5px; pointer-events: none; opacity: 0; transition: opacity 0.8s ease; }
-  #hint.show { opacity: 1; }
-  #clock.hidden, #date.hidden { opacity: 0; }
+  
+  /* Upgraded Floating Glass HUD */
+  #hud {
+    position: fixed; left: 40px; bottom: 40px; pointer-events: none;
+    background: linear-gradient(135deg, rgb(var(--surface_rgb) / 0.75) 0%, rgb(var(--surface_rgb) / 0.4) 100%);
+    backdrop-filter: blur(20px); -webkit-backdrop-filter: blur(20px);
+    padding: 28px 36px; border-radius: 24px; border: 1px solid rgb(var(--outline_rgb) / 0.12);
+    box-shadow: 0 24px 60px rgba(0, 0, 0, 0.5), inset 0 1px 0 rgba(255, 255, 255, 0.06);
+    transition: opacity 0.5s cubic-bezier(0.16, 1, 0.3, 1), transform 0.5s cubic-bezier(0.16, 1, 0.3, 1);
+  }
+  #hud.hidden { opacity: 0; transform: translateY(16px); }
+
+  #clock { font-family: "Google Sans","Segoe UI",Roboto,system-ui,sans-serif; font-weight: 200; font-variant-numeric: tabular-nums; letter-spacing: -2px; font-size: clamp(48px, 7vw, 80px); line-height: 0.9; text-shadow: 0 4px 24px rgba(0,0,0,0.45); }
+  #clock .ampm { font-size: 0.28em; margin-left: 8px; opacity: 0.7; font-weight: 500; text-transform: uppercase; vertical-align: super; letter-spacing: 2px; }
+  #date { font-family: "Google Sans","Segoe UI",Roboto,system-ui,sans-serif; font-size: clamp(12px, 1.2vw, 15px); letter-spacing: 3px; text-transform: uppercase; margin-top: 10px; opacity: 0.85; font-weight: 500; }
+  
+  #hint { position: fixed; right: 40px; bottom: 40px; font-family: "Google Sans","Segoe UI",Roboto,system-ui,sans-serif; font-size: 11px; letter-spacing: 2.5px; text-transform: uppercase; opacity: 0; transition: opacity 0.6s ease; padding: 10px 20px; background: rgb(var(--surface_rgb) / 0.5); backdrop-filter: blur(12px); border: 1px solid rgb(var(--outline_rgb) / 0.1); border-radius: 14px; pointer-events: none; }
+  #hint.show { opacity: 0.65; }
 </style>
 <link rel="stylesheet" href="file:///home/sakib/.config/matugen/matugen-colors.css">
 </head>
 <body>
 <canvas id="c"></canvas>
-<div id="clock">00:00</div>
-<div id="date">Mon, Jan 1</div>
-<div id="hint">press C to toggle clock</div>
+<div id="hud">
+  <div id="clock">00:00</div>
+  <div id="date">Mon, Jan 1</div>
+</div>
+<div id="hint">Press <b>C</b> to toggle UI</div>
 <script src="clock-shared.js"></script>
 <script>
 const canvas = document.getElementById('c');
 const ctx = canvas.getContext('2d');
+const hudEl = document.getElementById('hud');
 const clockEl = document.getElementById('clock');
 const dateEl = document.getElementById('date');
 const hintEl = document.getElementById('hint');
@@ -60,37 +75,49 @@ function loadTheme() {
     primary: readRGB('--primary_rgb'), secondary: readRGB('--secondary_rgb'),
     tertiary: readRGB('--tertiary_rgb'), outline: readRGB('--outline_rgb'),
   };
-  clockEl.style.color = rgba(theme.primary, 0.92);
-  dateEl.style.color = rgba(theme.secondary, 0.85);
-  hintEl.style.color = rgba(theme.outline, 0.9);
+  clockEl.style.color = rgba(theme.primary, 0.98);
+  dateEl.style.color = rgba(theme.secondary, 0.9);
+  hintEl.style.color = rgba(theme.outline, 0.95);
 }
 
-let streaks = [], beads = [];
+let streaks = [], beads = [], splashes = [];
 function makeDrops() {
   streaks = [];
-  for (let i = 0; i < 220; i++) {
-    streaks.push({ x: Math.random() * W, y: Math.random() * H, len: 14 + Math.random() * 26, speed: 500 + Math.random() * 350, drift: -30 - Math.random() * 20, alpha: 0.15 + Math.random() * 0.25 });
+  for (let i = 0; i < 240; i++) {
+    streaks.push({ x: Math.random() * W, y: Math.random() * H, len: 18 + Math.random() * 32, speed: 600 + Math.random() * 400, drift: -40 - Math.random() * 30, alpha: 0.15 + Math.random() * 0.3 });
   }
   beads = [];
-  for (let i = 0; i < 18; i++) {
-    beads.push({ x: Math.random() * W, y: Math.random() * H, speed: 25 + Math.random() * 30, wob: Math.random() * Math.PI * 2, r: 2 + Math.random() * 2.5 });
+  for (let i = 0; i < 20; i++) {
+    beads.push({ x: Math.random() * W, y: Math.random() * H, speed: 30 + Math.random() * 35, wob: Math.random() * Math.PI * 2, r: 2 + Math.random() * 2.5 });
   }
+  splashes = [];
 }
 
-let nextFlash = 6 + Math.random() * 10;
+let nextFlash = 5 + Math.random() * 8;
 let flashAlpha = 0;
-let bolt = null;
+let bolts = [];
 
 function makeBolt() {
   const x0 = Math.random() * W;
-  const points = [[x0, 0]];
-  let x = x0, y = 0;
-  while (y < H * 0.6) {
-    y += 20 + Math.random() * 30;
-    x += (Math.random() - 0.5) * 40;
-    points.push([x, y]);
+  const generateBranch = (x, y, targetY, spread) => {
+    const points = [[x, y]];
+    while (y < targetY) {
+      y += 15 + Math.random() * 25;
+      x += (Math.random() - 0.5) * spread;
+      points.push([x, y]);
+    }
+    return points;
+  };
+
+  const main = generateBranch(x0, 0, H * 0.65, 50);
+  const branches = [];
+  // Add a sub-branch midway down
+  if (main.length > 5) {
+    const forkIdx = Math.floor(main.length * 0.4);
+    const forkPoint = main[forkIdx];
+    branches.push(generateBranch(forkPoint[0], forkPoint[1], forkPoint[1] + H * 0.3, 60));
   }
-  return points;
+  return { main, branches };
 }
 
 let start = performance.now();
@@ -109,33 +136,68 @@ function frame(now) {
   ctx.fillRect(0, 0, W, H);
 
   if (t >= nextFlash) {
-    flashAlpha = 0.5;
-    bolt = makeBolt();
-    nextFlash = t + 8 + Math.random() * 14;
+    flashAlpha = 0.6;
+    bolts = [makeBolt()];
+    if (Math.random() > 0.6) bolts.push(makeBolt());
+    nextFlash = t + 7 + Math.random() * 12;
   }
+
   if (flashAlpha > 0.001) {
     ctx.fillStyle = `rgba(255,255,255,${flashAlpha})`;
     ctx.fillRect(0, 0, W, H);
-    if (bolt) {
-      ctx.strokeStyle = `rgba(255,255,255,${flashAlpha})`;
-      ctx.lineWidth = 2;
+    
+    ctx.strokeStyle = `rgba(255,255,255,${flashAlpha * 0.9})`;
+    ctx.lineWidth = 2;
+    for (const b of bolts) {
       ctx.beginPath();
-      ctx.moveTo(bolt[0][0], bolt[0][1]);
-      for (const p of bolt) ctx.lineTo(p[0], p[1]);
+      ctx.moveTo(b.main[0][0], b.main[0][1]);
+      for (const p of b.main) ctx.lineTo(p[0], p[1]);
       ctx.stroke();
+
+      for (const branch of b.branches) {
+        ctx.beginPath();
+        ctx.moveTo(branch[0][0], branch[0][1]);
+        for (const p of branch) ctx.lineTo(p[0], p[1]);
+        ctx.stroke();
+      }
     }
-    flashAlpha *= 0.86;
+    flashAlpha *= 0.84;
   }
+
+  // Wind shear effect based on time
+  const wind = Math.sin(t * 0.5) * 15;
 
   for (const s of streaks) {
     s.y += s.speed * dt;
-    s.x += s.drift * dt;
-    if (s.y > H) { s.y = -s.len; s.x = Math.random() * W; }
+    s.x += (s.drift + wind) * dt;
+    if (s.y > H) {
+      if (Math.random() > 0.4) {
+        splashes.push({ x: s.x, y: H - Math.random() * 15, r: 2, maxR: 10 + Math.random() * 8, alpha: 0.4 });
+      }
+      s.y = -s.len;
+      s.x = Math.random() * W;
+    }
     ctx.beginPath();
     ctx.moveTo(s.x, s.y);
-    ctx.lineTo(s.x + s.drift * 0.05, s.y - s.len);
+    ctx.lineTo(s.x + (s.drift + wind) * 0.04, s.y - s.len);
     ctx.strokeStyle = rgba(theme.primary, s.alpha);
     ctx.lineWidth = 1.2;
+    ctx.stroke();
+  }
+
+  // Render splashes
+  for (let i = splashes.length - 1; i >= 0; i--) {
+    const sp = splashes[i];
+    sp.r += 60 * dt;
+    sp.alpha -= 1.2 * dt;
+    if (sp.alpha <= 0) {
+      splashes.splice(i, 1);
+      continue;
+    }
+    ctx.beginPath();
+    ctx.ellipse(sp.x, sp.y, sp.r, sp.r * 0.3, 0, 0, Math.PI * 2);
+    ctx.strokeStyle = rgba(theme.secondary, sp.alpha);
+    ctx.lineWidth = 1;
     ctx.stroke();
   }
 
@@ -152,12 +214,11 @@ function frame(now) {
   requestAnimationFrame(frame);
 }
 
-let clockVisible = true;
+let hudVisible = true;
 window.addEventListener('keydown', (e) => {
   if (e.key.toLowerCase() === 'c') {
-    clockVisible = !clockVisible;
-    clockEl.classList.toggle('hidden', !clockVisible);
-    dateEl.classList.toggle('hidden', !clockVisible);
+    hudVisible = !hudVisible;
+    hudEl.classList.toggle('hidden', !hudVisible);
   }
 });
 hintEl.classList.add('show');
