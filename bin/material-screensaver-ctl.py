@@ -633,6 +633,19 @@ def _inhibit_overview():
             print(f"[overview] inhibited overlay={_saved_overlay_key} shell={_saved_shell_toggle}", file=sys.stderr)
         except Exception:
             pass
+        # hide overview immediately if it was already visible and start blocker for double Super
+        try:
+            subprocess.run(["gdbus", "call", "--session", "--dest", "org.gnome.Shell",
+                            "--object-path", "/org/gnome/Shell",
+                            "--method", "org.gnome.Shell.Eval",
+                            "Main.overview.hide();"],
+                           capture_output=True, timeout=1)
+        except Exception:
+            pass
+        try:
+            _start_overview_block()
+        except Exception:
+            pass
     except Exception as e:
         try:
             print(f"[overview] inhibit failed {e}", file=sys.stderr)
@@ -679,11 +692,63 @@ def _restore_overview():
                 except Exception:
                     pass
             _saved_shell_toggle=None
+            try:
+                _stop_overview_block()
+            except Exception:
+                pass
     except Exception:
         pass
+    try:
+        _stop_overview_block()
+    except Exception:
+        pass
+_overview_block_id = None
+def _start_overview_block():
+    global _overview_block_id
+    try:
+        if _overview_block_id is not None:
+            return
+        from gi.repository import GLib
+        def _check():
+            try:
+                if not is_viewer_active():
+                    return True
+                # hide overview if visible while screensaver active (double Super)
+                out = subprocess.run(["gdbus", "call", "--session", "--dest", "org.gnome.Shell",
+                                      "--object-path", "/org/gnome/Shell",
+                                      "--method", "org.gnome.Shell.Eval",
+                                      "Main.overview.visible"],
+                                     capture_output=True, text=True, timeout=1)
+                if out.returncode==0 and "true" in out.stdout.lower():
+                    subprocess.run(["gdbus", "call", "--session", "--dest", "org.gnome.Shell",
+                                    "--object-path", "/org/gnome/Shell",
+                                    "--method", "org.gnome.Shell.Eval",
+                                    "Main.overview.hide();"],
+                                   capture_output=True, timeout=1)
+            except Exception:
+                pass
+            return True
+        _overview_block_id = GLib.timeout_add(180, _check)
+    except Exception:
+        pass
+
+def _stop_overview_block():
+    global _overview_block_id
+    try:
+        if _overview_block_id is not None:
+            from gi.repository import GLib
+            try:
+                GLib.source_remove(_overview_block_id)
+            except Exception:
+                pass
+            _overview_block_id = None
+    except Exception:
+        pass
+
 # Ensure overlay restored even on crash / SIGTERM
 try:
     atexit.register(_restore_overview)
+    atexit.register(_stop_overview_block)
 except Exception:
     pass
 
