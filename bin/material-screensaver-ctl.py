@@ -38,6 +38,7 @@ INTERFACE_NAME = "io.github.sakib.MaterialScreensaver"
 _viewer_windows = []  # list[Gtk.Window]
 _viewer_inhibit_cookie = None
 _viewer_inhibit_proxy = None
+_daemon_app = None  # Gtk.Application for daemon (Wayland fullscreen needs ApplicationWindow)
 
 
 def load_config():
@@ -153,7 +154,14 @@ def _create_viewer_windows(html_path, clock_format="24h"):
     uri = f"file://{html_path}?format={clock_format}"
     windows = []
     for mon in monitors:
-        win = Gtk.Window(title="Material Screensaver")
+        # Use ApplicationWindow when daemon app exists (Wayland needs app for proper fullscreen/layer)
+        try:
+            if _daemon_app is not None:
+                win = Gtk.ApplicationWindow(application=_daemon_app, title="Material Screensaver")
+            else:
+                win = Gtk.Window(title="Material Screensaver")
+        except Exception:
+            win = Gtk.Window(title="Material Screensaver")
         win.set_decorated(False)
         win.set_default_size(1920, 1080)
         # Make fullscreen on that monitor
@@ -516,121 +524,208 @@ def run_daemon():
     gi.require_version("Gtk", "4.0")
     gi.require_version("Gdk", "4.0")
     gi.require_version("WebKit", "6.0")
-    from gi.repository import Gio, GLib, Gtk
+    from gi.repository import Gio, GLib, Gtk, Gdk
 
-    # Ensure Gtk initialized for viewer windows (even though we use GLib loop)
+    # Use Gtk.Application (required for Wayland fullscreen to map correctly, not Gtk.init + GLib loop)
+    global _daemon_app
+    app = Gtk.Application(application_id="io.github.sakib.MaterialScreensaver")
+    _daemon_app = app
+    # Hold to keep app running without windows
     try:
-        Gtk.init()
+        app.hold()
     except Exception:
         pass
 
-    bus = Gio.bus_get_sync(Gio.BusType.SESSION, None)
-    proxy_idle = Gio.DBusProxy.new_sync(
-        bus, Gio.DBusProxyFlags.NONE, None,
-        "org.gnome.Mutter.IdleMonitor",
-        "/org/gnome/Mutter/IdleMonitor/Core",
-        "org.gnome.Mutter.IdleMonitor", None,
-    )
-
-    # Own D-Bus name for delegation
-    own_id = None
-    try:
-        # Use Gio.bus_own_name to handle name ownership
-        from gi.repository import Gio as Gio2
-        def on_bus_acquired(conn, name):
-            # Export object
-            try:
-                # Introspection XML
-                node_xml = f"""
-                <node>
-                  <interface name="{INTERFACE_NAME}">
-                    <method name="Show"/>
-                    <method name="Hide"/>
-                    <method name="Toggle"/>
-                    <method name="IsActive">
-                      <arg type="b" name="active" direction="out"/>
-                    </method>
-                  </interface>
-                </node>
-                """
-                from gi.repository import Gio as Gio3
-                node_info = Gio3.DBusNodeInfo.new_for_xml(node_xml)
-                iface_info = node_info.interfaces[0]
-                def on_method_call(conn, sender, path, iface, method, params, invocation):
-                    try:
-                        if method == "Show":
-                            show_viewer()
-                            invocation.return_value(None)
-                        elif method == "Hide":
-                            hide_viewer()
-                            invocation.return_value(None)
-                        elif method == "Toggle":
-                            if is_viewer_active():
-                                hide_viewer()
-                            else:
-                                show_viewer()
-                            invocation.return_value(None)
-                        elif method == "IsActive":
-                            active = is_viewer_active()
-                            invocation.return_value(GLib.Variant("(b)", (active,)))
-                        else:
-                            invocation.return_error_literal(Gio.DBusError, Gio.DBusError.UNKNOWN_METHOD, "Unknown method")
-                    except Exception as e:
-                        invocation.return_error_literal(Gio.DBusError, Gio.DBusError.FAILED, str(e))
-                conn.register_object(OBJECT_PATH, iface_info, on_method_call, None, None)
-            except Exception as e:
-                print(f"Failed to export D-Bus object: {e}", file=sys.stderr)
-
-        def on_name_acquired(conn, name):
-            pass
-        def on_name_lost(conn, name):
-            pass
-
-        own_id = Gio.bus_own_name(Gio.BusType.SESSION, SERVICE_NAME, Gio.BusNameOwnerFlags.NONE,
-            on_bus_acquired, on_name_acquired, on_name_lost)
-    except Exception as e:
-        print(f"D-Bus own name failed: {e}", file=sys.stderr)
-
+    # Need to wait for app to be registered before getting display
+    # Use idle to setup D-Bus and watches after app activation
+    bus = None
+    proxy_idle = None
     watch_ids = {"idle": None, "active": None}
 
-    def current_idle_seconds():
-        return int(load_config().get("idle_seconds", 300))
+    def setup_idle_watches():
+        nonlocal bus, proxy_idle
+        try:
+            bus = Gio.bus_get_sync(Gio.BusType.SESSION, None)
+            proxy_idle = Gio.DBusProxy.new_sync(
+                bus, Gio.DBusProxyFlags.NONE, None,
+                "org.gnome.Mutter.IdleMonitor",
+                "/org/gnome/Mutter/IdleMonitor/Core",
+                "org.gnome.Mutter.IdleMonitor", None,
+            )
+        except Exception as e:
+            print(f"IdleMonitor proxy failed: {e}", file=sys.stderr)
+            return
 
-    def remove_watch(kind):
-        wid = watch_ids.get(kind)
-        if wid is not None:
+        def current_idle_seconds():
+            return int(load_config().get("idle_seconds", 300))
+
+        def remove_watch(kind):
+            wid = watch_ids.get(kind)
+            if wid is not None:
+                try:
+                    proxy_idle.call_sync("RemoveWatch", GLib.Variant("(u)", (wid,)), Gio.DBusCallFlags.NONE, -1, None)
+                except Exception:
+                    pass
+                watch_ids[kind] = None
+
+        def add_idle_watch():
+            remove_watch("idle")
             try:
-                proxy_idle.call_sync("RemoveWatch", GLib.Variant("(u)", (wid,)), Gio.DBusCallFlags.NONE, -1, None)
+                result = proxy_idle.call_sync("AddIdleWatch", GLib.Variant("(t)", (current_idle_seconds() * 1000,)), Gio.DBusCallFlags.NONE, -1, None)
+                watch_ids["idle"] = result.unpack()[0]
+            except Exception as e:
+                print(f"AddIdleWatch failed: {e}", file=sys.stderr)
+
+        def add_active_watch():
+            remove_watch("active")
+            try:
+                result = proxy_idle.call_sync("AddUserActiveWatch", None, Gio.DBusCallFlags.NONE, -1, None)
+                watch_ids["active"] = result.unpack()[0]
+            except Exception as e:
+                print(f"AddUserActiveWatch failed: {e}", file=sys.stderr)
+
+        def on_signal(_proxy, _sender, signal_name, params):
+            if signal_name != "WatchFired":
+                return
+            (fired_id,) = params.unpack()
+            if fired_id == watch_ids["idle"]:
+                show_viewer()
+                add_active_watch()
+            elif fired_id == watch_ids["active"]:
+                hide_viewer()
+                add_idle_watch()
+
+        try:
+            proxy_idle.connect("g-signal", on_signal)
+        except Exception:
+            pass
+        add_idle_watch()
+
+    # Setup watches on idle after app startup
+    def on_startup(app):
+        setup_idle_watches()
+        # Own D-Bus name for delegation (same as before, but ensure app holds it)
+        try:
+            def on_bus_acquired(conn, name):
+                try:
+                    node_xml = f"""
+                    <node>
+                      <interface name="{INTERFACE_NAME}">
+                        <method name="Show"/>
+                        <method name="Hide"/>
+                        <method name="Toggle"/>
+                        <method name="IsActive">
+                          <arg type="b" name="active" direction="out"/>
+                        </method>
+                      </interface>
+                    </node>
+                    """
+                    from gi.repository import Gio as Gio3
+                    node_info = Gio3.DBusNodeInfo.new_for_xml(node_xml)
+                    iface_info = node_info.interfaces[0]
+                    def on_method_call(conn, sender, path, iface, method, params, invocation):
+                        try:
+                            if method == "Show":
+                                show_viewer()
+                                invocation.return_value(None)
+                            elif method == "Hide":
+                                hide_viewer()
+                                invocation.return_value(None)
+                            elif method == "Toggle":
+                                if is_viewer_active():
+                                    hide_viewer()
+                                else:
+                                    show_viewer()
+                                invocation.return_value(None)
+                            elif method == "IsActive":
+                                active = is_viewer_active()
+                                invocation.return_value(GLib.Variant("(b)", (active,)))
+                            else:
+                                invocation.return_error_literal(Gio.DBusError, Gio.DBusError.UNKNOWN_METHOD, "Unknown method")
+                        except Exception as e:
+                            invocation.return_error_literal(Gio.DBusError, Gio.DBusError.FAILED, str(e))
+                    conn.register_object(OBJECT_PATH, iface_info, on_method_call, None, None)
+                except Exception as e:
+                    print(f"Failed to export D-Bus object: {e}", file=sys.stderr)
+            def on_name_acquired(conn, name):
+                pass
+            def on_name_lost(conn, name):
+                pass
+            Gio.bus_own_name(Gio.BusType.SESSION, SERVICE_NAME, Gio.BusNameOwnerFlags.NONE,
+                on_bus_acquired, on_name_acquired, on_name_lost)
+        except Exception as e:
+            print(f"D-Bus own name failed: {e}", file=sys.stderr)
+
+    def on_activate(app):
+        pass
+
+    app.connect("startup", on_startup)
+    app.connect("activate", on_activate)
+
+    # Register app without running its own loop, then use GLib loop (keeps idle low)
+    try:
+        app.register(None)
+    except Exception:
+        pass
+    # Also run startup manually if not yet called (register triggers startup)
+    # Fallback: ensure watches are setup even if startup not fired yet
+    try:
+        if bus is None:
+            setup_idle_watches()
+            # Own D-Bus name if not yet owned via startup
+            try:
+                def _acquire(conn, name):
+                    try:
+                        node_xml = f"""
+                        <node>
+                          <interface name="{INTERFACE_NAME}">
+                            <method name="Show"/>
+                            <method name="Hide"/>
+                            <method name="Toggle"/>
+                            <method name="IsActive">
+                              <arg type="b" name="active" direction="out"/>
+                            </method>
+                          </interface>
+                        </node>
+                        """
+                        from gi.repository import Gio as Gio3
+                        node_info = Gio3.DBusNodeInfo.new_for_xml(node_xml)
+                        iface_info = node_info.interfaces[0]
+                        def _on_method(conn, sender, path, iface, method, params, invocation):
+                            try:
+                                if method == "Show":
+                                    show_viewer()
+                                    invocation.return_value(None)
+                                elif method == "Hide":
+                                    hide_viewer()
+                                    invocation.return_value(None)
+                                elif method == "Toggle":
+                                    hide_viewer() if is_viewer_active() else show_viewer()
+                                    invocation.return_value(None)
+                                elif method == "IsActive":
+                                    invocation.return_value(GLib.Variant("(b)", (is_viewer_active(),)))
+                                else:
+                                    invocation.return_error_literal(Gio.DBusError, Gio.DBusError.UNKNOWN_METHOD, "Unknown method")
+                            except Exception as e:
+                                invocation.return_error_literal(Gio.DBusError, Gio.DBusError.FAILED, str(e))
+                        conn.register_object(OBJECT_PATH, iface_info, _on_method, None, None)
+                    except Exception as e:
+                        print(f"Failed to export D-Bus object (fallback): {e}", file=sys.stderr)
+                Gio.bus_own_name(Gio.BusType.SESSION, SERVICE_NAME, Gio.BusNameOwnerFlags.NONE, _acquire, lambda *_: None, lambda *_: None)
             except Exception:
                 pass
-            watch_ids[kind] = None
+    except Exception:
+        pass
 
-    def add_idle_watch():
-        remove_watch("idle")
-        result = proxy_idle.call_sync("AddIdleWatch", GLib.Variant("(t)", (current_idle_seconds() * 1000,)), Gio.DBusCallFlags.NONE, -1, None)
-        watch_ids["idle"] = result.unpack()[0]
-
-    def add_active_watch():
-        remove_watch("active")
-        result = proxy_idle.call_sync("AddUserActiveWatch", None, Gio.DBusCallFlags.NONE, -1, None)
-        watch_ids["active"] = result.unpack()[0]
-
-    def on_signal(_proxy, _sender, signal_name, params):
-        if signal_name != "WatchFired":
-            return
-        (fired_id,) = params.unpack()
-        if fired_id == watch_ids["idle"]:
-            show_viewer()
-            add_active_watch()
-        elif fired_id == watch_ids["active"]:
-            hide_viewer()
-            add_idle_watch()
-
-    proxy_idle.connect("g-signal", on_signal)
-    add_idle_watch()
-
-    # Run main loop (GLib). Gtk windows will be serviced by same loop.
-    GLib.MainLoop().run()
+    # Run GLib main loop (instead of app.run to keep idle CPU low)
+    try:
+        GLib.MainLoop().run()
+    except Exception as e:
+        print(f"MainLoop failed: {e}", file=sys.stderr)
+        try:
+            app.run(None)
+        except Exception:
+            pass
 
 
 if __name__ == "__main__":
