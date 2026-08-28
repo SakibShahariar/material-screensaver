@@ -244,6 +244,10 @@ def _create_viewer_windows(html_path, clock_format="24h"):
         except Exception:
             win = Gtk.Window(title="Material Screensaver")
         win.set_decorated(False)
+        try:
+            win.set_modal(True)
+        except Exception:
+            pass
         # Set size to monitor geometry early (helps Wayland compositor place correctly)
         try:
             if mon is not None:
@@ -317,15 +321,9 @@ def _create_viewer_windows(html_path, clock_format="24h"):
             except Exception:
                 pass
             return
-        # cursor helpers — hidden by default, show 1.2s on movement (CSS + blank Gdk cursor on both win+web)
+        # cursor helpers — hidden by default, show 1.2s on movement (blank Gdk cursor on win+web)
         try:
             gi.require_version("GdkPixbuf", "2.0")
-        except Exception:
-            pass
-        try:
-            _css = Gtk.CssProvider()
-            _css.load_from_data(b".screensaver-window, .screensaver-window * { cursor: none !important; } window.screensaver-window { cursor: none !important; }")
-            Gtk.StyleContext.add_provider_for_display(display, _css, Gtk.STYLE_PROVIDER_PRIORITY_APPLICATION)
         except Exception:
             pass
         def _hide_cursor(w, web=None):
@@ -583,22 +581,24 @@ def _inhibit_overview():
     try:
         if _saved_overlay_key is not None:
             return
-        # mutter overlay-key is main Super→overview trigger
         out = subprocess.run(["gsettings", "get", "org.gnome.mutter", "overlay-key"],
                              capture_output=True, text=True, timeout=2)
         if out.returncode==0:
             cur = out.stdout.strip()
             _saved_overlay_key = cur
-            if cur not in ("''", "'Super_L'", "'Super_R'"):
-                # only blank if not already blank — keep original for restore
-                if cur != "''":
-                    subprocess.run(["gsettings", "set", "org.gnome.mutter", "overlay-key", "''"],
-                                   capture_output=True, timeout=2)
-            else:
-                if cur != "''":
-                    subprocess.run(["gsettings", "set", "org.gnome.mutter", "overlay-key", "''"],
-                                   capture_output=True, timeout=2)
-            # also try shell toggle-overview if set to Super
+            if cur != "''":
+                subprocess.run(["gsettings", "set", "org.gnome.mutter", "overlay-key", "''"],
+                               capture_output=True, timeout=2)
+                # verify and retry with dconf if needed
+                try:
+                    chk = subprocess.run(["gsettings", "get", "org.gnome.mutter", "overlay-key"],
+                                         capture_output=True, text=True, timeout=2)
+                    if chk.returncode==0 and chk.stdout.strip() != "''":
+                        subprocess.run(["dconf", "write", "/org/gnome/mutter/overlay-key", "''"],
+                                       capture_output=True, timeout=2)
+                except Exception:
+                    pass
+            # also blank shell toggle-overview if it contains Super
             try:
                 out2 = subprocess.run(["gsettings", "get", "org.gnome.shell.keybindings", "toggle-overview"],
                                       capture_output=True, text=True, timeout=2)
@@ -607,8 +607,16 @@ def _inhibit_overview():
                                    capture_output=True, timeout=2)
             except Exception:
                 pass
-    except Exception:
-        pass
+            # log for debug
+            try:
+                print(f"[overview] inhibited {cur} -> ''", file=sys.stderr)
+            except Exception:
+                pass
+    except Exception as e:
+        try:
+            print(f"[overview] inhibit failed {e}", file=sys.stderr)
+        except Exception:
+            pass
 
 def _restore_overview():
     global _saved_overlay_key
