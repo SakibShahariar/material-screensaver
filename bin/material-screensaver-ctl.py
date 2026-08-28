@@ -39,6 +39,8 @@ _viewer_windows = []  # list[Gtk.Window]
 _viewer_inhibit_cookie = None
 _viewer_inhibit_proxy = None
 _daemon_app = None  # Gtk.Application for daemon (Wayland fullscreen needs ApplicationWindow)
+_idle_proxy = None  # Gio.DBusProxy for org.gnome.Mutter.IdleMonitor (daemon only)
+_idle_watch_ids = {"idle": None, "active": None}
 
 
 def load_config():
@@ -140,6 +142,33 @@ def _get_shared_context():
         _shared_web_context = None
     return _shared_web_context
 
+def _kill_orphan_webkit():
+    """Kill any lingering bwrap/WebKit children of this daemon (ghost btop). Returns count killed."""
+    try:
+        import os, signal, subprocess
+        out = subprocess.run(["ps", "--ppid", str(os.getpid()), "-o", "pid=,args="],
+                             capture_output=True, text=True, timeout=2)
+        killed=0
+        for line in out.stdout.splitlines():
+            line=line.strip()
+            if not line:
+                continue
+            parts=line.split(None,1)
+            try:
+                pid=int(parts[0])
+            except Exception:
+                continue
+            cmd=parts[1] if len(parts)>1 else ""
+            if "WebKitNetworkProcess" in cmd or "WebKitWebProcess" in cmd or ("bwrap" in cmd and "xdg-dbus-proxy" in cmd):
+                try:
+                    os.kill(pid, signal.SIGTERM)
+                    killed+=1
+                except Exception:
+                    pass
+        return killed
+    except Exception:
+        return 0
+
 def _create_viewer_windows(html_path, clock_format="24h"):
     """Create one fullscreen Gtk.Window per monitor with WebKit WebView."""
     import gi
@@ -148,12 +177,19 @@ def _create_viewer_windows(html_path, clock_format="24h"):
     gi.require_version("WebKit", "6.0")
     from gi.repository import Gtk, Gdk, WebKit, GLib
 
-    # Ensure any previous ghost is gone before creating new (prevents dash ghost + bwrap leak)
-    # Caller (show_viewer) already checks is_viewer_active, but be defensive
+    # Always clean orphans before create — second Show often ghosts if previous Hide left bwrap
+    # is_viewer_active is false when ghost is invisible, so we need explicit orphan check
     try:
+        # If any WebKit child still alive while we think hidden, kill it before new Show
+        import subprocess, os
+        out = subprocess.run(["ps", "--ppid", str(os.getpid()), "-o", "args="],
+                             capture_output=True, text=True, timeout=2)
+        if "WebKit" in out.stdout or "bwrap" in out.stdout:
+            _kill_orphan_webkit()
+            import time
+            time.sleep(0.15)
         if is_viewer_active():
             hide_viewer()
-            # Give old WebProcess time to terminate before spawning new
             import time
             time.sleep(0.05)
     except Exception:
@@ -186,8 +222,15 @@ def _create_viewer_windows(html_path, clock_format="24h"):
 
     uri = f"file://{html_path}?format={clock_format}"
     windows = []
-    # Reuse shared context so NetworkProcess is not leaked per Show
-    ctx = _get_shared_context()
+    # Ephemeral per Show — allows full cleanup after Hide and avoids reusing killed shared NetworkProcess (second-show ghost)
+    try:
+        ctx = WebKit.WebContext.new_ephemeral()
+        try:
+            ctx.set_cache_model(WebKit.CacheModel.DOCUMENT_VIEWER)
+        except Exception:
+            pass
+    except Exception:
+        ctx = _get_shared_context()
     _ephemeral_ctx = ctx
     for mon in monitors:
         try:
@@ -305,6 +348,17 @@ def _create_viewer_windows(html_path, clock_format="24h"):
         # Defer fullscreen to next idle so Wayland compositor has surface
         try:
             GLib.idle_add(_do_fullscreen, priority=GLib.PRIORITY_HIGH_IDLE)
+            # Retry after 200ms — second Show sometimes ghosts if first hide SIGTERM left compositor state stale
+            def _retry_fs(w=win):
+                try:
+                    if w.get_visible() and not w.is_visible() or True:
+                        w.fullscreen()
+                        w.present()
+                except Exception:
+                    pass
+                return False
+            GLib.timeout_add(200, _retry_fs)
+            GLib.timeout_add(600, _retry_fs)
         except Exception:
             _do_fullscreen()
         # Also ensure fullscreen on map (covers case where idle fired before map)
@@ -312,6 +366,7 @@ def _create_viewer_windows(html_path, clock_format="24h"):
             def _on_map(w, _pspec=None):
                 try:
                     w.fullscreen()
+                    w.present()
                 except Exception:
                     pass
                 return False
@@ -357,6 +412,52 @@ def is_viewer_active():
     return False
 
 
+def _daemon_switch_to_active_watch():
+    """If daemon IdleMonitor is active, switch idle→active so mouse movement hides even manual Show."""
+    try:
+        if _idle_proxy is None:
+            return
+        from gi.repository import GLib, Gio
+        # remove idle, add active
+        if _idle_watch_ids.get("idle") is not None:
+            try:
+                _idle_proxy.call_sync("RemoveWatch", GLib.Variant("(u)", (_idle_watch_ids["idle"],)), Gio.DBusCallFlags.NONE, -1, None)
+            except Exception:
+                pass
+            _idle_watch_ids["idle"]=None
+        if _idle_watch_ids.get("active") is None:
+            try:
+                res=_idle_proxy.call_sync("AddUserActiveWatch", None, Gio.DBusCallFlags.NONE, -1, None)
+                _idle_watch_ids["active"]=res.unpack()[0]
+            except Exception:
+                pass
+    except Exception:
+        pass
+
+def _daemon_switch_to_idle_watch():
+    try:
+        if _idle_proxy is None:
+            return
+        from gi.repository import GLib, Gio
+        if _idle_watch_ids.get("active") is not None:
+            try:
+                _idle_proxy.call_sync("RemoveWatch", GLib.Variant("(u)", (_idle_watch_ids["active"],)), Gio.DBusCallFlags.NONE, -1, None)
+            except Exception:
+                pass
+            _idle_watch_ids["active"]=None
+        if _idle_watch_ids.get("idle") is None:
+            try:
+                import json, os
+                # read current idle_seconds
+                cfg=load_config()
+                secs=int(cfg.get("idle_seconds",300))
+                res=_idle_proxy.call_sync("AddIdleWatch", GLib.Variant("(t)", (secs*1000,)), Gio.DBusCallFlags.NONE, -1, None)
+                _idle_watch_ids["idle"]=res.unpack()[0]
+            except Exception:
+                pass
+    except Exception:
+        pass
+
 def show_viewer():
     """Show screensaver viewer in this process (non-blocking, creates windows)."""
     global _viewer_windows
@@ -370,6 +471,7 @@ def show_viewer():
         _viewer_windows = []
         _viewer_windows = _create_viewer_windows(html_path, clock_format)
         _inhibit()
+        _daemon_switch_to_active_watch()
         return True
     except Exception as e:
         print(f"Failed to show screensaver: {e}", file=sys.stderr)
@@ -397,6 +499,16 @@ def hide_viewer():
     if not to_close:
         _viewer_windows = []
         _uninhibit()
+        # Ghost bwrap may remain even when no visible window — still kill (second-show ghost)
+        try:
+            _kill_orphan_webkit()
+        except Exception:
+            pass
+        try:
+            import gc
+            gc.collect()
+        except Exception:
+            pass
         return False
     # Ungrab once before closing
     try:
@@ -483,6 +595,7 @@ def hide_viewer():
             pass
     _viewer_windows = []
     _uninhibit()
+    _daemon_switch_to_idle_watch()
     # Clear WebKit caches to prevent memory creep
     try:
         import gi
@@ -516,37 +629,10 @@ def hide_viewer():
         gc.collect()
     except Exception:
         pass
-    # Kill lingering NetworkProcess/WebProcess bwrap orphans that cause ghost dash/btop
-    # After successful hide, there should be 0 WebKit children; the default WebContext keeps
-    # a NetworkProcess alive (≈ 200M) which shows in btop as ghost. We terminate it so idle
-    # returns to 6 tasks / 30M like fresh daemon.
+    # Kill lingering orphans — btop ghost (also second-show ghost if shared NetworkProcess killed)
     try:
-        import os, signal, subprocess
-        # Only kill if no viewer active (we just hid)
         if not is_viewer_active():
-            # Find direct children that are WebKit processes
-            try:
-                out = subprocess.run(["ps", "--ppid", str(os.getpid()), "-o", "pid=,args="],
-                                     capture_output=True, text=True, timeout=2)
-                for line in out.stdout.splitlines():
-                    line=line.strip()
-                    if not line:
-                        continue
-                    parts=line.split(None,1)
-                    pid=int(parts[0])
-                    cmd=parts[1] if len(parts)>1 else ""
-                    if "WebKitNetworkProcess" in cmd or "WebKitWebProcess" in cmd:
-                        try:
-                            os.kill(pid, signal.SIGTERM)
-                        except Exception:
-                            pass
-                    elif "bwrap" in cmd and ("xdg-dbus-proxy" in cmd or "WebKit" in cmd):
-                        try:
-                            os.kill(pid, signal.SIGTERM)
-                        except Exception:
-                            pass
-            except Exception:
-                pass
+            _kill_orphan_webkit()
     except Exception:
         pass
     try:
@@ -717,17 +803,15 @@ def run_daemon():
     except Exception:
         pass
 
-    # Need to wait for app to be registered before getting display
-    # Use idle to setup D-Bus and watches after app activation
+    # Need to wait for app to be registered before getting display — use globals so manual Show/Hide can switch watches
+    global _idle_proxy, _idle_watch_ids
     bus = None
-    proxy_idle = None
-    watch_ids = {"idle": None, "active": None}
 
     def setup_idle_watches():
-        nonlocal bus, proxy_idle
+        global _idle_proxy, _idle_watch_ids
         try:
             bus = Gio.bus_get_sync(Gio.BusType.SESSION, None)
-            proxy_idle = Gio.DBusProxy.new_sync(
+            _idle_proxy = Gio.DBusProxy.new_sync(
                 bus, Gio.DBusProxyFlags.NONE, None,
                 "org.gnome.Mutter.IdleMonitor",
                 "/org/gnome/Mutter/IdleMonitor/Core",
@@ -741,27 +825,27 @@ def run_daemon():
             return int(load_config().get("idle_seconds", 300))
 
         def remove_watch(kind):
-            wid = watch_ids.get(kind)
+            wid = _idle_watch_ids.get(kind)
             if wid is not None:
                 try:
-                    proxy_idle.call_sync("RemoveWatch", GLib.Variant("(u)", (wid,)), Gio.DBusCallFlags.NONE, -1, None)
+                    _idle_proxy.call_sync("RemoveWatch", GLib.Variant("(u)", (wid,)), Gio.DBusCallFlags.NONE, -1, None)
                 except Exception:
                     pass
-                watch_ids[kind] = None
+                _idle_watch_ids[kind] = None
 
         def add_idle_watch():
             remove_watch("idle")
             try:
-                result = proxy_idle.call_sync("AddIdleWatch", GLib.Variant("(t)", (current_idle_seconds() * 1000,)), Gio.DBusCallFlags.NONE, -1, None)
-                watch_ids["idle"] = result.unpack()[0]
+                result = _idle_proxy.call_sync("AddIdleWatch", GLib.Variant("(t)", (current_idle_seconds() * 1000,)), Gio.DBusCallFlags.NONE, -1, None)
+                _idle_watch_ids["idle"] = result.unpack()[0]
             except Exception as e:
                 print(f"AddIdleWatch failed: {e}", file=sys.stderr)
 
         def add_active_watch():
             remove_watch("active")
             try:
-                result = proxy_idle.call_sync("AddUserActiveWatch", None, Gio.DBusCallFlags.NONE, -1, None)
-                watch_ids["active"] = result.unpack()[0]
+                result = _idle_proxy.call_sync("AddUserActiveWatch", None, Gio.DBusCallFlags.NONE, -1, None)
+                _idle_watch_ids["active"] = result.unpack()[0]
             except Exception as e:
                 print(f"AddUserActiveWatch failed: {e}", file=sys.stderr)
 
@@ -769,18 +853,22 @@ def run_daemon():
             if signal_name != "WatchFired":
                 return
             (fired_id,) = params.unpack()
-            if fired_id == watch_ids["idle"]:
+            if fired_id == _idle_watch_ids["idle"]:
                 show_viewer()
                 add_active_watch()
-            elif fired_id == watch_ids["active"]:
+            elif fired_id == _idle_watch_ids["active"]:
                 hide_viewer()
                 add_idle_watch()
 
         try:
-            proxy_idle.connect("g-signal", on_signal)
+            _idle_proxy.connect("g-signal", on_signal)
         except Exception:
             pass
         add_idle_watch()
+        # Expose helpers for manual Show/Hide watch switching
+        global _daemon_switch_to_active_watch, _daemon_switch_to_idle_watch
+        _daemon_switch_to_active_watch = add_active_watch
+        _daemon_switch_to_idle_watch = add_idle_watch
 
     # Setup watches on idle after app startup
     def on_startup(app):
