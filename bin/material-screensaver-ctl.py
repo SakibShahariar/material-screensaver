@@ -324,7 +324,7 @@ def _create_viewer_windows(html_path, clock_format="24h"):
             pass
         try:
             _css = Gtk.CssProvider()
-            _css.load_from_data(b".screensaver-window, .screensaver-window * { cursor: none; } window.screensaver-window { cursor: none; }")
+            _css.load_from_data(b".screensaver-window, .screensaver-window * { cursor: none !important; } window.screensaver-window { cursor: none !important; }")
             Gtk.StyleContext.add_provider_for_display(display, _css, Gtk.STYLE_PROVIDER_PRIORITY_APPLICATION)
         except Exception:
             pass
@@ -341,12 +341,16 @@ def _create_viewer_windows(html_path, clock_format="24h"):
                         continue
                     except Exception:
                         pass
-                    c = Gdk.Cursor.new_from_name("none", None)
-                    if c is not None:
-                        tgt.set_cursor(c)
-                        continue
-                    # try invisible via CSS fallback
-                    tgt.set_cursor(None)
+                    for name in ("none", "blank", "hidden", "invisible"):
+                        try:
+                            c = Gdk.Cursor.new_from_name(name, None)
+                            if c is not None:
+                                tgt.set_cursor(c)
+                                break
+                        except Exception:
+                            continue
+                    else:
+                        tgt.set_cursor(Gdk.Cursor.new_from_name("none", None))
                 except Exception:
                     try:
                         tgt.set_cursor(None)
@@ -578,16 +582,31 @@ def _inhibit_overview():
     global _saved_overlay_key
     try:
         if _saved_overlay_key is not None:
-            # already inhibited — don't overwrite saved value with "''"
             return
+        # mutter overlay-key is main Super→overview trigger
         out = subprocess.run(["gsettings", "get", "org.gnome.mutter", "overlay-key"],
                              capture_output=True, text=True, timeout=2)
         if out.returncode==0:
             cur = out.stdout.strip()
             _saved_overlay_key = cur
-            if cur != "''":
-                subprocess.run(["gsettings", "set", "org.gnome.mutter", "overlay-key", "''"],
-                               capture_output=True, timeout=2)
+            if cur not in ("''", "'Super_L'", "'Super_R'"):
+                # only blank if not already blank — keep original for restore
+                if cur != "''":
+                    subprocess.run(["gsettings", "set", "org.gnome.mutter", "overlay-key", "''"],
+                                   capture_output=True, timeout=2)
+            else:
+                if cur != "''":
+                    subprocess.run(["gsettings", "set", "org.gnome.mutter", "overlay-key", "''"],
+                                   capture_output=True, timeout=2)
+            # also try shell toggle-overview if set to Super
+            try:
+                out2 = subprocess.run(["gsettings", "get", "org.gnome.shell.keybindings", "toggle-overview"],
+                                      capture_output=True, text=True, timeout=2)
+                if out2.returncode==0 and "'<Super>" in out2.stdout:
+                    subprocess.run(["gsettings", "set", "org.gnome.shell.keybindings", "toggle-overview", "@as []"],
+                                   capture_output=True, timeout=2)
+            except Exception:
+                pass
     except Exception:
         pass
 
@@ -595,20 +614,23 @@ def _restore_overview():
     global _saved_overlay_key
     try:
         if _saved_overlay_key is not None:
-            if _saved_overlay_key != "''":
+            if _saved_overlay_key not in ("''", ""):
                 subprocess.run(["gsettings", "set", "org.gnome.mutter", "overlay-key", _saved_overlay_key],
                                capture_output=True, timeout=2)
             else:
-                # saved was already "''" — ensure we don't leave blank if current is blank
                 cur = subprocess.run(["gsettings", "get", "org.gnome.mutter", "overlay-key"],
                                      capture_output=True, text=True, timeout=2)
                 if cur.returncode==0 and cur.stdout.strip() == "''":
-                    # restore default Super if we never saved a real value
                     subprocess.run(["gsettings", "set", "org.gnome.mutter", "overlay-key", "'Super'"],
                                    capture_output=True, timeout=2)
             _saved_overlay_key=None
+            # restore shell toggle-overview if we blanked it
+            try:
+                subprocess.run(["gsettings", "reset", "org.gnome.shell.keybindings", "toggle-overview"],
+                               capture_output=True, timeout=2)
+            except Exception:
+                pass
         else:
-            # no saved value but overlay is blank — fix orphaned blank from crash
             try:
                 cur = subprocess.run(["gsettings", "get", "org.gnome.mutter", "overlay-key"],
                                      capture_output=True, text=True, timeout=2)
