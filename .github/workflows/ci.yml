@@ -1,0 +1,61 @@
+name: CI
+
+on:
+  push:
+    branches: [master]
+  pull_request:
+    branches: [master]
+
+jobs:
+  lint:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.x"
+
+      - name: Python syntax check
+        run: python3 -m py_compile bin/*.py
+
+      - name: Bash syntax check
+        run: bash -n install.sh
+
+      - name: Desktop file validation
+        run: |
+          sudo apt-get update -qq && sudo apt-get install -y -qq desktop-file-utils
+          desktop-file-validate applications/material-screensaver-settings.desktop
+
+      - name: No invalid CSS rgba(var) pattern
+        run: |
+          if grep -rn "rgba(var" screensavers/; then
+            echo "Found invalid rgba(var(--x), ...) — use rgb(var(--x) / alpha)"
+            exit 1
+          fi
+          if grep -rnE 'rgb\(var\(--[a-z_]+\)\s*,' screensavers/; then
+            echo "Found rgb(var(--x), comma) — use rgb(var(--x) / alpha)"
+            exit 1
+          fi
+          echo "CSS var alpha patterns OK"
+
+      - name: HTML sanity
+        run: |
+          python3 << 'PY'
+          import glob, re, sys
+          ok=True
+          for p in sorted(glob.glob("screensavers/*.html")):
+              t=open(p).read()
+              if "matugen-colors.css" not in t:
+                  print(f"FAIL {p}: missing matugen link"); ok=False
+              if t.count("<script") != t.count("</script>"):
+                  print(f"FAIL {p}: script tag mismatch"); ok=False
+              if '<meta name="viewport"' not in t:
+                  print(f"FAIL {p}: missing viewport meta"); ok=False
+          sys.exit(0 if ok else 1)
+          PY
+
+      - name: Shell check (if available)
+        run: |
+          if command -v shellcheck >/dev/null 2>&1; then shellcheck install.sh; else echo "shellcheck not installed — skipping"; fi
