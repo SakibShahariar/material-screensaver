@@ -318,15 +318,35 @@ def _create_viewer_windows(html_path, clock_format="24h"):
             except Exception:
                 pass
             return
-        # cursor helpers — hidden by default, show 1.2s on movement
+        # cursor helpers — hidden by default, show 1.2s on movement (CSS + blank Gdk cursor)
+        try:
+            gi.require_version("GdkPixbuf", "2.0")
+        except Exception:
+            pass
+        try:
+            _css = Gtk.CssProvider()
+            _css.load_from_data(b".screensaver-window, .screensaver-window * { cursor: none; }")
+            Gtk.StyleContext.add_provider_for_display(display, _css, Gtk.STYLE_PROVIDER_PRIORITY_APPLICATION)
+        except Exception:
+            pass
         def _hide_cursor(w):
             try:
-                c = Gdk.Cursor.new_from_name("none", None)
-                if c is None:
-                    c = Gdk.Cursor.new_from_name("default", None)
-                    # fallback blank via CSS already
+                try:
+                    from gi.repository import GdkPixbuf
+                    pix = GdkPixbuf.Pixbuf.new(GdkPixbuf.Colorspace.RGB, True, 8, 1, 1)
+                    pix.fill(0x00000000)
+                    tex = Gdk.Texture.new_for_pixbuf(pix)
+                    c = Gdk.Cursor.new_from_texture(tex, 0, 0, None)
+                    w.set_cursor(c)
                     return
-                w.set_cursor(c)
+                except Exception:
+                    pass
+                c = Gdk.Cursor.new_from_name("none", None)
+                if c is not None:
+                    w.set_cursor(c)
+                    return
+                # CSS already hides, just clear
+                w.set_cursor(None)
             except Exception:
                 try:
                     w.set_cursor(None)
@@ -334,12 +354,10 @@ def _create_viewer_windows(html_path, clock_format="24h"):
                     pass
         def _show_cursor_temporarily(w):
             try:
-                # show default cursor
                 try:
                     w.set_cursor(Gdk.Cursor.new_from_name("default", None))
                 except Exception:
                     w.set_cursor(None)
-                # hide again after 1200ms
                 from gi.repository import GLib as _GLib2
                 def _rehide():
                     try:
@@ -350,7 +368,6 @@ def _create_viewer_windows(html_path, clock_format="24h"):
                 _GLib2.timeout_add(1200, _rehide)
             except Exception:
                 pass
-        # initially hide cursor even after launch
         try:
             _hide_cursor(win)
         except Exception:
