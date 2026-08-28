@@ -286,17 +286,20 @@ def _create_viewer_windows(html_path, clock_format="24h"):
             pass
         # Hide cursor inside web content from the first paint — WebKit's CSS cursor
         # overrides the widget's Gdk cursor, so Gdk blank alone still shows default
-        # arrow over the page until first motion. Inject a blanket cursor:none.
-        try:
-            ucm = web.get_user_content_manager()
-            sheet = WebKit.UserStyleSheet.new(
-                "* { cursor: none !important; } html, body { cursor: none !important; }",
-                WebKit.UserContentInjectedFrames.ALL_FRAMES,
-                WebKit.UserStyleLevel.AUTHOR,
-                None, None)
-            ucm.add_style_sheet(sheet)
-        except Exception:
-            pass
+        # arrow over the page until first motion. Inject a blanket cursor:none
+        # except for interactive screensavers (solar-system manages its own cursor).
+        is_interactive = "solar-system" in os.path.basename(html_path)
+        if not is_interactive:
+            try:
+                ucm = web.get_user_content_manager()
+                sheet = WebKit.UserStyleSheet.new(
+                    "* { cursor: none !important; } html, body { cursor: none !important; }",
+                    WebKit.UserContentInjectedFrames.ALL_FRAMES,
+                    WebKit.UserStyleLevel.AUTHOR,
+                    None, None)
+                ucm.add_style_sheet(sheet)
+            except Exception:
+                pass
         web.load_uri(uri)
         win.set_child(web)
 
@@ -345,6 +348,9 @@ def _create_viewer_windows(html_path, clock_format="24h"):
         except Exception:
             pass
         def _hide_cursor(w, web=None):
+            # for interactive (solar-system) let page manage cursor itself
+            if is_interactive:
+                return
             for tgt in ([w] + ([web] if web is not None else [])):
                 try:
                     try:
@@ -379,6 +385,8 @@ def _create_viewer_windows(html_path, clock_format="24h"):
                 except Exception:
                     pass
         def _show_cursor_temporarily(w, web=None):
+            # hide except solar-system: never show via Gdk for any; solar-system manages via page CSS (body.show-cursor)
+            return
             for tgt in ([w] + ([web] if web is not None else [])):
                 try:
                     try:
