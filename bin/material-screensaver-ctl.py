@@ -409,6 +409,14 @@ def _create_viewer_windows(html_path, clock_format="24h"):
             except Exception:
                 pass
             try:
+                w.grab_focus()
+            except Exception:
+                pass
+            try:
+                w.set_focus_visible(True)
+            except Exception:
+                pass
+            try:
                 _hide_cursor(w, wb)
             except Exception:
                 pass
@@ -721,11 +729,11 @@ def show_viewer():
         return False
     clock_format = cfg.get("clock_format", "24h")
     try:
+        _inhibit()
+        _inhibit_overview()
         # Defensive: clear stale refs before creating new (ghost prevention)
         _viewer_windows = []
         _viewer_windows = _create_viewer_windows(html_path, clock_format)
-        _inhibit()
-        _inhibit_overview()
         _daemon_switch_to_active_watch()
         _schedule_lock()
         return True
