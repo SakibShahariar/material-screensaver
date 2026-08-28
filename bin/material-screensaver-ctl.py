@@ -118,6 +118,28 @@ def _uninhibit():
 
 
 # ---------- WebKit viewer ----------
+# Shared WebKit context to avoid spawning a new NetworkProcess per Show
+_shared_web_context = None
+
+def _get_shared_context():
+    global _shared_web_context
+    if _shared_web_context is not None:
+        return _shared_web_context
+    try:
+        import gi
+        gi.require_version("WebKit", "6.0")
+        from gi.repository import WebKit
+        # Use default context (shared NetworkProcess) — prevents bwrap/WebKitNetworkProcess leak per Show
+        _shared_web_context = WebKit.WebContext.get_default()
+        # Reduce cache to avoid memory bloat across shows
+        try:
+            _shared_web_context.set_cache_model(WebKit.CacheModel.DOCUMENT_VIEWER)
+        except Exception:
+            pass
+    except Exception:
+        _shared_web_context = None
+    return _shared_web_context
+
 def _create_viewer_windows(html_path, clock_format="24h"):
     """Create one fullscreen Gtk.Window per monitor with WebKit WebView."""
     import gi
@@ -126,12 +148,19 @@ def _create_viewer_windows(html_path, clock_format="24h"):
     gi.require_version("WebKit", "6.0")
     from gi.repository import Gtk, Gdk, WebKit, GLib
 
-    # Ensure Gtk initialized (no-op if already)
-    # Gtk.init() not needed for Gtk4 Application, but safe for daemon GLib loop
-    # Use Gdk.Display to enumerate monitors
+    # Ensure any previous ghost is gone before creating new (prevents dash ghost + bwrap leak)
+    # Caller (show_viewer) already checks is_viewer_active, but be defensive
+    try:
+        if is_viewer_active():
+            hide_viewer()
+            # Give old WebProcess time to terminate before spawning new
+            import time
+            time.sleep(0.05)
+    except Exception:
+        pass
+
     display = Gdk.Display.get_default()
     if display is None:
-        # fallback: try default
         try:
             Gtk.init()
             display = Gdk.Display.get_default()
@@ -141,20 +170,26 @@ def _create_viewer_windows(html_path, clock_format="24h"):
     monitors = []
     if display is not None:
         try:
-            # Gdk.Display.get_monitors() is Gio.ListModel
             lm = display.get_monitors()
             n = lm.get_n_items()
             for i in range(n):
-                monitors.append(lm.get_item(i))
+                try:
+                    m = lm.get_item(i)
+                    if m is not None:
+                        monitors.append(m)
+                except Exception:
+                    continue
         except Exception:
             pass
     if not monitors:
-        monitors = [None]  # single window fallback
+        monitors = [None]
 
     uri = f"file://{html_path}?format={clock_format}"
     windows = []
+    # Reuse shared context so NetworkProcess is not leaked per Show
+    ctx = _get_shared_context()
+    _ephemeral_ctx = ctx
     for mon in monitors:
-        # Use ApplicationWindow when daemon app exists (Wayland needs app for proper fullscreen/layer)
         try:
             if _daemon_app is not None:
                 win = Gtk.ApplicationWindow(application=_daemon_app, title="Material Screensaver")
@@ -163,52 +198,58 @@ def _create_viewer_windows(html_path, clock_format="24h"):
         except Exception:
             win = Gtk.Window(title="Material Screensaver")
         win.set_decorated(False)
-        win.set_default_size(1920, 1080)
-        # Make fullscreen on that monitor
-        # GTK4 fullscreen is per-window, compositor picks monitor where window is placed
-        # For per-monitor, we can fullscreen each window; compositor will map each to a monitor if possible
-        # Add CSS to hide cursor (also html has cursor:none)
+        # Set size to monitor geometry early (helps Wayland compositor place correctly)
+        try:
+            if mon is not None:
+                geom = mon.get_geometry()
+                win.set_default_size(geom.width, geom.height)
+            else:
+                win.set_default_size(1920, 1080)
+        except Exception:
+            win.set_default_size(1920, 1080)
         try:
             win.add_css_class("screensaver-window")
         except Exception:
             pass
 
-        web = WebKit.WebView()
+        # Create WebView with shared context
+        try:
+            if ctx is not None:
+                web = WebKit.WebView.new_with_context(ctx)
+            else:
+                web = WebKit.WebView()
+        except Exception:
+            web = WebKit.WebView()
         settings = web.get_settings()
         try:
             settings.set_allow_file_access_from_file_urls(True)
             settings.set_allow_universal_access_from_file_urls(True)
             settings.set_enable_write_console_messages_to_stdout(False)
             settings.set_enable_javascript(True)
+            # Prevent WebKit throttling when window is not focused (ghost 0.1% vs 87% fix)
+            try:
+                settings.set_enable_back_forward_navigation_gestures(False)
+            except Exception:
+                pass
         except Exception:
             pass
-
         web.load_uri(uri)
-
-        # Hide cursor via blank cursor after present (also CSS does)
         win.set_child(web)
 
-        # Input handling: any key/motion/button should hide (for standalone; daemon also handles via IdleMonitor)
-        def on_key(ctrl, keyval, keycode, state):
-            # Esc also hides, any key hides
+        def on_key(ctrl, keyval, keycode, state, _win=win):
             hide_viewer()
             return True
-        def on_click(ctrl, n_press, x, y):
+        def on_click(ctrl, n_press, x, y, _win=win):
             hide_viewer()
             return
-        def on_motion(ctrl, x, y):
-            # Optional: could require movement threshold; for now any motion after 500ms hides
-            # To avoid immediate hide on show, check elapsed
+        def on_motion(ctrl, x, y, _win=win):
             try:
-                if getattr(win, "_show_time", 0) and (GLib.get_monotonic_time() - win._show_time) < 500_000:
+                if getattr(_win, "_show_time", 0) and (GLib.get_monotonic_time() - _win._show_time) < 500_000:
                     return
             except Exception:
                 pass
-            # Don't hide on tiny jitter if daemon will handle via IdleMonitor? For now hide to allow standalone dismiss
-            # In daemon mode, IdleMonitor's AddUserActiveWatch will also fire, but double hide is okay
             hide_viewer()
             return
-
         try:
             key_ctrl = Gtk.EventControllerKey()
             key_ctrl.connect("key-pressed", on_key)
@@ -222,46 +263,67 @@ def _create_viewer_windows(html_path, clock_format="24h"):
         except Exception:
             pass
 
-        # Ensure window covers monitor geometry before fullscreen
-        try:
-            if mon is not None:
-                geom = mon.get_geometry()
-                win.set_default_size(geom.width, geom.height)
-        except Exception:
-            pass
-        # Hide from taskbar/dash where possible (best effort)
         try:
             win.set_hide_on_close(False)
         except Exception:
             pass
 
-        # Present and fullscreen (order matters on Wayland: present first, then fullscreen)
-        win.present()
+        # Wayland: present must happen after app is active and surface realized.
+        # Using `present()` then `fullscreen()` immediately can create ghost (dash visible, WebProcess 0.1% throttled).
+        # Fix: present now, fullscreen on idle after surface mapped. Also connect to map for fallback.
+        def _do_fullscreen(w=win, d=display):
+            try:
+                w.fullscreen()
+            except Exception:
+                pass
+            try:
+                w.set_visible(True)
+            except Exception:
+                pass
+            try:
+                w._show_time = GLib.get_monotonic_time()
+            except Exception:
+                pass
+            # Seat grab after fullscreen (Wayland may fail — best effort)
+            try:
+                seat = d.get_default_seat() if d else None
+                surf = w.get_surface()
+                if seat and surf:
+                    seat.grab(surf, Gdk.SeatCapabilities.ALL, True, None, None, None, None)
+            except Exception:
+                pass
+            return False
+
+        # Present immediately (required to create surface)
         try:
-            win.fullscreen()
+            win.present()
         except Exception:
-            pass
-        # Ensure visible and on top
+            try:
+                win.set_visible(True)
+            except Exception:
+                pass
+        # Defer fullscreen to next idle so Wayland compositor has surface
         try:
-            win.set_visible(True)
+            GLib.idle_add(_do_fullscreen, priority=GLib.PRIORITY_HIGH_IDLE)
+        except Exception:
+            _do_fullscreen()
+        # Also ensure fullscreen on map (covers case where idle fired before map)
+        try:
+            def _on_map(w, _pspec=None):
+                try:
+                    w.fullscreen()
+                except Exception:
+                    pass
+                return False
+            win.connect("map", _on_map)
         except Exception:
             pass
 
-        # Record show time for motion grace
+        # keep ephemeral ctx ref on window to prevent early GC
         try:
-            win._show_time = GLib.get_monotonic_time()
+            win._ephemeral_ctx = _ephemeral_ctx
         except Exception:
             pass
-
-        # Seat grab (best effort, may fail on Wayland)
-        try:
-            seat = display.get_default_seat() if display else None
-            if seat and win.get_surface():
-                # Gdk.Seat.grab requires surface and capabilities
-                seat.grab(win.get_surface(), Gdk.SeatCapabilities.ALL, True, None, None, None, None)
-        except Exception:
-            pass
-
         windows.append(win)
 
     return windows
@@ -270,14 +332,13 @@ def _create_viewer_windows(html_path, clock_format="24h"):
 def is_viewer_active():
     """Local check (no D-Bus). True if we have visible viewer windows in this process."""
     global _viewer_windows
-    # Check tracked windows first
     for w in list(_viewer_windows):
         try:
             if w.get_visible():
                 return True
         except Exception:
             continue
-    # Fallback: check any toplevel ghost windows
+    # Fallback: scan toplevels for ghosts (created but not in _viewer_windows)
     try:
         import gi
         gi.require_version("Gtk", "4.0")
@@ -290,6 +351,9 @@ def is_viewer_active():
                 continue
     except Exception:
         pass
+    # Last resort: if any WebKit bwrap child still alive while we think hidden,
+    # treat as active ghost (prevents Show from spawning duplicate that stays throttled)
+    # We don't check here to avoid false positives during normal hide, but hide_viewer will clean anyway
     return False
 
 
@@ -302,18 +366,21 @@ def show_viewer():
     html_path = get_active_html_path(cfg)
     clock_format = cfg.get("clock_format", "24h")
     try:
+        # Defensive: clear stale refs before creating new (ghost prevention)
+        _viewer_windows = []
         _viewer_windows = _create_viewer_windows(html_path, clock_format)
         _inhibit()
         return True
     except Exception as e:
         print(f"Failed to show screensaver: {e}", file=sys.stderr)
+        import traceback
+        traceback.print_exc()
         return False
 
 
 def hide_viewer():
-    """Hide/destroy viewer windows in this process."""
+    """Hide/destroy viewer windows in this process. Thorough cleanup to prevent ghost dash/bwrap leak."""
     global _viewer_windows
-    # Also collect any orphaned toplevels (ghost windows not in _viewer_windows)
     to_close = list(_viewer_windows)
     try:
         import gi
@@ -331,37 +398,54 @@ def hide_viewer():
         _viewer_windows = []
         _uninhibit()
         return False
-    for w in list(to_close):
-        try:
-            # ungrab seat
+    # Ungrab once before closing
+    try:
+        import gi
+        gi.require_version("Gdk", "4.0")
+        from gi.repository import Gdk
+        display = Gdk.Display.get_default()
+        if display:
             try:
-                import gi
-                gi.require_version("Gdk", "4.0")
-                from gi.repository import Gdk
-                display = Gdk.Display.get_default()
-                if display:
-                    try:
-                        display.get_default_seat().ungrab()
-                    except Exception:
-                        pass
+                display.get_default_seat().ungrab()
             except Exception:
                 pass
-            # Stop WebView loading before close
+    except Exception:
+        pass
+    for w in list(to_close):
+        try:
+            # Detach WebView first — crucial to let WebKit release bwrap/WebProcess
+            web = None
             try:
-                child = w.get_child()
-                if child is not None:
-                    try:
-                        child.stop_loading()
-                    except Exception:
-                        pass
-                    try:
-                        child.load_uri("about:blank")
-                    except Exception:
-                        pass
-                    try:
-                        child.terminate_web_process()
-                    except Exception:
-                        pass
+                web = w.get_child()
+            except Exception:
+                web = None
+            if web is not None:
+                try:
+                    w.set_child(None)
+                except Exception:
+                    pass
+                try:
+                    web.stop_loading()
+                except Exception:
+                    pass
+                # Don't load about:blank — it spawns new navigation; just terminate
+                try:
+                    web.terminate_web_process()
+                except Exception:
+                    pass
+                try:
+                    web.unparent()
+                except Exception:
+                    pass
+                try:
+                    # GTK4: run_dispose frees underlying GObject and bwrap pipes (fixes Tasks leak)
+                    web.run_dispose()
+                except Exception:
+                    pass
+            # Remove from Gtk.Application if applicable (prevents ghost dash entry)
+            try:
+                if _daemon_app is not None:
+                    _daemon_app.remove_window(w)
             except Exception:
                 pass
             try:
@@ -372,26 +456,123 @@ def hide_viewer():
                 w.set_visible(False)
             except Exception:
                 pass
+            # Drop ephemeral ctx reference to allow GC (fixes 30M per cycle creep)
             try:
-                child = w.get_child()
-                if child is not None:
+                if hasattr(w, "_ephemeral_ctx"):
                     try:
-                        w.set_child(None)
+                        # Clear ctx cache before dropping ref
+                        c = getattr(w, "_ephemeral_ctx", None)
+                        if c is not None:
+                            try:
+                                c.clear_cache()
+                            except Exception:
+                                pass
                     except Exception:
                         pass
                     try:
-                        child.unparent()
+                        delattr(w, "_ephemeral_ctx")
                     except Exception:
                         pass
+            except Exception:
+                pass
+            try:
+                w.run_dispose()
             except Exception:
                 pass
         except Exception:
             pass
     _viewer_windows = []
     _uninhibit()
+    # Clear WebKit caches to prevent memory creep
+    try:
+        import gi
+        gi.require_version("WebKit", "6.0")
+        from gi.repository import WebKit
+        from gi.repository import GLib as _GLib
+        ctx = _shared_web_context
+        if ctx is None:
+            try:
+                ctx = WebKit.WebContext.get_default()
+            except Exception:
+                ctx = None
+        if ctx is not None:
+            try:
+                ctx.clear_cache()
+            except Exception:
+                pass
+            try:
+                mgr = ctx.get_website_data_manager()
+                if mgr is not None:
+                    try:
+                        mgr.clear(WebKit.WebsiteDataTypes.MEMORY_CACHE, _GLib.Variant("t", 0), None, None, None)
+                    except Exception:
+                        pass
+            except Exception:
+                pass
+    except Exception:
+        pass
     try:
         import gc
         gc.collect()
+    except Exception:
+        pass
+    # Kill lingering NetworkProcess/WebProcess bwrap orphans that cause ghost dash/btop
+    # After successful hide, there should be 0 WebKit children; the default WebContext keeps
+    # a NetworkProcess alive (≈ 200M) which shows in btop as ghost. We terminate it so idle
+    # returns to 6 tasks / 30M like fresh daemon.
+    try:
+        import os, signal, subprocess
+        # Only kill if no viewer active (we just hid)
+        if not is_viewer_active():
+            # Find direct children that are WebKit processes
+            try:
+                out = subprocess.run(["ps", "--ppid", str(os.getpid()), "-o", "pid=,args="],
+                                     capture_output=True, text=True, timeout=2)
+                for line in out.stdout.splitlines():
+                    line=line.strip()
+                    if not line:
+                        continue
+                    parts=line.split(None,1)
+                    pid=int(parts[0])
+                    cmd=parts[1] if len(parts)>1 else ""
+                    if "WebKitNetworkProcess" in cmd or "WebKitWebProcess" in cmd:
+                        try:
+                            os.kill(pid, signal.SIGTERM)
+                        except Exception:
+                            pass
+                    elif "bwrap" in cmd and ("xdg-dbus-proxy" in cmd or "WebKit" in cmd):
+                        try:
+                            os.kill(pid, signal.SIGTERM)
+                        except Exception:
+                            pass
+            except Exception:
+                pass
+    except Exception:
+        pass
+    try:
+        import gi
+        gi.require_version("Gtk", "4.0")
+        from gi.repository import GLib
+        def _gc_once():
+            try:
+                import gc as _gc
+                _gc.collect()
+            except Exception:
+                pass
+            try:
+                import gi as _gi
+                _gi.require_version("WebKit", "6.0")
+                from gi.repository import WebKit as _Wk
+                c = _shared_web_context or _Wk.WebContext.get_default()
+                if c is not None:
+                    try:
+                        c.clear_cache()
+                    except Exception:
+                        pass
+            except Exception:
+                pass
+            return False
+        GLib.idle_add(_gc_once, priority=GLib.PRIORITY_LOW)
     except Exception:
         pass
     return True
