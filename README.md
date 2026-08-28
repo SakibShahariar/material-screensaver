@@ -13,12 +13,13 @@ keyboard shortcut.
 ## Styles included
 
 Blob, Flow, Ripple, Orbit, Kaleidoscope, Constellation, Solar System (3D, Three.js),
-Lorenz Attractor, Fireworks, Typewriter, Terrain, Vinyl, City, Bubbles, Origami,
-Lanterns, Rain, Koi Pond, DNA, Oscilloscope, Sakura, Paper Boats, Bounce, Fractal Zoom
-(GLSL/WebGL), Falling Sand, Voronoi, Game of Life, Glitch, Organic Harmonic Field
-(GLSL/WebGL), Solar-Orbit, Aurora Wave, Hyper-Tesseract, Ambient Mesh, Quantum
-Interference, Starfield, Strange Attractor Flow, Snow Globe, Lava Lamp, Jellyfish,
-Spirograph, Circuit Board, Autumn Leaves, Radar, Paper Cranes.
+Lorenz Attractor, Fireworks, Fireflies, Typewriter, Terrain, Vinyl, City, Bubbles,
+Origami, Lanterns, Rain, Koi Pond, DNA, Oscilloscope, Sakura, Paper Boats, Bounce,
+Fractal Zoom (GLSL/WebGL), Falling Sand, Voronoi, Game of Life, Glitch, Organic
+Harmonic Field (GLSL/WebGL), Solar Orbit, Aurora Wave, Hyper-Tesseract, Metaphysical
+Horizon, Ambient Mesh, Quantum Interference, Starfield, Strange Attractor Flow,
+Snow Globe, Lava Lamp, Jellyfish, Spirograph, Circuit Board, Autumn Leaves, Radar,
+Paper Cranes (46 total).
 
 All pull their color palette live from a [matugen](https://github.com/InioX/matugen)
 generated stylesheet, so they follow your current wallpaper-derived Material You theme.
