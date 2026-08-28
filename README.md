@@ -23,6 +23,8 @@ Paper Cranes (46 total).
 
 All pull their color palette live from a [matugen](https://github.com/InioX/matugen)
 generated stylesheet, so they follow your current wallpaper-derived Material You theme.
+Shared helpers `screensavers/clock-shared.js` (clock) and `screensavers/theme-shared.js`
+(readRGB/rgba) are available for new styles to avoid duplicating theme code.
 
 Note: most files went through a Gemini update pass that reintroduced an invalid CSS
 `rgba(var(--x), alpha)` pattern (mixing space-separated variable expansion with a
@@ -41,8 +43,8 @@ and known-bug-pattern scanning has been done so far.
 - matugen generating colors to `~/.config/matugen/matugen-colors.css`
   (edit the `<link rel="stylesheet" href="file://...">` path in each `.html` file
   if your matugen output lives somewhere else)
-- Solar System specifically needs internet access on first launch (loads Three.js
-  from a CDN)
+- No network required — Solar System is now pure Canvas 2D (previous Three.js CDN
+  dependency was removed in the v2 rewrite)
 
 ## Install
 
