@@ -304,72 +304,76 @@ def _create_viewer_windows(html_path, clock_format="24h"):
                 except Exception:
                     pass
                 return False
-        def on_click(ctrl, n_press, x, y, _win=win):
-            # Disabled — only Super+Q closes, but show cursor briefly on click
+        def on_click(ctrl, n_press, x, y, _win=win, _web=web):
             try:
-                _show_cursor_temporarily(_win)
+                _show_cursor_temporarily(_win, _web)
             except Exception:
                 pass
             return
-        def on_motion(ctrl, x, y, _win=win):
+        def on_motion(ctrl, x, y, _win=win, _web=web):
             # Only Super+Q closes — motion just shows cursor briefly
             try:
                 _show_cursor_temporarily(_win)
             except Exception:
                 pass
             return
-        # cursor helpers — hidden by default, show 1.2s on movement (CSS + blank Gdk cursor)
+        # cursor helpers — hidden by default, show 1.2s on movement (CSS + blank Gdk cursor on both win+web)
         try:
             gi.require_version("GdkPixbuf", "2.0")
         except Exception:
             pass
         try:
             _css = Gtk.CssProvider()
-            _css.load_from_data(b".screensaver-window, .screensaver-window * { cursor: none; }")
+            _css.load_from_data(b".screensaver-window, .screensaver-window * { cursor: none; } window.screensaver-window { cursor: none; }")
             Gtk.StyleContext.add_provider_for_display(display, _css, Gtk.STYLE_PROVIDER_PRIORITY_APPLICATION)
         except Exception:
             pass
-        def _hide_cursor(w):
-            try:
+        def _hide_cursor(w, web=None):
+            for tgt in ([w] + ([web] if web is not None else [])):
                 try:
-                    from gi.repository import GdkPixbuf
-                    pix = GdkPixbuf.Pixbuf.new(GdkPixbuf.Colorspace.RGB, True, 8, 1, 1)
-                    pix.fill(0x00000000)
-                    tex = Gdk.Texture.new_for_pixbuf(pix)
-                    c = Gdk.Cursor.new_from_texture(tex, 0, 0, None)
-                    w.set_cursor(c)
-                    return
-                except Exception:
-                    pass
-                c = Gdk.Cursor.new_from_name("none", None)
-                if c is not None:
-                    w.set_cursor(c)
-                    return
-                # CSS already hides, just clear
-                w.set_cursor(None)
-            except Exception:
-                try:
-                    w.set_cursor(None)
-                except Exception:
-                    pass
-        def _show_cursor_temporarily(w):
-            try:
-                try:
-                    w.set_cursor(Gdk.Cursor.new_from_name("default", None))
-                except Exception:
-                    w.set_cursor(None)
-                from gi.repository import GLib as _GLib2
-                def _rehide():
                     try:
-                        _hide_cursor(w)
+                        from gi.repository import GdkPixbuf
+                        pix = GdkPixbuf.Pixbuf.new(GdkPixbuf.Colorspace.RGB, True, 8, 1, 1)
+                        pix.fill(0x00000000)
+                        tex = Gdk.Texture.new_for_pixbuf(pix)
+                        c = Gdk.Cursor.new_from_texture(tex, 0, 0, None)
+                        tgt.set_cursor(c)
+                        continue
                     except Exception:
                         pass
-                    return False
+                    c = Gdk.Cursor.new_from_name("none", None)
+                    if c is not None:
+                        tgt.set_cursor(c)
+                        continue
+                    # try invisible via CSS fallback
+                    tgt.set_cursor(None)
+                except Exception:
+                    try:
+                        tgt.set_cursor(None)
+                    except Exception:
+                        pass
+        def _show_cursor_temporarily(w, web=None):
+            for tgt in ([w] + ([web] if web is not None else [])):
+                try:
+                    try:
+                        tgt.set_cursor(Gdk.Cursor.new_from_name("default", None))
+                    except Exception:
+                        tgt.set_cursor(None)
+                except Exception:
+                    pass
+            from gi.repository import GLib as _GLib2
+            def _rehide():
+                try:
+                    _hide_cursor(w, web)
+                except Exception:
+                    pass
+                return False
+            try:
                 _GLib2.timeout_add(1200, _rehide)
             except Exception:
                 pass
         try:
-            _hide_cursor(win)
+            _hide_cursor(win, web)
         except Exception:
             pass
         try:
@@ -393,13 +397,17 @@ def _create_viewer_windows(html_path, clock_format="24h"):
         # Wayland: present must happen after app is active and surface realized.
         # Using `present()` then `fullscreen()` immediately can create ghost (dash visible, WebProcess 0.1% throttled).
         # Fix: present now, fullscreen on idle after surface mapped. Also connect to map for fallback.
-        def _do_fullscreen(w=win, d=display):
+        def _do_fullscreen(w=win, d=display, wb=web):
             try:
                 w.fullscreen()
             except Exception:
                 pass
             try:
                 w.set_visible(True)
+            except Exception:
+                pass
+            try:
+                _hide_cursor(w, wb)
             except Exception:
                 pass
             try:
