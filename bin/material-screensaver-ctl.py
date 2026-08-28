@@ -281,23 +281,32 @@ def _create_viewer_windows(html_path, clock_format="24h"):
         win.set_child(web)
 
         def on_key(ctrl, keyval, keycode, state, _win=win):
-            hide_viewer()
-            return True
+            # Only Super+Q closes — requested
+            try:
+                from gi.repository import Gdk
+                is_q = keyval in (Gdk.KEY_q, Gdk.KEY_Q)
+                has_super = bool(state & Gdk.ModifierType.SUPER_MASK)
+                if is_q and has_super:
+                    hide_viewer()
+                    return True
+                return False
+            except Exception:
+                # fallback: check Super+Q via accelerator
+                try:
+                    from gi.repository import Gtk
+                    if Gtk.accelerator_valid(keyval, state):
+                        name = Gtk.accelerator_name(keyval, state)
+                        if name == "<Super>q":
+                            hide_viewer()
+                            return True
+                except Exception:
+                    pass
+                return False
         def on_click(ctrl, n_press, x, y, _win=win):
-            hide_viewer()
+            # Disabled — only Super+Q closes
             return
         def on_motion(ctrl, x, y, _win=win):
-            try:
-                if not load_config().get("close_on_mouse", True):
-                    return
-            except Exception:
-                pass
-            try:
-                if getattr(_win, "_show_time", 0) and (GLib.get_monotonic_time() - _win._show_time) < 500_000:
-                    return
-            except Exception:
-                pass
-            hide_viewer()
+            # Disabled — only Super+Q closes (ignore close_on_mouse)
             return
         try:
             key_ctrl = Gtk.EventControllerKey()
