@@ -596,6 +596,15 @@ def _inhibit_overview():
         if out.returncode==0:
             cur = out.stdout.strip()
             _saved_overlay_key = cur
+            # try Gio.Settings sync for immediate Wayland effect
+            try:
+                from gi.repository import Gio as _GioI2
+                _s = _GioI2.Settings.new("org.gnome.mutter")
+                if _s.get_string("overlay-key") != "":
+                    _s.set_string("overlay-key", "")
+                    _GioI2.Settings.sync()
+            except Exception:
+                pass
             if cur != "''":
                 subprocess.run(["gsettings", "set", "org.gnome.mutter", "overlay-key", "''"],
                                capture_output=True, timeout=2)
