@@ -79,6 +79,15 @@ class ScreensaverWindow(Adw.ApplicationWindow):
         sv_group = Adw.PreferencesGroup(title="Screensaver")
         page.add(sv_group)
 
+        self.random_switch = Gtk.Switch(valign=Gtk.Align.CENTER)
+        random_row = Adw.ActionRow(
+            title="Pick a random screensaver each time",
+            subtitle="Overrides the active screensaver below — a fresh random pick on every launch",
+        )
+        random_row.add_suffix(self.random_switch)
+        random_row.set_activatable_widget(self.random_switch)
+        sv_group.add(random_row)
+
         self.screensaver_files = list_screensavers()
         self.combo_row = Adw.ComboRow(title="Active screensaver")
         if self.screensaver_files:
@@ -162,6 +171,7 @@ class ScreensaverWindow(Adw.ApplicationWindow):
         self.load_state()
 
         # connect after loading so initial population doesn't trigger writes
+        self.random_switch.connect("notify::active", self.on_random_toggled)
         self.combo_row.connect("notify::selected", self.on_screensaver_changed)
         self.idle_row.connect("notify::value", self.on_idle_changed)
         self.ampm_switch.connect("notify::active", self.on_ampm_toggled)
@@ -170,6 +180,10 @@ class ScreensaverWindow(Adw.ApplicationWindow):
 
     def load_state(self):
         cfg = load_config()
+
+        is_random = cfg.get("random", False)
+        self.random_switch.set_active(is_random)
+        self.combo_row.set_sensitive(bool(self.screensaver_files) and not is_random)
 
         if self.screensaver_files:
             active = cfg.get("active")
@@ -237,6 +251,11 @@ class ScreensaverWindow(Adw.ApplicationWindow):
         controller.connect("key-pressed", on_key)
         dialog.add_controller(controller)
         dialog.present()
+
+    def on_random_toggled(self, switch, _pspec):
+        is_random = switch.get_active()
+        save_config(random=is_random)
+        self.combo_row.set_sensitive(bool(self.screensaver_files) and not is_random)
 
     def on_screensaver_changed(self, row, _pspec):
         idx = row.get_selected()

@@ -17,13 +17,14 @@ import sys
 import json
 import glob
 import signal
+import random
 import subprocess
 
 SCREENSAVER_DIR = os.path.expanduser("~/.local/share/material-screensaver/screensavers")
 CONFIG_PATH = os.path.expanduser("~/.config/material-screensaver/config.json")
 PID_FILE = os.path.expanduser("~/.cache/material-screensaver.pid")
 
-DEFAULT_CONFIG = {"active": None, "idle_seconds": 300, "browser": "auto", "clock_format": "24h"}
+DEFAULT_CONFIG = {"active": None, "idle_seconds": 300, "browser": "auto", "clock_format": "24h", "random": False}
 
 CHROMIUM_LIKE = {"helium", "helium-browser", "chromium", "chromium-browser", "google-chrome", "google-chrome-stable", "brave-browser"}
 FIREFOX_LIKE = {"firefox"}
@@ -52,6 +53,8 @@ def get_active_html_path(cfg):
     screensavers = list_screensavers()
     if not screensavers:
         sys.exit(f"No screensaver .html files found in {SCREENSAVER_DIR}")
+    if cfg.get("random", False):
+        return random.choice(list(screensavers.values()))
     active = cfg.get("active")
     if active and active in screensavers:
         return screensavers[active]
