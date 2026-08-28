@@ -32,10 +32,6 @@ def get_keybinding_settings():
         child.set_string("command", f"{CTL_SCRIPT} toggle")
     return child
 
-BROWSER_OPTIONS = ["auto", "firefox", "helium", "helium-browser", "chromium", "chromium-browser", "google-chrome", "google-chrome-stable", "brave-browser"]
-BROWSER_LABELS = ["Auto-detect", "Firefox", "Helium", "Helium (AUR build)", "Chromium", "Chromium (browser)", "Google Chrome", "Google Chrome (stable)", "Brave"]
-
-
 def load_config():
     cfg = {"active": None, "idle_seconds": 300, "browser": "auto", "clock_format": "24h", "random": False}
     if os.path.exists(CONFIG_PATH):
@@ -134,13 +130,6 @@ class ScreensaverWindow(Adw.ApplicationWindow):
         autostart_row.set_activatable_widget(self.autostart_switch)
         auto_group.add(autostart_row)
 
-        # --- Browser ---
-        browser_group = Adw.PreferencesGroup(title="Browser")
-        page.add(browser_group)
-        self.browser_row = Adw.ComboRow(title="Kiosk browser")
-        self.browser_row.set_model(Gtk.StringList.new(BROWSER_LABELS))
-        browser_group.add(self.browser_row)
-
         # --- Shortcut ---
         shortcut_group = Adw.PreferencesGroup(title="Keyboard Shortcut")
         page.add(shortcut_group)
@@ -176,7 +165,6 @@ class ScreensaverWindow(Adw.ApplicationWindow):
         self.idle_row.connect("notify::value", self.on_idle_changed)
         self.ampm_switch.connect("notify::active", self.on_ampm_toggled)
         self.autostart_switch.connect("notify::active", self.on_autostart_toggled)
-        self.browser_row.connect("notify::selected", self.on_browser_changed)
 
     def load_state(self):
         cfg = load_config()
@@ -193,9 +181,6 @@ class ScreensaverWindow(Adw.ApplicationWindow):
         self.idle_row.set_value(cfg.get("idle_seconds", 300) / 60)
 
         self.ampm_switch.set_active(cfg.get("clock_format", "24h") == "12h")
-
-        browser = cfg.get("browser", "auto")
-        self.browser_row.set_selected(BROWSER_OPTIONS.index(browser) if browser in BROWSER_OPTIONS else 0)
 
         result = subprocess.run(
             ["systemctl", "--user", "is-enabled", SERVICE_NAME],
@@ -267,11 +252,6 @@ class ScreensaverWindow(Adw.ApplicationWindow):
 
     def on_ampm_toggled(self, switch, _pspec):
         save_config(clock_format="12h" if switch.get_active() else "24h")
-
-    def on_browser_changed(self, row, _pspec):
-        idx = row.get_selected()
-        if 0 <= idx < len(BROWSER_OPTIONS):
-            save_config(browser=BROWSER_OPTIONS[idx])
 
     def on_autostart_toggled(self, switch, _pspec):
         action = "enable" if switch.get_active() else "disable"

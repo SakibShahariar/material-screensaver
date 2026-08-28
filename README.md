@@ -6,9 +6,10 @@ A collection of animated, matugen-themed "screensavers" for GNOME (Wayland), plu
 GTK4/libadwaita settings app to manage them.
 
 Since GNOME dropped native animated screensavers, these run as standalone HTML/JS
-pages launched fullscreen in a kiosk browser window, triggered automatically after
+pages in a fullscreen `WebKitGTK` (`WebKit 6.0` + `Gtk 4`) window — one per monitor —
+with `SessionManager` inhibit and input grab while visible, triggered automatically after
 an idle timeout (via GNOME's `org.gnome.Mutter.IdleMonitor`) or manually via a
-keyboard shortcut.
+keyboard shortcut. No external browser, no PID file.
 
 ## Styles included
 
@@ -38,8 +39,7 @@ and known-bug-pattern scanning has been done so far.
 ## Requirements
 
 - GNOME on Wayland (uses `org.gnome.Mutter.IdleMonitor` over D-Bus for idle detection)
-- Python 3 with PyGObject (`python3-gi`) — almost always preinstalled on GNOME systems
-- A Chromium-family browser (Chromium, Chrome, Brave, Helium) or Firefox
+- Python 3 with PyGObject (`python3-gi`) and `WebKitGTK 6.0` (`webkitgtk6.0`, `gir1.2-webkit-6.0`) — almost always available on GNOME systems
 - matugen generating colors to `~/.config/matugen/matugen-colors.css`
   (edit the `<link rel="stylesheet" href="file://...">` path in each `.html` file
   if your matugen output lives somewhere else)
@@ -65,7 +65,6 @@ Run the settings app (search "Material Screensaver Settings" in the app grid, or
 - pick the active screensaver
 - set the idle timeout
 - toggle 12-hour/24-hour clock format
-- pick a specific browser (or leave on auto-detect)
 - set a keyboard shortcut to toggle it manually
 - enable/disable the automatic idle-triggered daemon
 - preview (start/stop) on demand
