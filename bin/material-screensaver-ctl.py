@@ -385,7 +385,19 @@ def _create_viewer_windows(html_path, clock_format="24h"):
             pass
         try:
             key_ctrl = Gtk.EventControllerKey()
+            key_ctrl.set_propagation_phase(Gtk.PropagationPhase.CAPTURE)
             key_ctrl.connect("key-pressed", on_key)
+            # also consume release of Super (Mutter triggers overview on release)
+            def on_key_release(ctrl, keyval, keycode, state, _win=win):
+                try:
+                    from gi.repository import Gdk
+                    is_super = keyval in (Gdk.KEY_Super_L, Gdk.KEY_Super_R, Gdk.KEY_Meta_L, Gdk.KEY_Meta_R, 65515, 65516)
+                    if is_super:
+                        return True
+                except Exception:
+                    pass
+                return False
+            key_ctrl.connect("key-released", on_key_release)
             win.add_controller(key_ctrl)
             click = Gtk.GestureClick()
             click.connect("pressed", on_click)
@@ -593,6 +605,19 @@ def _inhibit_overview():
     global _saved_overlay_key, _saved_shell_toggle
     try:
         if _saved_overlay_key is not None:
+            # already inhibited — re-assert that overlay-key stays '' (external reset guard)
+            try:
+                from gi.repository import Gio as _GioI2b
+                _sb = _GioI2b.Settings.new("org.gnome.mutter")
+                if _sb.get_string("overlay-key") != "":
+                    _sb.set_string("overlay-key", "")
+                    _GioI2b.Settings.sync()
+                    subprocess.run(["gsettings", "set", "org.gnome.mutter", "overlay-key", "''"],
+                                   capture_output=True, timeout=2)
+                    subprocess.run(["dconf", "write", "/org/gnome/mutter/overlay-key", "''"],
+                                   capture_output=True, timeout=2)
+            except Exception:
+                pass
             return
         # mutter overlay-key — main Super→overview
         out = subprocess.run(["gsettings", "get", "org.gnome.mutter", "overlay-key"],
@@ -600,27 +625,48 @@ def _inhibit_overview():
         if out.returncode==0:
             cur = out.stdout.strip()
             _saved_overlay_key = cur
-            # try Gio.Settings sync for immediate Wayland effect
+            # Gio.Settings sync for immediate Wayland effect (primary, most reliable)
+            gio_ok = False
+            gio_err = ""
             try:
                 from gi.repository import Gio as _GioI2
                 _s = _GioI2.Settings.new("org.gnome.mutter")
-                if _s.get_string("overlay-key") != "":
-                    _s.set_string("overlay-key", "")
-                    _GioI2.Settings.sync()
-            except Exception:
+                before = _s.get_string("overlay-key")
+                _s.set_string("overlay-key", "")
+                _GioI2.Settings.sync()
+                after = _s.get_string("overlay-key")
+                gio_ok = (after == "")
+                if not gio_ok:
+                    gio_err = f"Gio after={after!r} before={before!r}"
+            except Exception as e:
+                gio_err = f"Gio exception {e}"
                 pass
+            set_rc = None
+            dconf_rc = None
             if cur != "''":
-                subprocess.run(["gsettings", "set", "org.gnome.mutter", "overlay-key", "''"],
-                               capture_output=True, timeout=2)
-                subprocess.run(["dconf", "write", "/org/gnome/mutter/overlay-key", "''"],
-                               capture_output=True, timeout=2)
-            # verify
+                r1 = subprocess.run(["gsettings", "set", "org.gnome.mutter", "overlay-key", "''"],
+                               capture_output=True, text=True, timeout=2)
+                set_rc = r1.returncode
+                r2 = subprocess.run(["dconf", "write", "/org/gnome/mutter/overlay-key", "''"],
+                               capture_output=True, text=True, timeout=2)
+                dconf_rc = r2.returncode
+            # verify via both Gio and gsettings
+            verify = ""
             try:
                 chk = subprocess.run(["gsettings", "get", "org.gnome.mutter", "overlay-key"],
                                      capture_output=True, text=True, timeout=2)
+                verify = chk.stdout.strip() if chk.returncode==0 else f"chk_rc={chk.returncode} err={chk.stderr.strip()}"
                 if chk.returncode==0 and chk.stdout.strip() != "''":
                     subprocess.run(["dconf", "write", "/org/gnome/mutter/overlay-key", "''"],
                                    capture_output=True, timeout=2)
+                    # re-read
+                    chk2 = subprocess.run(["gsettings", "get", "org.gnome.mutter", "overlay-key"],
+                                         capture_output=True, text=True, timeout=2)
+                    verify += f" -> retry {chk2.stdout.strip()}"
+            except Exception as e:
+                verify = f"verify_exc {e}"
+            try:
+                print(f"[overview] inhibit Gio ok={gio_ok} err={gio_err} set_rc={set_rc} dconf_rc={dconf_rc} verify={verify}", file=sys.stderr)
             except Exception:
                 pass
         # shell toggle-overview if it was bound to Super
@@ -660,29 +706,60 @@ def _restore_overview():
     global _saved_overlay_key, _saved_shell_toggle
     try:
         if _saved_overlay_key is not None:
-            if _saved_overlay_key not in ("''", ""):
-                subprocess.run(["gsettings", "set", "org.gnome.mutter", "overlay-key", _saved_overlay_key],
+            # restore exactly what was saved (including '' if user had it disabled)
+            saved = _saved_overlay_key
+            try:
+                from gi.repository import Gio as _GioR
+                _sr = _GioR.Settings.new("org.gnome.mutter")
+                # saved is like "'Super'" or "''" — strip outer quotes for Gio
+                if saved in ("''", ""):
+                    _sr.set_string("overlay-key", "")
+                else:
+                    # remove leading/trailing single quotes
+                    val = saved.strip()
+                    if len(val) >= 2 and val[0] == "'" and val[-1] == "'":
+                        val = val[1:-1]
+                    _sr.set_string("overlay-key", val)
+                _GioR.Settings.sync()
+            except Exception as e:
+                try:
+                    print(f"[overview] restore Gio failed {e}", file=sys.stderr)
+                except Exception:
+                    pass
+            # also via subprocess/dconf for robustness
+            try:
+                subprocess.run(["gsettings", "set", "org.gnome.mutter", "overlay-key", saved],
                                capture_output=True, timeout=2)
-                subprocess.run(["dconf", "write", "/org/gnome/mutter/overlay-key", _saved_overlay_key],
+                subprocess.run(["dconf", "write", "/org/gnome/mutter/overlay-key", saved],
                                capture_output=True, timeout=2)
-            else:
-                cur = subprocess.run(["gsettings", "get", "org.gnome.mutter", "overlay-key"],
+            except Exception:
+                pass
+            # verify
+            try:
+                chk = subprocess.run(["gsettings", "get", "org.gnome.mutter", "overlay-key"],
                                      capture_output=True, text=True, timeout=2)
-                if cur.returncode==0 and cur.stdout.strip() == "''":
-                    subprocess.run(["gsettings", "set", "org.gnome.mutter", "overlay-key", "'Super'"],
-                                   capture_output=True, timeout=2)
-                    subprocess.run(["dconf", "write", "/org/gnome/mutter/overlay-key", "'Super'"],
-                                   capture_output=True, timeout=2)
+                print(f"[overview] restored overlay={saved} now={chk.stdout.strip() if chk.returncode==0 else chk.stderr.strip()}", file=sys.stderr)
+            except Exception:
+                pass
             _saved_overlay_key=None
         else:
             try:
                 cur = subprocess.run(["gsettings", "get", "org.gnome.mutter", "overlay-key"],
                                      capture_output=True, text=True, timeout=2)
                 if cur.returncode==0 and cur.stdout.strip() == "''":
+                    # no saved state — likely leftover inhibit from crash; restore default 'Super' via Gio too
+                    try:
+                        from gi.repository import Gio as _GioR2
+                        _sr2 = _GioR2.Settings.new("org.gnome.mutter")
+                        _sr2.set_string("overlay-key", "Super")
+                        _GioR2.Settings.sync()
+                    except Exception:
+                        pass
                     subprocess.run(["gsettings", "set", "org.gnome.mutter", "overlay-key", "'Super'"],
                                    capture_output=True, timeout=2)
                     subprocess.run(["dconf", "write", "/org/gnome/mutter/overlay-key", "'Super'"],
                                    capture_output=True, timeout=2)
+                    print("[overview] restored (no saved) -> 'Super'", file=sys.stderr)
             except Exception:
                 pass
         if _saved_shell_toggle is not None:
@@ -717,6 +794,21 @@ def _start_overview_block():
             try:
                 if not is_viewer_active():
                     return True
+                # re-assert overlay-key stays '' while screensaver visible (guard external reset)
+                try:
+                    from gi.repository import Gio as _GioChk
+                    _sc = _GioChk.Settings.new("org.gnome.mutter")
+                    if _sc.get_string("overlay-key") != "":
+                        _sc.set_string("overlay-key", "")
+                        _GioChk.Settings.sync()
+                        try:
+                            subprocess.run(["gsettings", "set", "org.gnome.mutter", "overlay-key", "''"],
+                                           capture_output=True, timeout=1)
+                        except Exception:
+                            pass
+                        print("[overview] re-asserted overlay='' (was non-empty)", file=sys.stderr)
+                except Exception:
+                    pass
                 # hide overview if visible while screensaver active (double Super)
                 out = subprocess.run(["gdbus", "call", "--session", "--dest", "org.gnome.Shell",
                                       "--object-path", "/org/gnome/Shell",
@@ -729,6 +821,7 @@ def _start_overview_block():
                                     "--method", "org.gnome.Shell.Eval",
                                     "Main.overview.hide();"],
                                    capture_output=True, timeout=1)
+                    print("[overview] hid double-Super overview", file=sys.stderr)
             except Exception:
                 pass
             return True
@@ -1104,16 +1197,17 @@ def start():
     if html_path is None:
         sys.exit(1)
     clock_format = cfg.get("clock_format", "24h")
-    # For standalone, we need to run a Gtk loop blocking
+    # For standalone, we need to run a Gtk loop blocking — match show_viewer() ordering (inhibit before create)
     try:
         import gi
         gi.require_version("Gtk", "4.0")
         gi.require_version("WebKit", "6.0")
         from gi.repository import Gtk, GLib
-        # Create windows and run
         global _viewer_windows
-        _viewer_windows = _create_viewer_windows(html_path, clock_format)
         _inhibit()
+        _inhibit_overview()
+        _viewer_windows = _create_viewer_windows(html_path, clock_format)
+        _schedule_lock()
         # For standalone, run main loop until windows closed
         loop = GLib.MainLoop()
         # Poll for windows closed
@@ -1136,7 +1230,14 @@ def start():
         except Exception:
             pass
         loop.run()
+        # hide_viewer already uninhibited; ensure cleanup even if loop exited without hide
+        try:
+            hide_viewer()
+        except Exception:
+            pass
         _uninhibit()
+        _restore_overview()
+        _cancel_lock()
     except Exception as e:
         print(f"Failed to start screensaver viewer: {e}", file=sys.stderr)
         sys.exit(1)
@@ -1173,7 +1274,7 @@ def toggle():
     if is_viewer_active():
         hide_viewer()
     else:
-        # fallback local toggle
+        # fallback local toggle — same ordering as show_viewer()
         cfg = load_config()
         html_path = get_active_html_path(cfg)
         if html_path is None:
@@ -1181,9 +1282,9 @@ def toggle():
         clock_format = cfg.get("clock_format", "24h")
         try:
             global _viewer_windows
-            _viewer_windows = _create_viewer_windows(html_path, clock_format)
             _inhibit()
             _inhibit_overview()
+            _viewer_windows = _create_viewer_windows(html_path, clock_format)
             _schedule_lock()
         except Exception:
             pass
