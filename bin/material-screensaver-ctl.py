@@ -284,6 +284,19 @@ def _create_viewer_windows(html_path, clock_format="24h"):
                 pass
         except Exception:
             pass
+        # Hide cursor inside web content from the first paint — WebKit's CSS cursor
+        # overrides the widget's Gdk cursor, so Gdk blank alone still shows default
+        # arrow over the page until first motion. Inject a blanket cursor:none.
+        try:
+            ucm = web.get_user_content_manager()
+            sheet = WebKit.UserStyleSheet.new(
+                "* { cursor: none !important; } html, body { cursor: none !important; }",
+                WebKit.UserContentInjectedFrames.ALL_FRAMES,
+                WebKit.UserStyleLevel.AUTHOR,
+                None, None)
+            ucm.add_style_sheet(sheet)
+        except Exception:
+            pass
         web.load_uri(uri)
         win.set_child(web)
 
@@ -322,7 +335,7 @@ def _create_viewer_windows(html_path, clock_format="24h"):
         def on_motion(ctrl, x, y, _win=win, _web=web):
             # Only Super+Q closes — motion just shows cursor briefly
             try:
-                _show_cursor_temporarily(_win)
+                _show_cursor_temporarily(_win, _web)
             except Exception:
                 pass
             return
@@ -359,6 +372,12 @@ def _create_viewer_windows(html_path, clock_format="24h"):
                         tgt.set_cursor(None)
                     except Exception:
                         pass
+            # also hide web-content cursor via JS (WebKit CSS overrides widget cursor)
+            if web is not None:
+                try:
+                    web.evaluate_javascript("document.documentElement.style.cursor='none';document.body&& (document.body.style.cursor='none')", -1, None, None, None, None, None)
+                except Exception:
+                    pass
         def _show_cursor_temporarily(w, web=None):
             for tgt in ([w] + ([web] if web is not None else [])):
                 try:
@@ -366,6 +385,11 @@ def _create_viewer_windows(html_path, clock_format="24h"):
                         tgt.set_cursor(Gdk.Cursor.new_from_name("default", None))
                     except Exception:
                         tgt.set_cursor(None)
+                except Exception:
+                    pass
+            if web is not None:
+                try:
+                    web.evaluate_javascript("document.documentElement.style.cursor='auto';document.body&& (document.body.style.cursor='auto')", -1, None, None, None, None, None)
                 except Exception:
                     pass
             from gi.repository import GLib as _GLib2
@@ -379,8 +403,40 @@ def _create_viewer_windows(html_path, clock_format="24h"):
                 _GLib2.timeout_add(1200, _rehide)
             except Exception:
                 pass
+        # robust initial hide — Wayland resets cursor on map/fullscreen, so schedule after realize/map/timeouts
+        def _hide_now():
+            try:
+                _hide_cursor(win, web)
+            except Exception:
+                pass
+            return False
+        def _schedule_hide():
+            try:
+                _hide_now()
+                # also hide after realize/map and short delays to beat compositor resets
+                def _deferred_hide():
+                    _hide_now()
+                    return False
+                try:
+                    GLib.idle_add(_deferred_hide, priority=GLib.PRIORITY_HIGH_IDLE)
+                except Exception:
+                    pass
+                for ms in (50, 200, 600, 1200):
+                    try:
+                        GLib.timeout_add(ms, _deferred_hide)
+                    except Exception:
+                        pass
+                # on realize/map — most reliable for Wayland
+                for sig in ("realize", "map"):
+                    try:
+                        win.connect(sig, lambda *_: _hide_now())
+                        web.connect(sig, lambda *_: _hide_now())
+                    except Exception:
+                        pass
+            except Exception:
+                pass
         try:
-            _hide_cursor(win, web)
+            _schedule_hide()
         except Exception:
             pass
         try:
@@ -449,9 +505,12 @@ def _create_viewer_windows(html_path, clock_format="24h"):
                     seat.grab(surf, Gdk.SeatCapabilities.ALL, True, None, None, None, None)
             except Exception:
                 pass
-            # ensure cursor hidden after launch (even if compositor reset it)
+            # ensure cursor hidden after launch (even if compositor reset it) — retry via timeouts
             try:
-                _hide_cursor(w)
+                _hide_cursor(w, wb)
+                # schedule a couple more hides to survive Wayland cursor resets after fullscreen
+                GLib.timeout_add(100, lambda: (_hide_cursor(w, wb), False)[1])
+                GLib.timeout_add(500, lambda: (_hide_cursor(w, wb), False)[1])
             except Exception:
                 pass
             return False
@@ -490,12 +549,17 @@ def _create_viewer_windows(html_path, clock_format="24h"):
                 _do_fullscreen()
             except Exception:
                 pass
-        # Also ensure fullscreen on map (covers case where idle fired before map)
+        # Also ensure fullscreen + cursor hidden on map (covers case where idle fired before map)
         try:
             def _on_map(w, _pspec=None):
                 try:
                     w.fullscreen()
                     w.present()
+                except Exception:
+                    pass
+                try:
+                    _hide_cursor(w, web)
+                    GLib.timeout_add(100, lambda: (_hide_cursor(w, web), False)[1])
                 except Exception:
                     pass
                 return False
