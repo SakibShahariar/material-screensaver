@@ -18,6 +18,7 @@ import json
 import glob
 import signal
 import random
+import shutil
 import subprocess
 
 SCREENSAVER_DIR = os.path.expanduser("~/.local/share/material-screensaver/screensavers")
@@ -90,7 +91,7 @@ def pick_browser_cmd(cfg, html_path):
     choice = cfg.get("browser", "auto")
     candidates = [choice] if choice != "auto" and choice in (CHROMIUM_LIKE | FIREFOX_LIKE) else BROWSER_ORDER
     for browser in candidates:
-        if subprocess.run(["which", browser], capture_output=True).returncode == 0:
+        if shutil.which(browser) is not None:
             return browser_cmd(browser, html_path, url_suffix)
     sys.exit("No supported browser found (tried firefox, helium, chromium, chrome, brave). Install one of these.")
 
