@@ -27,7 +27,7 @@ import subprocess
 
 SCREENSAVER_DIR = os.path.expanduser("~/.local/share/material-screensaver/screensavers")
 CONFIG_PATH = os.path.expanduser("~/.config/material-screensaver/config.json")
-DEFAULT_CONFIG = {"active": None, "idle_seconds": 300, "clock_format": "24h", "random": False, "browser": "auto", "lock_after_seconds": 300}
+DEFAULT_CONFIG = {"active": None, "idle_seconds": 300, "clock_format": "24h", "random": False, "browser": "auto", "lock_after_seconds": 300, "close_on_mouse": True}
 
 # D-Bus service for daemon delegation (PID file gone)
 SERVICE_NAME = "io.github.sakib.MaterialScreensaver"
@@ -288,6 +288,11 @@ def _create_viewer_windows(html_path, clock_format="24h"):
             return
         def on_motion(ctrl, x, y, _win=win):
             try:
+                if not load_config().get("close_on_mouse", True):
+                    return
+            except Exception:
+                pass
+            try:
                 if getattr(_win, "_show_time", 0) and (GLib.get_monotonic_time() - _win._show_time) < 500_000:
                     return
             except Exception:
@@ -474,10 +479,15 @@ def _cancel_lock():
         pass
 
 def _daemon_switch_to_active_watch():
-    """If daemon IdleMonitor is active, switch idle→active so mouse movement hides even manual Show."""
+    """If daemon IdleMonitor is active, switch idle→active so mouse movement hides even manual Show (if close_on_mouse)."""
     try:
         if _idle_proxy is None:
             return
+        try:
+            if not load_config().get("close_on_mouse", True):
+                return
+        except Exception:
+            pass
         from gi.repository import GLib, Gio
         # remove idle, add active
         if _idle_watch_ids.get("idle") is not None:
@@ -920,8 +930,21 @@ def run_daemon():
             (fired_id,) = params.unpack()
             if fired_id == _idle_watch_ids["idle"]:
                 show_viewer()
-                add_active_watch()
+                # Only watch for activity if close_on_mouse is on — otherwise stay until key/click
+                try:
+                    if load_config().get("close_on_mouse", True):
+                        add_active_watch()
+                    else:
+                        # keep idle watch removed, no active watch — manual key/click only
+                        pass
+                except Exception:
+                    add_active_watch()
             elif fired_id == _idle_watch_ids["active"]:
+                try:
+                    if not load_config().get("close_on_mouse", True):
+                        return
+                except Exception:
+                    pass
                 hide_viewer()
                 add_idle_watch()
 
