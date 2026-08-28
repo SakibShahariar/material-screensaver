@@ -1077,6 +1077,16 @@ def hide_viewer():
                 web = None
             if web is not None:
                 try:
+                    # remove per-view UserStyleSheets we injected (prevents manager leak)
+                    try:
+                        ucm = web.get_user_content_manager()
+                        ucm.remove_all_style_sheets()
+                        ucm.remove_all_scripts()
+                    except Exception:
+                        pass
+                except Exception:
+                    pass
+                try:
                     w.set_child(None)
                 except Exception:
                     pass
@@ -1142,32 +1152,42 @@ def hide_viewer():
     _restore_overview()
     _cancel_lock()
     _daemon_switch_to_idle_watch()
-    # Clear WebKit caches to prevent memory creep
+    # Clear WebKit caches to prevent memory creep — both shared and ephemeral
     try:
         import gi
         gi.require_version("WebKit", "6.0")
         from gi.repository import WebKit
         from gi.repository import GLib as _GLib
-        ctx = _shared_web_context
-        if ctx is None:
+        for _ctx in [_shared_web_context, _ephemeral_ctx]:
+            if _ctx is None:
+                continue
             try:
-                ctx = WebKit.WebContext.get_default()
-            except Exception:
-                ctx = None
-        if ctx is not None:
-            try:
-                ctx.clear_cache()
+                _ctx.clear_cache()
             except Exception:
                 pass
             try:
-                mgr = ctx.get_website_data_manager()
+                mgr = _ctx.get_website_data_manager()
                 if mgr is not None:
                     try:
                         mgr.clear(WebKit.WebsiteDataTypes.MEMORY_CACHE, _GLib.Variant("t", 0), None, None, None)
                     except Exception:
                         pass
+                    try:
+                        mgr.clear(WebKit.WebsiteDataTypes.DISK_CACHE, _GLib.Variant("t", 0), None, None, None)
+                    except Exception:
+                        pass
             except Exception:
                 pass
+        # also try default context
+        try:
+            dctx = WebKit.WebContext.get_default()
+            if dctx not in (_shared_web_context, _ephemeral_ctx):
+                try:
+                    dctx.clear_cache()
+                except Exception:
+                    pass
+        except Exception:
+            pass
     except Exception:
         pass
     try:
