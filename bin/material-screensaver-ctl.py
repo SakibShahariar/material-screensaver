@@ -104,8 +104,25 @@ def read_pid():
             pid = int(f.read().strip())
         os.kill(pid, 0)  # raises if not alive
         return pid
-    except (ValueError, ProcessLookupError, PermissionError):
+    except ValueError:
+        try:
+            os.remove(PID_FILE)
+        except FileNotFoundError:
+            pass
         return None
+    except ProcessLookupError:
+        try:
+            os.remove(PID_FILE)
+        except FileNotFoundError:
+            pass
+        return None
+    except PermissionError:
+        # process exists but we lack permission to signal it — treat as running
+        try:
+            with open(PID_FILE) as f:
+                return int(f.read().strip())
+        except (ValueError, OSError):
+            return None
 
 
 def is_running():
