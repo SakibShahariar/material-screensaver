@@ -2,6 +2,13 @@
 import gi
 gi.require_version("Gtk", "4.0")
 gi.require_version("Adw", "1")
+try:
+    gi.require_version("WebKit", "6.0")
+    from gi.repository import WebKit
+    HAS_WEBKIT = True
+except Exception:
+    WebKit = None
+    HAS_WEBKIT = False
 from gi.repository import Gtk, Adw, GLib, Gio, Gdk
 
 import os
@@ -117,6 +124,34 @@ class ScreensaverWindow(Adw.ApplicationWindow):
         note.add_css_class("dim-label")
         sv_group.add(note)
 
+        # --- Live Preview (WebKit thumbnail) ---
+        if HAS_WEBKIT and self.screensaver_files:
+            preview_group_live = Adw.PreferencesGroup(title="Live Preview")
+            page.add(preview_group_live)
+            frame = Gtk.Frame()
+            frame.add_css_class("card")
+            try:
+                frame.set_overflow(Gtk.Overflow.HIDDEN)
+            except Exception:
+                pass
+            self.preview_web = WebKit.WebView()
+            self.preview_web.set_size_request(460, 260)
+            # reduce resources for thumbnail
+            try:
+                s = self.preview_web.get_settings()
+                s.set_enable_write_console_messages_to_stdout(False)
+            except Exception:
+                pass
+            frame.set_child(self.preview_web)
+            # wrap frame in a row-like container for PreferencesGroup
+            box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL)
+            box.append(frame)
+            preview_group_live.add(box)
+            # overlay label for random
+            self._update_preview()
+        else:
+            self.preview_web = None
+
         # --- Timing ---
         timing_group = Adw.PreferencesGroup(title="Timing")
         page.add(timing_group)
@@ -223,6 +258,29 @@ class ScreensaverWindow(Adw.ApplicationWindow):
 
         self.refresh_shortcut_label()
 
+    def _update_preview(self):
+        if not HAS_WEBKIT or not hasattr(self, "preview_web") or self.preview_web is None:
+            return
+        # if random, show first file as preview hint
+        cfg = load_config()
+        if cfg.get("random", False):
+            # show a hint that random is on
+            try:
+                self.preview_web.load_uri("about:blank")
+            except Exception:
+                pass
+            return
+        idx = self.combo_row.get_selected()
+        if 0 <= idx < len(self.screensaver_files):
+            fn = self.screensaver_files[idx]
+            path = os.path.join(SCREENSAVER_DIR, fn)
+            fmt = cfg.get("clock_format", "24h")
+            uri = f"file://{path}?format={fmt}"
+            try:
+                self.preview_web.load_uri(uri)
+            except Exception:
+                pass
+
     def refresh_shortcut_label(self):
         try:
             binding = get_keybinding_settings().get_string("binding")
@@ -274,11 +332,13 @@ class ScreensaverWindow(Adw.ApplicationWindow):
         is_random = switch.get_active()
         save_config(random=is_random)
         self.combo_row.set_sensitive(bool(self.screensaver_files) and not is_random)
+        self._update_preview()
 
     def on_screensaver_changed(self, row, _pspec):
         idx = row.get_selected()
         if 0 <= idx < len(self.screensaver_files):
             save_config(active=self.screensaver_files[idx])
+        self._update_preview()
 
     def on_idle_changed(self, row, _pspec):
         save_config(idle_seconds=int(row.get_value() * 60))
@@ -291,6 +351,7 @@ class ScreensaverWindow(Adw.ApplicationWindow):
 
     def on_ampm_toggled(self, switch, _pspec):
         save_config(clock_format="12h" if switch.get_active() else "24h")
+        self._update_preview()
 
     def on_autostart_toggled(self, switch, _pspec):
         action = "enable" if switch.get_active() else "disable"
