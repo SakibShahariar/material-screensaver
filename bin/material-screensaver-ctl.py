@@ -48,7 +48,10 @@ _saved_overlay_key = None  # saved org.gnome.mutter overlay-key while Super+Q is
 _saved_shell_toggle = None  # saved shell toggle-overview
 _is_showing = False  # guard double-Show TOCTOU
 _pending_sources = []  # GLib source ids for fullscreen retry / gc to cancel on Hide
+_viewer_process = None  # subprocess.Popen for isolated viewer (daemon only, keeps daemon 30M flat)
 _ephemeral_ctx = None  # single ephemeral WebContext reused across Shows (fixes per-Show leak)
+_is_viewer_mode = False  # True in viewer subprocess (isolated WebKit, daemon stays lean)
+_viewer_loop = None  # GLib.MainLoop for viewer subprocess
 
 
 def load_config():
@@ -586,8 +589,18 @@ def _create_viewer_windows(html_path, clock_format="24h"):
 
 
 def is_viewer_active():
-    """Local check (no D-Bus). True if we have visible viewer windows in this process."""
-    global _viewer_windows
+    """Local check (no D-Bus). True if we have visible viewer windows in this process or subprocess."""
+    global _viewer_windows, _viewer_process
+    # Isolated viewer subprocess alive?
+    if _viewer_process is not None:
+        try:
+            if _viewer_process.poll() is None:
+                return True
+            else:
+                # clean stale reference
+                _viewer_process = None
+        except Exception:
+            pass
     for w in list(_viewer_windows):
         try:
             if w.get_visible():
@@ -972,9 +985,75 @@ def _daemon_switch_to_idle_watch():
     except Exception:
         pass
 
+def run_viewer(html_path, clock_format="24h"):
+    """Viewer subprocess entry point — isolated WebKit, daemon stays 30M flat."""
+    global _is_viewer_mode, _viewer_loop, _viewer_windows
+    _is_viewer_mode = True
+    # Viewer handles its own SIGTERM/SIGINT to exit cleanly when daemon Hide kills it
+    try:
+        import gi
+        gi.require_version("Gtk", "4.0")
+        gi.require_version("WebKit", "6.0")
+        from gi.repository import Gtk, GLib
+        _viewer_windows = _create_viewer_windows(html_path, clock_format)
+        loop = GLib.MainLoop()
+        _viewer_loop = loop
+        def check_closed():
+            if not is_viewer_active():
+                loop.quit()
+                return False
+            return True
+        GLib.timeout_add(200, check_closed)
+        def _viewer_sig(*_a):
+            try:
+                for w in list(_viewer_windows):
+                    try:
+                        w.close()
+                    except Exception:
+                        pass
+            except Exception:
+                pass
+            try:
+                loop.quit()
+            except Exception:
+                pass
+            return False
+        try:
+            GLib.unix_signal_add(GLib.PRIORITY_DEFAULT, signal.SIGTERM, _viewer_sig)
+            GLib.unix_signal_add(GLib.PRIORITY_DEFAULT, signal.SIGINT, _viewer_sig)
+            GLib.unix_signal_add(GLib.PRIORITY_DEFAULT, signal.SIGHUP, _viewer_sig)
+        except Exception:
+            pass
+        loop.run()
+    except Exception as e:
+        print(f"Viewer failed: {e}", file=sys.stderr)
+        import traceback
+        traceback.print_exc()
+        sys.exit(1)
+    # ensure WebKit processes terminated before exit (so daemon's kill is not needed)
+    try:
+        for w in list(_viewer_windows):
+            try:
+                web = w.get_child()
+                if web is not None:
+                    try:
+                        web.terminate_web_process()
+                    except Exception:
+                        pass
+                    try:
+                        web.run_dispose()
+                    except Exception:
+                        pass
+                w.run_dispose()
+            except Exception:
+                pass
+    except Exception:
+        pass
+    sys.exit(0)
+
 def show_viewer():
-    """Show screensaver viewer in this process (non-blocking, creates windows)."""
-    global _viewer_windows, _is_showing
+    """Show screensaver viewer — daemon spawns isolated viewer subprocess (keeps daemon lean)."""
+    global _viewer_windows, _is_showing, _viewer_process
     if _is_showing:
         return True
     if is_viewer_active():
@@ -986,14 +1065,66 @@ def show_viewer():
         _is_showing = False
         return False
     clock_format = cfg.get("clock_format", "24h")
+    # If viewer subprocess already alive, treat as active
+    if _viewer_process is not None:
+        try:
+            if _viewer_process.poll() is None:
+                _is_showing = False
+                return True
+            else:
+                _viewer_process = None
+        except Exception:
+            _viewer_process = None
     try:
         _inhibit()
         _inhibit_overview()
-        # Defensive: clear stale refs before creating new (ghost prevention)
+        # Defensive: clear stale in-daemon windows (should be none with subprocess model)
         _viewer_windows = []
-        _viewer_windows = _create_viewer_windows(html_path, clock_format)
+        # Spawn isolated viewer — daemon stays 30M, WebKit ~400M lives in child and is reaped on Hide
+        try:
+            _viewer_process = subprocess.Popen(
+                [sys.executable, os.path.abspath(__file__), "viewer", html_path, clock_format],
+                stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
+                preexec_fn=os.setsid if hasattr(os, "setsid") else None)
+        except Exception as e:
+            print(f"Failed to spawn viewer subprocess: {e}", file=sys.stderr)
+            # fallback to in-process (old path) if spawn fails
+            _viewer_windows = _create_viewer_windows(html_path, clock_format)
+            _viewer_process = None
         _daemon_switch_to_active_watch()
         _schedule_lock()
+        # Reap child when it exits on its own (Super+Q): uninhibit/restore even without Hide
+        try:
+            from gi.repository import GLib
+            def _watch_child():
+                if _viewer_process is None:
+                    return False
+                try:
+                    if _viewer_process.poll() is not None:
+                        # child exited (e.g., Super+Q) — cleanup daemon state
+                        try:
+                            _uninhibit()
+                        except Exception:
+                            pass
+                        try:
+                            _restore_overview()
+                        except Exception:
+                            pass
+                        try:
+                            _cancel_lock()
+                        except Exception:
+                            pass
+                        try:
+                            _daemon_switch_to_idle_watch()
+                        except Exception:
+                            pass
+                        return False
+                except Exception:
+                    return False
+                return True
+            GLib.timeout_add(500, _watch_child)
+        except Exception:
+            pass
         return True
     except Exception as e:
         print(f"Failed to show screensaver: {e}", file=sys.stderr)
@@ -1006,7 +1137,96 @@ def show_viewer():
 
 def hide_viewer():
     """Hide/destroy viewer windows in this process. Thorough cleanup to prevent ghost dash/bwrap leak."""
-    global _viewer_windows, _is_showing, _pending_sources
+    global _viewer_windows, _is_showing, _pending_sources, _ephemeral_ctx, _viewer_process, _is_viewer_mode, _viewer_loop
+    # Viewer subprocess: just close windows and exit, daemon handles inhibit/overlay via child watch
+    if _is_viewer_mode:
+        try:
+            for w in list(_viewer_windows):
+                try:
+                    w.close()
+                except Exception:
+                    pass
+            if _viewer_loop is not None:
+                try:
+                    _viewer_loop.quit()
+                except Exception:
+                    pass
+        except Exception:
+            pass
+        # also terminate WebKit quickly
+        try:
+            for w in list(_viewer_windows):
+                try:
+                    web = w.get_child()
+                    if web is not None:
+                        try:
+                            web.terminate_web_process()
+                        except Exception:
+                            pass
+                except Exception:
+                    pass
+        except Exception:
+            pass
+        try:
+            import sys
+            sys.exit(0)
+        except Exception:
+            pass
+        return True
+    # Daemon: if isolated viewer subprocess alive, terminate it (keeps daemon lean)
+    if _viewer_process is not None:
+        try:
+            if _viewer_process.poll() is None:
+                try:
+                    # try graceful TERM to process group
+                    try:
+                        os.killpg(os.getpgid(_viewer_process.pid), signal.SIGTERM)
+                    except Exception:
+                        _viewer_process.terminate()
+                    try:
+                        _viewer_process.wait(timeout=2)
+                    except Exception:
+                        try:
+                            os.killpg(os.getpgid(_viewer_process.pid), signal.SIGKILL)
+                        except Exception:
+                            try:
+                                _viewer_process.kill()
+                            except Exception:
+                                pass
+                except Exception:
+                    pass
+            _viewer_process = None
+        except Exception:
+            _viewer_process = None
+        # daemon inhibit/overlay cleanup (viewer subprocess already exited, but daemon inhibited)
+        try:
+            _uninhibit()
+        except Exception:
+            pass
+        try:
+            _restore_overview()
+        except Exception:
+            pass
+        try:
+            _cancel_lock()
+        except Exception:
+            pass
+        try:
+            _daemon_switch_to_idle_watch()
+        except Exception:
+            pass
+        try:
+            _kill_orphan_webkit()
+        except Exception:
+            pass
+        try:
+            import gc
+            gc.collect()
+        except Exception:
+            pass
+        # also clear legacy in-daemon windows if any (fallback path)
+        _viewer_windows = []
+        return True
     # Cancel any pending fullscreen/gc sources from previous Show (leaked GLib sources)
     try:
         from gi.repository import GLib
@@ -1186,6 +1406,16 @@ def hide_viewer():
                     dctx.clear_cache()
                 except Exception:
                     pass
+        except Exception:
+            pass
+        # drop ephemeral to fully free its NetworkProcess (trade ~30M create vs 38M retain)
+        try:
+            if _ephemeral_ctx is not None:
+                try:
+                    _ephemeral_ctx.clear_cache()
+                except Exception:
+                    pass
+                _ephemeral_ctx = None
         except Exception:
             pass
     except Exception:
@@ -1592,5 +1822,13 @@ if __name__ == "__main__":
         stop()
     elif action == "daemon":
         run_daemon()
+    elif action == "viewer":
+        # isolated viewer subprocess: viewer <html_path> [clock_format]
+        hp = sys.argv[2] if len(sys.argv) > 2 else None
+        cf = sys.argv[3] if len(sys.argv) > 3 else "24h"
+        if hp is None:
+            print("viewer requires html_path", file=sys.stderr)
+            sys.exit(1)
+        run_viewer(hp, cf)
     else:
         sys.exit(__doc__)
