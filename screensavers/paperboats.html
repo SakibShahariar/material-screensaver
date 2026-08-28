@@ -5,182 +5,183 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Material Screensaver — Paper Boats</title>
 <style>
-  :root {
-    --primary_rgb: 138 206 255; --secondary_rgb: 180 199 233; --tertiary_rgb: 186 196 250;
-    --primary_container_rgb: 0 75 111; --secondary_container_rgb: 53 72 99; --tertiary_container_rgb: 58 68 114;
-    --surface_rgb: 12 20 27; --surface_bright_rgb: 50 58 65; --outline_rgb: 137 146 154;
-  }
-  html, body {
-    margin: 0; padding: 0; width: 100%; height: 100%;
-    overflow: hidden; background: rgb(var(--surface_rgb));
-    font-family: "Google Sans", "Segoe UI", Roboto, system-ui, sans-serif;
-    user-select: none;
-  }
+:root {
+  --primary_rgb: 138 206 255;
+  --secondary_rgb: 180 199 233;
+  --tertiary_rgb: 186 196 250;
+  --primary_container_rgb: 0 75 111;
+  --secondary_container_rgb: 53 72 99;
+  --tertiary_container_rgb: 58 68 114;
+  --surface_rgb: 12 20 27;
+  --surface_bright_rgb: 50 58 65;
+  --outline_rgb: 137 146 154;
+}
+* { margin: 0; padding: 0; box-sizing: border-box; }
+html, body {
+  width: 100%; height: 100%; overflow: hidden;
+  background: rgb(var(--surface_rgb));
+  cursor: none;
+  font-family: "Google Sans", "Segoe UI", system-ui, sans-serif;
+}
+body.show-cursor { cursor: default; }
+canvas { display: block; width: 100vw; height: 100vh; }
 
-  body { cursor: none; }
-  body.show-cursor { cursor: default; }
+#clock-wrap {
+  position: fixed;
+  left: clamp(20px, 2.5vw, 40px);
+  bottom: clamp(16px, 2vw, 28px);
+  padding: 18px 26px 14px;
+  border-radius: 20px;
+  background: radial-gradient(
+    ellipse at 30% 70%,
+    rgb(var(--surface_rgb) / .88) 0%,
+    rgb(var(--surface_rgb) / .55) 55%,
+    transparent 100%
+  );
+  pointer-events: none;
+  transition: opacity .7s ease;
+  z-index: 10;
+}
+#clock-wrap.hidden { opacity: 0; }
 
-  canvas { display: block; width: 100vw; height: 100vh; }
+#clock {
+  font-weight: 200;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: -2px;
+  font-size: clamp(40px, 5.5vw, 78px);
+  color: rgb(var(--primary_rgb));
+  text-shadow:
+    0 0 2px rgb(var(--surface_rgb)),
+    0 0 14px rgb(var(--surface_rgb) / .95),
+    0 0 36px rgb(var(--primary_rgb) / .5),
+    0 2px 14px rgba(0,0,0,.85);
+  line-height: 1;
+}
+#clock .ampm {
+  font-size: .26em;
+  margin-left: 10px;
+  opacity: .78;
+  vertical-align: 22%;
+  letter-spacing: 2px;
+  font-weight: 400;
+}
+#date {
+  margin-top: 8px;
+  font-size: clamp(11px, 1.05vw, 14px);
+  letter-spacing: 4px;
+  text-transform: uppercase;
+  color: rgb(var(--secondary_rgb));
+  text-shadow:
+    0 0 8px rgb(var(--surface_rgb) / .9),
+    0 1px 8px rgba(0,0,0,.7);
+  opacity: .95;
+}
 
-  /* Ambient background depth vignette */
-  body::after {
-    content: '';
-    position: fixed; inset: 0; pointer-events: none; z-index: 5;
-    background: radial-gradient(circle at center, transparent 40%, rgb(var(--surface_rgb) / 0.6) 100%);
-  }
-
-  #ui-container {
-    position: fixed; inset: 0; pointer-events: none; z-index: 10;
-    display: flex; flex-direction: column; justify-content: flex-end;
-    padding: 56px; box-sizing: border-box;
-    transition: opacity 0.5s cubic-bezier(0.16, 1, 0.3, 1), transform 0.5s cubic-bezier(0.16, 1, 0.3, 1);
-  }
-  #ui-container.hidden { opacity: 0; transform: translateY(16px); }
-
-  .vignette-card {
-    background: linear-gradient(135deg, rgb(var(--surface_rgb) / 0.75) 0%, rgb(var(--surface_rgb) / 0.4) 100%);
-    backdrop-filter: blur(20px);
-    -webkit-backdrop-filter: blur(20px);
-    padding: 32px 40px;
-    width: fit-content;
-    border-radius: 28px;
-    border: 1px solid rgb(var(--outline_rgb) / 0.12);
-    box-shadow: 0 24px 60px rgba(0, 0, 0, 0.5), inset 0 1px 0 rgba(255, 255, 255, 0.06);
-  }
-
-  #clock {
-    font-size: clamp(56px, 8vw, 92px);
-    font-weight: 200;
-    font-variant-numeric: tabular-nums;
-    letter-spacing: -3px;
-    line-height: 0.9;
-    text-shadow: 0 4px 24px rgba(0, 0, 0, 0.45);
-  }
-  #clock .ampm {
-    font-size: 0.26em;
-    margin-left: 10px;
-    opacity: 0.7;
-    font-weight: 500;
-    text-transform: uppercase;
-    vertical-align: super;
-    letter-spacing: 2px;
-  }
-  #date {
-    font-size: clamp(13px, 1.4vw, 16px);
-    letter-spacing: 4px;
-    text-transform: uppercase;
-    margin-top: 12px;
-    opacity: 0.85;
-    font-weight: 500;
-  }
-  #hint {
-    position: fixed; right: 40px; bottom: 40px;
-    font-size: 11px; letter-spacing: 2.5px; text-transform: uppercase;
-    opacity: 0; transition: opacity 0.6s ease;
-    padding: 10px 20px;
-    background: rgb(var(--surface_rgb) / 0.5);
-    backdrop-filter: blur(12px);
-    border: 1px solid rgb(var(--outline_rgb) / 0.1);
-    border-radius: 14px;
-    pointer-events: none;
-    z-index: 10;
-  }
-  #hint.show { opacity: 0.65; }
+#hint {
+  position: fixed; right: 28px; bottom: 24px; z-index: 10;
+  font-size: 11px; letter-spacing: 1.5px;
+  color: rgb(var(--outline_rgb) / .55);
+  opacity: 0; transition: opacity 1s ease;
+  text-transform: uppercase;
+  pointer-events: none;
+  text-shadow: 0 1px 8px rgb(var(--surface_rgb));
+}
+#hint.show { opacity: .7; }
 </style>
 <link rel="stylesheet" href="file:///home/sakib/.config/matugen/matugen-colors.css">
 </head>
 <body>
 <canvas id="c"></canvas>
-
-<div id="ui-container">
-  <div class="vignette-card">
-    <div id="clock">00:00</div>
-    <div id="date">Mon, Jan 1</div>
-  </div>
+<div id="clock-wrap">
+  <div id="clock">00:00<span class="ampm">AM</span></div>
+  <div id="date">MON, JAN 1</div>
 </div>
-<div id="hint">Press <b>C</b> to toggle UI</div>
+<div id="hint">C · toggle clock</div>
 
-<script src="clock-shared.js"></script>
 <script>
-const canvas = document.getElementById('c');
-const ctx = canvas.getContext('2d');
-const clockEl = document.getElementById('clock');
-const dateEl = document.getElementById('date');
-const hintEl = document.getElementById('hint');
-const uiContainer = document.getElementById('ui-container');
+"use strict";
 
-let cursorTimeout;
-function triggerCursor() {
-  document.body.classList.add('show-cursor');
-  clearTimeout(cursorTimeout);
-  cursorTimeout = setTimeout(() => {
-    document.body.classList.remove('show-cursor');
-  }, 2500);
-}
-window.addEventListener('pointermove', triggerCursor);
-window.addEventListener('pointerdown', triggerCursor);
+const canvas = document.getElementById("c");
+const ctx = canvas.getContext("2d", { alpha: false, desynchronized: true });
+const clockEl = document.getElementById("clock");
+const dateEl  = document.getElementById("date");
+const hintEl  = document.getElementById("hint");
+const clockWrap = document.getElementById("clock-wrap");
 
-let dpr = Math.min(window.devicePixelRatio || 1, 2);
-let W, H;
-function resize() {
-  W = window.innerWidth; H = window.innerHeight;
-  canvas.width = W * dpr; canvas.height = H * dpr;
-  ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
-}
-window.addEventListener('resize', resize);
-resize();
-
-const reduceMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
-const speedMul = reduceMotion ? 0.25 : 1;
-
-function readRGB(name, fallback) {
-  const raw = getComputedStyle(document.documentElement).getPropertyValue(name).trim();
-  const parts = raw.split(/\s+/).map(Number);
-  if (parts.length === 3 && parts.every(n => !isNaN(n))) return parts;
-  return fallback;
-}
-function rgba(rgb, a) {
-  const c = rgb || [200, 200, 200];
-  return `rgba(${c[0]}, ${c[1]}, ${c[2]}, ${a})`;
-}
-
+let W = 0, H = 0, DPR = 1;
 let theme = {};
 let roleList = [];
 let boats = [];
+let start = performance.now();
+let cursorTimer;
+
+const reduceMotion = matchMedia("(prefers-reduced-motion: reduce)").matches;
+const speedMul = reduceMotion ? 0.28 : 0.85;
+
+function readRGB(name, fb = [160, 160, 160]) {
+  const r = getComputedStyle(document.documentElement).getPropertyValue(name).trim();
+  const p = r.split(/\s+/).map(Number);
+  return (p.length === 3 && p.every(n => !isNaN(n))) ? p : fb;
+}
+function rgba(c, a = 1) {
+  return `rgba(${c[0]},${c[1]},${c[2]},${a})`;
+}
 
 function loadTheme() {
   theme = {
-    surface: readRGB('--surface_rgb', [12, 20, 27]),
-    surfaceBright: readRGB('--surface_bright_rgb', [50, 58, 65]),
-    primary: readRGB('--primary_rgb', [138, 206, 255]),
-    secondary: readRGB('--secondary_rgb', [180, 199, 233]),
-    tertiary: readRGB('--tertiary_rgb', [186, 196, 250]),
-    primaryContainer: readRGB('--primary_container_rgb', [0, 75, 111]),
-    secondaryContainer: readRGB('--secondary_container_rgb', [53, 72, 99]),
-    tertiaryContainer: readRGB('--tertiary_container_rgb', [58, 68, 114]),
-    outline: readRGB('--outline_rgb', [137, 146, 154]),
+    surface:            readRGB("--surface_rgb", [12, 20, 27]),
+    surfaceBright:      readRGB("--surface_bright_rgb", [50, 58, 65]),
+    primary:            readRGB("--primary_rgb", [138, 206, 255]),
+    secondary:          readRGB("--secondary_rgb", [180, 199, 233]),
+    tertiary:           readRGB("--tertiary_rgb", [186, 196, 250]),
+    primaryContainer:   readRGB("--primary_container_rgb", [0, 75, 111]),
+    secondaryContainer: readRGB("--secondary_container_rgb", [53, 72, 99]),
+    tertiaryContainer:  readRGB("--tertiary_container_rgb", [58, 68, 114]),
+    outline:            readRGB("--outline_rgb", [137, 146, 154])
   };
-  roleList = [theme.primary, theme.secondary, theme.tertiary, theme.primaryContainer, theme.secondaryContainer];
-  boats.forEach((b, i) => { b.color = roleList[i % roleList.length]; });
-  clockEl.style.color = rgba(theme.primary, 0.98);
-  dateEl.style.color = rgba(theme.secondary, 0.9);
-  hintEl.style.color = rgba(theme.outline, 0.95);
+
+  roleList = [
+    theme.primary,
+    theme.secondary,
+    theme.tertiary,
+    theme.primaryContainer,
+    theme.secondaryContainer
+  ];
+
+  boats.forEach((b, i) => {
+    b.color = roleList[i % roleList.length];
+  });
+
+  document.body.style.background = rgba(theme.surface);
+  clockEl.style.color = rgba(theme.primary, 1);
+  dateEl.style.color  = rgba(theme.secondary, 0.95);
+  hintEl.style.color  = rgba(theme.outline, 0.6);
 }
 
-// river meanders using a slowly-shifting sine centerline
+function resize() {
+  W = innerWidth; H = innerHeight;
+  DPR = Math.min(devicePixelRatio || 1, 2);
+  canvas.width  = Math.floor(W * DPR);
+  canvas.height = Math.floor(H * DPR);
+  ctx.setTransform(DPR, 0, 0, DPR, 0, 0);
+}
+addEventListener("resize", resize, { passive: true });
+
 function riverCenterY(x, t) {
-  return H * 0.5 + Math.sin(x * 0.0022 + t * 0.05) * H * 0.16 + Math.sin(x * 0.0009 - t * 0.03) * H * 0.08;
+  return H * 0.5
+    + Math.sin(x * 0.0022 + t * 0.05) * H * 0.16
+    + Math.sin(x * 0.0009 - t * 0.03) * H * 0.08;
 }
 
 function spawnBoat(b) {
-  b.x = -60 - Math.random() * 200;
-  b.speed = 26 + Math.random() * 18;
-  b.bobAmp = 3 + Math.random() * 3;
-  b.bobFreq = 0.8 + Math.random() * 0.6;
+  b.x = -60 - Math.random() * 180;
+  b.speed = 24 + Math.random() * 18;
+  b.bobAmp = 2.5 + Math.random() * 3;
+  b.bobFreq = 0.75 + Math.random() * 0.55;
   b.phase = Math.random() * Math.PI * 2;
   b.lateral = (Math.random() - 0.5) * H * 0.12;
-  b.size = 14 + Math.random() * 10;
-  b.color = roleList[Math.floor(Math.random() * roleList.length)];
+  b.size = 13 + Math.random() * 11;
+  b.color = roleList[Math.floor(Math.random() * Math.max(1, roleList.length))] || [140, 200, 255];
 }
 
 function initBoats() {
@@ -196,113 +197,120 @@ function initBoats() {
 function drawBoat(b, t, y, heading) {
   const bob = Math.sin(t * b.bobFreq + b.phase) * b.bobAmp;
 
-  // wake: two small fading ellipses trailing behind, along the heading direction
+  // Wake
   for (let i = 1; i <= 2; i++) {
-    const wx = b.x - Math.cos(heading) * b.size * 1.4 * i;
-    const wy = y + bob - Math.sin(heading) * b.size * 1.4 * i;
+    const wx = b.x - Math.cos(heading) * b.size * 1.35 * i;
+    const wy = y + bob - Math.sin(heading) * b.size * 1.35 * i;
     ctx.beginPath();
-    ctx.ellipse(wx, wy, b.size * 0.4 * i, b.size * 0.15 * i, heading, 0, Math.PI * 2);
-    ctx.strokeStyle = rgba(b.color, 0.18 / i);
+    ctx.ellipse(wx, wy, b.size * 0.38 * i, b.size * 0.14 * i, heading, 0, Math.PI * 2);
+    ctx.strokeStyle = rgba(b.color, 0.16 / i);
     ctx.lineWidth = 1.2;
     ctx.stroke();
   }
 
   ctx.save();
   ctx.translate(b.x, y + bob);
-  ctx.rotate(heading * 0.15); // subtle tilt, not a full turn into the flow
+  ctx.rotate(heading * 0.14);
 
-  // reflection
+  // Reflection
   ctx.save();
-  ctx.scale(1, -0.4);
-  ctx.translate(0, -b.size * 0.3);
+  ctx.scale(1, -0.38);
+  ctx.translate(0, -b.size * 0.28);
   ctx.beginPath();
   ctx.moveTo(-b.size, 0);
   ctx.lineTo(b.size, 0);
-  ctx.lineTo(b.size * 0.5, b.size * 0.4);
-  ctx.lineTo(-b.size * 0.5, b.size * 0.4);
+  ctx.lineTo(b.size * 0.5, b.size * 0.38);
+  ctx.lineTo(-b.size * 0.5, b.size * 0.38);
   ctx.closePath();
-  ctx.fillStyle = rgba(b.color, 0.22);
+  ctx.fillStyle = rgba(b.color, 0.2);
   ctx.fill();
   ctx.restore();
 
+  // Hull
   ctx.beginPath();
   ctx.moveTo(-b.size, 0);
   ctx.lineTo(b.size, 0);
-  ctx.lineTo(b.size * 0.5, b.size * 0.4);
-  ctx.lineTo(-b.size * 0.5, b.size * 0.4);
+  ctx.lineTo(b.size * 0.5, b.size * 0.38);
+  ctx.lineTo(-b.size * 0.5, b.size * 0.38);
   ctx.closePath();
   ctx.fillStyle = rgba(b.color, 0.9);
   ctx.fill();
 
-  // fold crease down the hull center
+  // Center crease
   ctx.beginPath();
   ctx.moveTo(0, 0);
-  ctx.lineTo(0, b.size * 0.4);
-  ctx.strokeStyle = rgba(theme.surface, 0.45);
-  ctx.lineWidth = 1.1;
+  ctx.lineTo(0, b.size * 0.38);
+  ctx.strokeStyle = rgba(theme.surface, 0.4);
+  ctx.lineWidth = 1;
   ctx.stroke();
+
+  // Sail
+  ctx.beginPath();
+  ctx.moveTo(0, 0);
+  ctx.lineTo(0, -b.size * 1.05);
+  ctx.lineTo(b.size * 0.52, -b.size * 0.32);
+  ctx.closePath();
+  ctx.fillStyle = rgba(b.color, 0.62);
+  ctx.fill();
 
   ctx.beginPath();
   ctx.moveTo(0, 0);
-  ctx.lineTo(0, -b.size * 1.1);
-  ctx.lineTo(b.size * 0.55, -b.size * 0.35);
-  ctx.closePath();
-  ctx.fillStyle = rgba(b.color, 0.65);
-  ctx.fill();
-  ctx.beginPath();
-  ctx.moveTo(0, 0);
-  ctx.lineTo(0, -b.size * 1.1);
-  ctx.strokeStyle = rgba(theme.surface, 0.35);
-  ctx.lineWidth = 1.1;
+  ctx.lineTo(0, -b.size * 1.05);
+  ctx.strokeStyle = rgba(theme.surface, 0.32);
+  ctx.lineWidth = 1;
   ctx.stroke();
+
   ctx.restore();
 }
-
-let start = performance.now();
 
 function frame(now) {
   const t = ((now - start) / 1000) * speedMul;
 
-  ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
-  ctx.fillStyle = `rgb(${(theme.surfaceBright || [50, 58, 65]).join(',')})`;
+  ctx.setTransform(DPR, 0, 0, DPR, 0, 0);
+
+  // Banks
+  ctx.fillStyle = rgba(theme.surfaceBright || theme.surface, 1);
   ctx.fillRect(0, 0, W, H);
 
-  const riverW = H * 0.5;
+  // River band
+  const riverW = H * 0.48;
+  const steps = 64;
   ctx.beginPath();
-  const steps = 60;
   for (let i = 0; i <= steps; i++) {
     const x = (i / steps) * W;
-    const y = riverCenterY(x, t) - riverW / 2;
+    const y = riverCenterY(x, t) - riverW * 0.5;
     i === 0 ? ctx.moveTo(x, y) : ctx.lineTo(x, y);
   }
   for (let i = steps; i >= 0; i--) {
     const x = (i / steps) * W;
-    const y = riverCenterY(x, t) + riverW / 2;
+    const y = riverCenterY(x, t) + riverW * 0.5;
     ctx.lineTo(x, y);
   }
   ctx.closePath();
+
   const waterGrad = ctx.createLinearGradient(0, 0, 0, H);
-  waterGrad.addColorStop(0, `rgb(${(theme.primaryContainer || [0, 75, 111]).join(',')})`);
-  waterGrad.addColorStop(1, `rgb(${(theme.surface || [12, 20, 27]).join(',')})`);
+  waterGrad.addColorStop(0, rgba(theme.primaryContainer || [0, 75, 111], 1));
+  waterGrad.addColorStop(1, rgba(theme.surface, 1));
   ctx.fillStyle = waterGrad;
   ctx.fill();
 
-  // subtle flow lines
-  ctx.strokeStyle = 'rgba(255,255,255,0.06)';
-  ctx.lineWidth = 1.2;
+  // Flow lines
+  ctx.strokeStyle = "rgba(255,255,255,0.055)";
+  ctx.lineWidth = 1.1;
   for (let lane = -2; lane <= 2; lane++) {
     ctx.beginPath();
     for (let i = 0; i <= steps; i++) {
       const x = (i / steps) * W;
-      const y = riverCenterY(x, t) + lane * riverW * 0.15 + Math.sin(x * 0.03 + t * 2 + lane) * 4;
+      const y = riverCenterY(x, t) + lane * riverW * 0.14 + Math.sin(x * 0.028 + t * 1.8 + lane) * 3.5;
       i === 0 ? ctx.moveTo(x, y) : ctx.lineTo(x, y);
     }
     ctx.stroke();
   }
 
+  // Boats
   for (const b of boats) {
     b.x += b.speed * (1 / 60) * speedMul;
-    if (b.x > W + 60) spawnBoat(b);
+    if (b.x > W + 70) spawnBoat(b);
     const y = riverCenterY(b.x, t) + b.lateral;
     const yAhead = riverCenterY(b.x + 8, t) + b.lateral;
     const heading = Math.atan2(yAhead - y, 8);
@@ -312,35 +320,55 @@ function frame(now) {
   requestAnimationFrame(frame);
 }
 
-let uiVisible = true;
-window.addEventListener('keydown', (e) => {
-  if (e.key.toLowerCase() === 'c') {
-    uiVisible = !uiVisible;
-    uiContainer.classList.toggle('hidden', !uiVisible);
+addEventListener("pointermove", () => {
+  document.body.classList.add("show-cursor");
+  clearTimeout(cursorTimer);
+  cursorTimer = setTimeout(() => document.body.classList.remove("show-cursor"), 2500);
+}, { passive: true });
+
+addEventListener("keydown", e => {
+  if (e.key.toLowerCase() === "c") {
+    clockWrap.classList.toggle("hidden");
   }
 });
 
-hintEl.classList.add('show');
-setTimeout(() => hintEl.classList.remove('show'), 4000);
-
-window.addEventListener('load', () => {
-  loadTheme();
-  initBoats();
-  try {
-    startClock(clockEl, dateEl);
-  } catch (e) {
-    const update = () => {
-      const now = new Date();
-      let hours = now.getHours();
-      const minutes = String(now.getMinutes()).padStart(2, '0');
-      const ampm = hours >= 12 ? 'PM' : 'AM';
-      hours = hours % 12 || 12;
-      clockEl.innerHTML = `${String(hours).padStart(2, '0')}:${minutes}<span class="ampm">${ampm}</span>`;
-      dateEl.textContent = now.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' });
-    };
-    update();
-    setInterval(update, 1000);
+function fallbackClock() {
+  function update() {
+    const n = new Date();
+    let h = n.getHours();
+    const ap = h >= 12 ? "PM" : "AM";
+    h = h % 12 || 12;
+    clockEl.innerHTML =
+      `${String(h).padStart(2,"0")}:${String(n.getMinutes()).padStart(2,"0")}` +
+      `<span class="ampm">${ap}</span>`;
+    dateEl.textContent = n.toLocaleDateString("en-US", {
+      weekday: "short", month: "short", day: "numeric"
+    }).toUpperCase();
   }
+  update();
+  setInterval(update, 1000);
+}
+
+addEventListener("load", () => {
+  loadTheme();
+  resize();
+  initBoats();
+  loadTheme();
+
+  const s = document.createElement("script");
+  s.src = "clock-shared.js";
+  s.onload = () => {
+    try {
+      if (typeof startClock === "function") startClock(clockEl, dateEl);
+      else fallbackClock();
+    } catch { fallbackClock(); }
+  };
+  s.onerror = fallbackClock;
+  document.head.appendChild(s);
+
+  hintEl.classList.add("show");
+  setTimeout(() => hintEl.classList.remove("show"), 4000);
+
   requestAnimationFrame(frame);
 });
 </script>

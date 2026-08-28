@@ -5,197 +5,179 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Material Screensaver — Oscilloscope</title>
 <style>
-  :root {
-    --primary_rgb: 138 206 255;
-    --secondary_rgb: 180 199 233;
-    --tertiary_rgb: 186 196 250;
-    --surface_rgb: 12 20 27;
-    --outline_rgb: 137 146 154;
-  }
-  html, body {
-    margin: 0; padding: 0; width: 100%; height: 100%;
-    overflow: hidden; background: rgb(var(--surface_rgb));
-    font-family: "Google Sans", "Segoe UI", Roboto, system-ui, sans-serif;
-    user-select: none;
-  }
+:root {
+  --primary_rgb: 138 206 255;
+  --secondary_rgb: 180 199 233;
+  --tertiary_rgb: 186 196 250;
+  --surface_rgb: 12 20 27;
+  --outline_rgb: 137 146 154;
+}
+* { margin: 0; padding: 0; box-sizing: border-box; }
+html, body {
+  width: 100%; height: 100%; overflow: hidden;
+  background: rgb(var(--surface_rgb));
+  cursor: none;
+  font-family: "Google Sans", "Segoe UI", system-ui, sans-serif;
+}
+body.show-cursor { cursor: default; }
+canvas { display: block; width: 100vw; height: 100vh; }
 
-  body { cursor: none; }
-  body.show-cursor { cursor: default; }
+#clock-wrap {
+  position: fixed;
+  left: clamp(20px, 2.5vw, 40px);
+  bottom: clamp(16px, 2vw, 28px);
+  padding: 18px 26px 14px;
+  border-radius: 20px;
+  background: radial-gradient(
+    ellipse at 30% 70%,
+    rgb(var(--surface_rgb) / .88) 0%,
+    rgb(var(--surface_rgb) / .55) 55%,
+    transparent 100%
+  );
+  pointer-events: none;
+  transition: opacity .7s ease;
+  z-index: 10;
+}
+#clock-wrap.hidden { opacity: 0; }
 
-  canvas { display: block; width: 100vw; height: 100vh; }
+#clock {
+  font-weight: 200;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: -2px;
+  font-size: clamp(40px, 5.5vw, 78px);
+  color: rgb(var(--primary_rgb));
+  text-shadow:
+    0 0 2px rgb(var(--surface_rgb)),
+    0 0 14px rgb(var(--surface_rgb) / .95),
+    0 0 36px rgb(var(--primary_rgb) / .5),
+    0 2px 14px rgba(0,0,0,.85);
+  line-height: 1;
+}
+#clock .ampm {
+  font-size: .26em;
+  margin-left: 10px;
+  opacity: .78;
+  vertical-align: 22%;
+  letter-spacing: 2px;
+  font-weight: 400;
+}
+#date {
+  margin-top: 8px;
+  font-size: clamp(11px, 1.05vw, 14px);
+  letter-spacing: 4px;
+  text-transform: uppercase;
+  color: rgb(var(--secondary_rgb));
+  text-shadow:
+    0 0 8px rgb(var(--surface_rgb) / .9),
+    0 1px 8px rgba(0,0,0,.7);
+  opacity: .95;
+}
 
-  /* Ambient background depth vignette */
-  body::after {
-    content: '';
-    position: fixed; inset: 0; pointer-events: none; z-index: 5;
-    background: radial-gradient(circle at center, transparent 40%, rgb(var(--surface_rgb) / 0.65) 100%);
-  }
-
-  #ui-container {
-    position: fixed; inset: 0; pointer-events: none; z-index: 10;
-    display: flex; flex-direction: column; justify-content: flex-end;
-    padding: 56px; box-sizing: border-box;
-    transition: opacity 0.5s cubic-bezier(0.16, 1, 0.3, 1), transform 0.5s cubic-bezier(0.16, 1, 0.3, 1);
-  }
-  #ui-container.hidden { opacity: 0; transform: translateY(16px); }
-
-  .vignette-card {
-    background: linear-gradient(135deg, rgb(var(--surface_rgb) / 0.75) 0%, rgb(var(--surface_rgb) / 0.4) 100%);
-    backdrop-filter: blur(20px);
-    -webkit-backdrop-filter: blur(20px);
-    padding: 32px 40px;
-    width: fit-content;
-    border-radius: 28px;
-    border: 1px solid rgb(var(--outline_rgb) / 0.12);
-    box-shadow: 0 24px 60px rgba(0, 0, 0, 0.5), inset 0 1px 0 rgba(255, 255, 255, 0.06);
-  }
-
-  #clock {
-    font-size: clamp(56px, 8vw, 92px);
-    font-weight: 200;
-    font-variant-numeric: tabular-nums;
-    letter-spacing: -3px;
-    line-height: 0.9;
-    text-shadow: 0 4px 24px rgba(0, 0, 0, 0.45);
-  }
-  #clock .ampm {
-    font-size: 0.26em;
-    margin-left: 10px;
-    opacity: 0.7;
-    font-weight: 500;
-    text-transform: uppercase;
-    vertical-align: super;
-    letter-spacing: 2px;
-  }
-  #date {
-    font-size: clamp(13px, 1.4vw, 16px);
-    letter-spacing: 4px;
-    text-transform: uppercase;
-    margin-top: 12px;
-    opacity: 0.85;
-    font-weight: 500;
-  }
-  #hint {
-    position: fixed; right: 40px; bottom: 40px;
-    font-size: 11px; letter-spacing: 2.5px; text-transform: uppercase;
-    opacity: 0; transition: opacity 0.6s ease;
-    padding: 10px 20px;
-    background: rgb(var(--surface_rgb) / 0.5);
-    backdrop-filter: blur(12px);
-    border: 1px solid rgb(var(--outline_rgb) / 0.1);
-    border-radius: 14px;
-    pointer-events: none;
-    z-index: 10;
-  }
-  #hint.show { opacity: 0.65; }
+#hint {
+  position: fixed; right: 28px; bottom: 24px; z-index: 10;
+  font-size: 11px; letter-spacing: 1.5px;
+  color: rgb(var(--outline_rgb) / .55);
+  opacity: 0; transition: opacity 1s ease;
+  text-transform: uppercase;
+  pointer-events: none;
+  text-shadow: 0 1px 8px rgb(var(--surface_rgb));
+}
+#hint.show { opacity: .7; }
 </style>
 <link rel="stylesheet" href="file:///home/sakib/.config/matugen/matugen-colors.css">
 </head>
 <body>
 <canvas id="c"></canvas>
-
-<div id="ui-container">
-  <div class="vignette-card">
-    <div id="clock">00:00</div>
-    <div id="date">Mon, Jan 1</div>
-  </div>
+<div id="clock-wrap">
+  <div id="clock">00:00<span class="ampm">AM</span></div>
+  <div id="date">MON, JAN 1</div>
 </div>
-<div id="hint">Press <b>C</b> to toggle UI</div>
+<div id="hint">C · toggle clock</div>
 
-<script src="clock-shared.js"></script>
 <script>
-const canvas = document.getElementById('c');
-const ctx = canvas.getContext('2d');
-const clockEl = document.getElementById('clock');
-const dateEl = document.getElementById('date');
-const hintEl = document.getElementById('hint');
-const uiContainer = document.getElementById('ui-container');
+"use strict";
 
-let cursorTimeout;
-function triggerCursor() {
-  document.body.classList.add('show-cursor');
-  clearTimeout(cursorTimeout);
-  cursorTimeout = setTimeout(() => {
-    document.body.classList.remove('show-cursor');
-  }, 2500);
-}
-window.addEventListener('pointermove', triggerCursor);
-window.addEventListener('pointerdown', triggerCursor);
+const canvas = document.getElementById("c");
+const ctx = canvas.getContext("2d", { alpha: false, desynchronized: true });
+const clockEl = document.getElementById("clock");
+const dateEl  = document.getElementById("date");
+const hintEl  = document.getElementById("hint");
+const clockWrap = document.getElementById("clock-wrap");
 
-let dpr = Math.min(window.devicePixelRatio || 1, 2);
-let W, H, cx, cy, scale;
-function resize() {
-  W = window.innerWidth;
-  H = window.innerHeight;
-  cx = W / 2;
-  cy = H / 2;
-  scale = Math.min(W, H) * 0.36;
-  canvas.width = W * dpr;
-  canvas.height = H * dpr;
-  ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
-  ctx.fillStyle = `rgb(${theme.surface ? theme.surface.join(',') : '12,20,27'})`;
-  ctx.fillRect(0, 0, W, H);
-}
-window.addEventListener('resize', resize);
-
-const reduceMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
-const speedMul = reduceMotion ? 0.15 : 1;
-
-function readRGB(name, fallback) {
-  const raw = getComputedStyle(document.documentElement).getPropertyValue(name).trim();
-  const parts = raw.split(/\s+/).map(Number);
-  if (parts.length === 3 && parts.every(n => !isNaN(n))) return parts;
-  return fallback;
-}
-function rgba(rgb, a) {
-  const c = rgb || [200, 200, 200];
-  return `rgba(${c[0]}, ${c[1]}, ${c[2]}, ${a})`;
-}
-
+let W = 0, H = 0, DPR = 1, cx = 0, cy = 0, scale = 1;
 let theme = {};
 let curves = [];
+let start = performance.now();
+let cursorTimer;
+
+const reduceMotion = matchMedia("(prefers-reduced-motion: reduce)").matches;
+const speedMul = reduceMotion ? 0.18 : 0.85;
+
+function readRGB(name, fb = [160, 160, 160]) {
+  const r = getComputedStyle(document.documentElement).getPropertyValue(name).trim();
+  const p = r.split(/\s+/).map(Number);
+  return (p.length === 3 && p.every(n => !isNaN(n))) ? p : fb;
+}
+function rgba(c, a = 1) {
+  return `rgba(${c[0]},${c[1]},${c[2]},${a})`;
+}
+
 function loadTheme() {
   theme = {
-    surface: readRGB('--surface_rgb', [12, 20, 27]),
-    primary: readRGB('--primary_rgb', [138, 206, 255]),
-    secondary: readRGB('--secondary_rgb', [180, 199, 233]),
-    tertiary: readRGB('--tertiary_rgb', [186, 196, 250]),
-    outline: readRGB('--outline_rgb', [137, 146, 154]),
+    surface:   readRGB("--surface_rgb", [12, 20, 27]),
+    primary:   readRGB("--primary_rgb", [138, 206, 255]),
+    secondary: readRGB("--secondary_rgb", [180, 199, 233]),
+    tertiary:  readRGB("--tertiary_rgb", [186, 196, 250]),
+    outline:   readRGB("--outline_rgb", [137, 146, 154])
   };
-  clockEl.style.color = rgba(theme.primary, 0.98);
-  dateEl.style.color = rgba(theme.secondary, 0.9);
-  hintEl.style.color = rgba(theme.outline, 0.95);
-  document.body.style.backgroundColor = `rgb(${theme.surface.join(',')})`;
 
   curves = [
-    { freqA: 3, freqB: 2, color: theme.primary, lag: 0 },
+    { freqA: 3, freqB: 2, color: theme.primary,   lag: 0 },
     { freqA: 5, freqB: 4, color: theme.secondary, lag: Math.PI / 3 },
-    { freqA: 2, freqB: 3, color: theme.tertiary, lag: Math.PI / 6 },
+    { freqA: 2, freqB: 3, color: theme.tertiary,  lag: Math.PI / 6 }
   ];
+
+  document.body.style.background = rgba(theme.surface);
+  clockEl.style.color = rgba(theme.primary, 1);
+  dateEl.style.color  = rgba(theme.secondary, 0.95);
+  hintEl.style.color  = rgba(theme.outline, 0.6);
 }
+
+function resize() {
+  W = innerWidth; H = innerHeight;
+  cx = W * 0.5; cy = H * 0.5;
+  scale = Math.min(W, H) * 0.34;
+  DPR = Math.min(devicePixelRatio || 1, 2);
+  canvas.width  = Math.floor(W * DPR);
+  canvas.height = Math.floor(H * DPR);
+  ctx.setTransform(DPR, 0, 0, DPR, 0, 0);
+  ctx.fillStyle = rgba(theme.surface || [12, 20, 27], 1);
+  ctx.fillRect(0, 0, W, H);
+}
+addEventListener("resize", resize, { passive: true });
 
 function freqDrift(base, t, speed) {
-  return base + Math.sin(t * speed) * 0.4;
+  return base + Math.sin(t * speed) * 0.35;
 }
-
-let start = performance.now();
 
 function frame(now) {
   const t = ((now - start) / 1000) * speedMul;
 
-  ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
-  ctx.globalCompositeOperation = 'source-over';
-  ctx.fillStyle = rgba(theme.surface || [12, 20, 27], 0.22);
+  ctx.setTransform(DPR, 0, 0, DPR, 0, 0);
+  ctx.globalCompositeOperation = "source-over";
+  ctx.fillStyle = rgba(theme.surface, 0.18);
   ctx.fillRect(0, 0, W, H);
 
-  ctx.globalCompositeOperation = 'lighter';
-  for (const curve of curves) {
-    const a = freqDrift(curve.freqA, t, 0.03);
-    const b = freqDrift(curve.freqB, t, 0.021);
-    const phaseShift = t * 0.25 + curve.lag;
+  ctx.globalCompositeOperation = "lighter";
+  ctx.lineCap = "round";
+  ctx.lineJoin = "round";
 
-    // Generate curve points once
-    const steps = 400;
+  for (const curve of curves) {
+    const a = freqDrift(curve.freqA, t, 0.028);
+    const b = freqDrift(curve.freqB, t, 0.02);
+    const phaseShift = t * 0.22 + curve.lag;
+
+    const steps = 360;
     const points = [];
     for (let i = 0; i <= steps; i++) {
       const u = (i / steps) * Math.PI * 2;
@@ -205,54 +187,76 @@ function frame(now) {
       });
     }
 
-    // Pass 1: Wide atmospheric glow
+    // Soft glow pass
     ctx.beginPath();
-    points.forEach((p, i) => i === 0 ? ctx.moveTo(p.x, p.y) : ctx.lineTo(p.x, p.y));
-    ctx.strokeStyle = rgba(curve.color, 0.12);
-    ctx.lineWidth = 4.5;
+    for (let i = 0; i < points.length; i++) {
+      i === 0 ? ctx.moveTo(points[i].x, points[i].y) : ctx.lineTo(points[i].x, points[i].y);
+    }
+    ctx.strokeStyle = rgba(curve.color, 0.14);
+    ctx.lineWidth = 5;
     ctx.stroke();
 
-    // Pass 2: Crisp core line
+    // Core line
     ctx.beginPath();
-    points.forEach((p, i) => i === 0 ? ctx.moveTo(p.x, p.y) : ctx.lineTo(p.x, p.y));
-    ctx.strokeStyle = rgba(curve.color, 0.45);
-    ctx.lineWidth = 1.2;
+    for (let i = 0; i < points.length; i++) {
+      i === 0 ? ctx.moveTo(points[i].x, points[i].y) : ctx.lineTo(points[i].x, points[i].y);
+    }
+    ctx.strokeStyle = rgba(curve.color, 0.55);
+    ctx.lineWidth = 1.35;
     ctx.stroke();
   }
-  ctx.globalCompositeOperation = 'source-over';
 
+  ctx.globalCompositeOperation = "source-over";
   requestAnimationFrame(frame);
 }
 
-let uiVisible = true;
-window.addEventListener('keydown', (e) => {
-  if (e.key.toLowerCase() === 'c') {
-    uiVisible = !uiVisible;
-    uiContainer.classList.toggle('hidden', !uiVisible);
+addEventListener("pointermove", () => {
+  document.body.classList.add("show-cursor");
+  clearTimeout(cursorTimer);
+  cursorTimer = setTimeout(() => document.body.classList.remove("show-cursor"), 2500);
+}, { passive: true });
+
+addEventListener("keydown", e => {
+  if (e.key.toLowerCase() === "c") {
+    clockWrap.classList.toggle("hidden");
   }
 });
 
-hintEl.classList.add('show');
-setTimeout(() => hintEl.classList.remove('show'), 4000);
+function fallbackClock() {
+  function update() {
+    const n = new Date();
+    let h = n.getHours();
+    const ap = h >= 12 ? "PM" : "AM";
+    h = h % 12 || 12;
+    clockEl.innerHTML =
+      `${String(h).padStart(2,"0")}:${String(n.getMinutes()).padStart(2,"0")}` +
+      `<span class="ampm">${ap}</span>`;
+    dateEl.textContent = n.toLocaleDateString("en-US", {
+      weekday: "short", month: "short", day: "numeric"
+    }).toUpperCase();
+  }
+  update();
+  setInterval(update, 1000);
+}
 
-window.addEventListener('load', () => {
+addEventListener("load", () => {
   loadTheme();
   resize();
-  try {
-    startClock(clockEl, dateEl);
-  } catch (e) {
-    const update = () => {
-      const now = new Date();
-      let hours = now.getHours();
-      const minutes = String(now.getMinutes()).padStart(2, '0');
-      const ampm = hours >= 12 ? 'PM' : 'AM';
-      hours = hours % 12 || 12;
-      clockEl.innerHTML = `${String(hours).padStart(2, '0')}:${minutes}<span class="ampm">${ampm}</span>`;
-      dateEl.textContent = now.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' });
-    };
-    update();
-    setInterval(update, 1000);
-  }
+
+  const s = document.createElement("script");
+  s.src = "clock-shared.js";
+  s.onload = () => {
+    try {
+      if (typeof startClock === "function") startClock(clockEl, dateEl);
+      else fallbackClock();
+    } catch { fallbackClock(); }
+  };
+  s.onerror = fallbackClock;
+  document.head.appendChild(s);
+
+  hintEl.classList.add("show");
+  setTimeout(() => hintEl.classList.remove("show"), 4000);
+
   requestAnimationFrame(frame);
 });
 </script>

@@ -2,245 +2,494 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Material Screensaver — City</title>
 <style>
-  :root {
-    --primary_rgb: 138 206 255;
-    --secondary_rgb: 180 199 233;
-    --tertiary_rgb: 186 196 250;
-    --surface_rgb: 12 20 27;
-    --surface_container_lowest_rgb: 7 15 21;
-    --on_surface_variant_rgb: 191 199 209;
-    --outline_rgb: 137 146 154;
-  }
-  html, body {
-    margin: 0; padding: 0; width: 100%; height: 100%;
-    overflow: hidden; background: rgb(var(--surface_rgb)); cursor: none;
-  }
-  body.show-cursor { cursor: default; }
-  canvas { display: block; width: 100vw; height: 100vh; }
-  #clock {
-    position: fixed; left: 32px; bottom: 28px;
-    font-family: "Google Sans", "Segoe UI", Roboto, system-ui, sans-serif;
-    font-weight: 400; font-variant-numeric: tabular-nums; letter-spacing: 0.5px;
-    font-size: clamp(28px, 4vw, 56px);
-    text-shadow: 0 0 24px rgba(0,0,0,0.5);
-    pointer-events: none; transition: opacity 0.6s ease;
-  }
-  #clock .ampm {
-    font-size: 0.36em;
-    margin-left: 6px;
-    opacity: 0.82;
-    vertical-align: middle;
-  }
-  #date {
-    position: fixed; left: 34px; bottom: 14px;
-    font-family: "Google Sans", "Segoe UI", Roboto, system-ui, sans-serif;
-    font-size: clamp(12px, 1.2vw, 16px); letter-spacing: 1.5px; text-transform: uppercase;
-    pointer-events: none; transition: opacity 0.6s ease;
-  }
-  #hint {
-    position: fixed; right: 28px; bottom: 26px;
-    font-family: "Google Sans", "Segoe UI", Roboto, system-ui, sans-serif;
-    font-size: 13px; letter-spacing: 0.5px;
-    pointer-events: none; opacity: 0; transition: opacity 0.8s ease;
-  }
-  #hint.show { opacity: 1; }
-  #clock.hidden, #date.hidden { opacity: 0; }
+:root {
+  --primary_rgb: 138 206 255;
+  --secondary_rgb: 180 199 233;
+  --tertiary_rgb: 186 196 250;
+  --secondary_container_rgb: 53 72 99;
+  --tertiary_container_rgb: 58 68 114;
+  --surface_rgb: 12 20 27;
+  --surface_container_lowest_rgb: 7 15 21;
+  --outline_rgb: 137 146 154;
+}
+* { margin: 0; padding: 0; box-sizing: border-box; }
+html, body {
+  width: 100%; height: 100%; overflow: hidden;
+  background: rgb(var(--surface_rgb));
+  cursor: none;
+  font-family: "Google Sans", "Segoe UI", system-ui, sans-serif;
+}
+body.show-cursor { cursor: default; }
+canvas { display: block; width: 100vw; height: 100vh; }
+
+#clock {
+  position: fixed;
+  left: clamp(28px, 3vw, 48px);
+  bottom: clamp(40px, 4.5vw, 56px);
+  font-weight: 200;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: -2px;
+  font-size: clamp(40px, 5.5vw, 78px);
+  color: rgb(var(--primary_rgb));
+  text-shadow:
+    0 0 40px rgb(var(--primary_rgb) / .4),
+    0 2px 16px rgba(0,0,0,.65);
+  pointer-events: none;
+  transition: opacity .7s ease;
+}
+#clock .ampm {
+  font-size: .26em;
+  margin-left: 10px;
+  opacity: .7;
+  vertical-align: 22%;
+  letter-spacing: 2px;
+  font-weight: 400;
+}
+#date {
+  position: fixed;
+  left: clamp(30px, 3.1vw, 50px);
+  bottom: clamp(18px, 2.2vw, 28px);
+  font-size: clamp(11px, 1.05vw, 14px);
+  letter-spacing: 4px;
+  text-transform: uppercase;
+  color: rgb(var(--secondary_rgb) / .88);
+  text-shadow: 0 1px 12px rgba(0,0,0,.55);
+  pointer-events: none;
+  transition: opacity .7s ease;
+}
+#clock.hidden, #date.hidden { opacity: 0; }
+
+#hint {
+  position: fixed; right: 28px; bottom: 24px;
+  font-size: 11px; letter-spacing: 1.5px;
+  color: rgb(var(--outline_rgb) / .55);
+  opacity: 0; transition: opacity 1s ease;
+  text-transform: uppercase;
+  pointer-events: none;
+}
+#hint.show { opacity: .7; }
 </style>
 <link rel="stylesheet" href="file:///home/sakib/.config/matugen/matugen-colors.css">
 </head>
 <body>
 <canvas id="c"></canvas>
-<div id="clock">00:00</div>
-<div id="date">Mon, Jan 1</div>
-<div id="hint">press C to toggle clock</div>
+<div id="clock">00:00<span class="ampm">AM</span></div>
+<div id="date">MON, JAN 1</div>
+<div id="hint">C · toggle clock</div>
 
-<script src="clock-shared.js"></script>
 <script>
-const canvas = document.getElementById('c');
-const ctx = canvas.getContext('2d');
-const clockEl = document.getElementById('clock');
-const dateEl = document.getElementById('date');
-const hintEl = document.getElementById('hint');
+"use strict";
 
-let cursorTimeout;
-window.addEventListener('pointermove', () => {
-  document.body.classList.add('show-cursor');
-  clearTimeout(cursorTimeout);
-  cursorTimeout = setTimeout(() => {
-    document.body.classList.remove('show-cursor');
-  }, 2500);
-});
+const canvas = document.getElementById("c");
+const ctx = canvas.getContext("2d", { alpha: false, desynchronized: true });
+const clockEl = document.getElementById("clock");
+const dateEl  = document.getElementById("date");
+const hintEl  = document.getElementById("hint");
 
-let dpr = Math.min(window.devicePixelRatio || 1, 2);
-let W, H;
+let W = 0, H = 0, DPR = 1;
+let theme = {};
+let windowColors = [];
+let buildingPalette = [];
+let buildings = [];
+let stars = [];
+let start = performance.now();
+let cursorTimer;
+
+const reduceMotion = matchMedia("(prefers-reduced-motion: reduce)").matches;
+const speedMul = reduceMotion ? 0.35 : 0.95;
+
+/* Funny room types for feature windows */
+const ROOM_TYPES = [
+  "empty", "tv", "cat", "plant", "desk", "lamp",
+  "fish", "pizza", "alien", "dance", "moon", "books"
+];
+
+function readRGB(name, fb = [160, 160, 160]) {
+  const r = getComputedStyle(document.documentElement).getPropertyValue(name).trim();
+  const p = r.split(/\s+/).map(Number);
+  return (p.length === 3 && p.every(n => !isNaN(n))) ? p : fb;
+}
+function rgba(c, a = 1) {
+  return `rgba(${c[0]},${c[1]},${c[2]},${a})`;
+}
+function blend(a, b, t) {
+  return [
+    Math.round(a[0] + (b[0] - a[0]) * t),
+    Math.round(a[1] + (b[1] - a[1]) * t),
+    Math.round(a[2] + (b[2] - a[2]) * t)
+  ];
+}
+function darkenForNight(c, amount = 0.72) {
+  const low = theme.surfaceLow || [7, 15, 21];
+  return blend(c, low, amount);
+}
+
+function loadTheme() {
+  theme = {
+    surface:            readRGB("--surface_rgb", [12, 20, 27]),
+    surfaceLow:         readRGB("--surface_container_lowest_rgb", [7, 15, 21]),
+    primary:            readRGB("--primary_rgb", [138, 206, 255]),
+    secondary:          readRGB("--secondary_rgb", [180, 199, 233]),
+    tertiary:           readRGB("--tertiary_rgb", [186, 196, 250]),
+    secondaryContainer: readRGB("--secondary_container_rgb", [53, 72, 99]),
+    tertiaryContainer:  readRGB("--tertiary_container_rgb", [58, 68, 114]),
+    outline:            readRGB("--outline_rgb", [137, 146, 154])
+  };
+
+  windowColors = [theme.primary, theme.secondary, theme.tertiary];
+
+  buildingPalette = [
+    darkenForNight(theme.surface, 0.55),
+    darkenForNight(theme.surfaceLow, 0.35),
+    darkenForNight(blend(theme.surface, theme.secondaryContainer, 0.35), 0.6),
+    darkenForNight(blend(theme.surface, theme.tertiaryContainer, 0.3), 0.6),
+    darkenForNight(blend(theme.surfaceLow, theme.secondaryContainer, 0.25), 0.45)
+  ];
+
+  document.body.style.background = rgba(theme.surface);
+  clockEl.style.color = rgba(theme.primary, 0.97);
+  dateEl.style.color  = rgba(theme.secondary, 0.88);
+  hintEl.style.color  = rgba(theme.outline, 0.6);
+
+  for (const b of buildings) {
+    b.color = buildingPalette[Math.floor(Math.random() * buildingPalette.length)];
+  }
+}
+
 function resize() {
-  W = window.innerWidth;
-  H = window.innerHeight;
-  canvas.width = W * dpr;
-  canvas.height = H * dpr;
-  ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+  W = innerWidth; H = innerHeight;
+  DPR = Math.min(devicePixelRatio || 1, 2);
+  canvas.width  = Math.floor(W * DPR);
+  canvas.height = Math.floor(H * DPR);
+  ctx.setTransform(DPR, 0, 0, DPR, 0, 0);
   makeBuildings();
   makeStars();
 }
-window.addEventListener('resize', resize);
+addEventListener("resize", resize, { passive: true });
 
-const reduceMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
-const speedMul = reduceMotion ? 0.3 : 1;
-
-function readRGB(name, fallback) {
-  const raw = getComputedStyle(document.documentElement).getPropertyValue(name).trim();
-  const parts = raw.split(/\s+/).map(Number);
-  if (parts.length === 3 && parts.every(n => !isNaN(n))) return parts;
-  return fallback;
-}
-function rgba(rgb, a) { return `rgba(${rgb[0]}, ${rgb[1]}, ${rgb[2]}, ${a})`; }
-
-let theme = {};
-let windowColors = [];
-
-async function loadMatugenColors() {
-  try {
-    const res = await fetch('file:///home/sakib/.config/matugen/matugen-colors.css');
-    if (res.ok) {
-      const cssText = await res.text();
-      const styleTag = document.createElement('style');
-      styleTag.textContent = cssText;
-      document.head.appendChild(styleTag);
-    }
-  } catch (e) {}
-  applyTheme();
-}
-
-function applyTheme() {
-  theme = {
-    surface: readRGB('--surface_rgb', [12, 20, 27]),
-    surfaceLow: readRGB('--surface_container_lowest_rgb', [7, 15, 21]),
-    primary: readRGB('--primary_rgb', [138, 206, 255]),
-    secondary: readRGB('--secondary_rgb', [180, 199, 233]),
-    tertiary: readRGB('--tertiary_rgb', [186, 196, 250]),
-    outline: readRGB('--outline_rgb', [137, 146, 154]),
-  };
-  windowColors = [theme.primary, theme.secondary, theme.tertiary];
-  clockEl.style.color = rgba(theme.primary, 0.92);
-  dateEl.style.color = rgba(theme.secondary, 0.85);
-  hintEl.style.color = rgba(theme.outline, 0.9);
-  document.body.style.backgroundColor = `rgb(${theme.surface.join(',')})`;
-}
-
-let buildings = [];
 function makeBuildings() {
   buildings = [];
-  let x = 0;
-  while (x < W * 1.05) {
-    const width = 40 + Math.random() * 80;
-    const isSkyscraper = Math.random() < 0.16;
-    const heightFrac = isSkyscraper ? 0.72 + Math.random() * 0.22 : 0.2 + Math.random() * 0.42;
-    const winW = 6, winH = 9, gapX = 5, gapY = 10;
-    const cols = Math.max(1, Math.floor((width - 10) / (winW + gapX)));
+  let x = -12;
+  while (x < W * 1.1) {
+    const width = 42 + Math.random() * 90;
+    const isTall = Math.random() < 0.14;
+    const heightFrac = isTall ? 0.66 + Math.random() * 0.28 : 0.18 + Math.random() * 0.4;
     const height = H * heightFrac;
-    const rows = Math.max(1, Math.floor((height - 20) / (winH + gapY)));
+
+    // Slightly larger windows so room details read
+    const winW = 7, winH = 10, gapX = 5, gapY = 8;
+    const cols = Math.max(1, Math.floor((width - 12) / (winW + gapX)));
+    const rows = Math.max(1, Math.floor((height - 18) / (winH + gapY)));
+
     const windows = [];
     for (let r = 0; r < rows; r++) {
       for (let c = 0; c < cols; c++) {
+        const isFeature = Math.random() < 0.14; // ~14% funny rooms
         windows.push({
-          x: c * (winW + gapX) + 8,
-          y: r * (winH + gapY) + 12,
+          x: c * (winW + gapX) + 6,
+          y: r * (winH + gapY) + 10,
           on: Math.random() < 0.4,
-          nextToggle: Math.random() * 20,
-          colorIdx: Math.floor(Math.random() * windowColors.length),
+          nextToggle: Math.random() * 16,
+          colorIdx: Math.floor(Math.random() * 3),
+          room: isFeature
+            ? ROOM_TYPES[1 + Math.floor(Math.random() * (ROOM_TYPES.length - 1))]
+            : "empty",
+          phase: Math.random() * Math.PI * 2
         });
       }
     }
+
     const roofRoll = Math.random();
-    const roofStyle = roofRoll < 0.4 ? 'flat' : roofRoll < 0.62 ? 'antenna' : roofRoll < 0.84 ? 'setback' : 'point';
-    const tint = 4 + Math.random() * 10;
-    buildings.push({ x, width, height, windows, winW, winH, roofStyle, tint });
-    x += width + 2 + Math.random() * 4;
+    const roofStyle =
+      roofRoll < 0.36 ? "flat" :
+      roofRoll < 0.56 ? "antenna" :
+      roofRoll < 0.78 ? "setback" : "point";
+
+    const color = buildingPalette.length
+      ? buildingPalette[Math.floor(Math.random() * buildingPalette.length)]
+      : [10, 14, 20];
+
+    buildings.push({
+      x, width, height, windows,
+      winW, winH, roofStyle, color
+    });
+    x += width + 1 + Math.random() * 5;
   }
 }
 
 function drawRoof(b, baseY) {
+  const roof = blend(b.color, theme.surfaceLow || [7, 15, 21], 0.35);
+  ctx.fillStyle = rgba(roof, 1);
   const cx = b.x + b.width / 2;
-  ctx.fillStyle = `rgb(${8 + b.tint},${10 + b.tint},${14 + b.tint})`;
-  if (b.roofStyle === 'antenna') {
-    ctx.fillRect(cx - 1.5, baseY - 22, 3, 22);
+
+  if (b.roofStyle === "antenna") {
+    ctx.fillRect(cx - 1.3, baseY - 18, 2.6, 18);
     ctx.beginPath();
-    ctx.arc(cx, baseY - 22, 2.5, 0, Math.PI * 2);
-    ctx.fillStyle = 'rgba(255,80,80,0.85)';
+    ctx.arc(cx, baseY - 18, 2.2, 0, Math.PI * 2);
+    ctx.fillStyle = rgba(theme.primary, 0.85);
     ctx.fill();
-  } else if (b.roofStyle === 'setback') {
-    const tierW = b.width * 0.55;
-    ctx.fillRect(b.x + (b.width - tierW) / 2, baseY - 20, tierW, 20);
-  } else if (b.roofStyle === 'point') {
+  } else if (b.roofStyle === "setback") {
+    const tierW = b.width * 0.5;
+    ctx.fillRect(b.x + (b.width - tierW) / 2, baseY - 16, tierW, 16);
+  } else if (b.roofStyle === "point") {
     ctx.beginPath();
     ctx.moveTo(b.x, baseY);
-    ctx.lineTo(cx, baseY - 26);
+    ctx.lineTo(cx, baseY - 22);
     ctx.lineTo(b.x + b.width, baseY);
     ctx.closePath();
     ctx.fill();
   }
 }
 
-let stars = [];
-function makeStars() {
-  stars = [];
-  const count = Math.floor((W * H * 0.5) / 9000);
-  for (let i = 0; i < count; i++) {
-    stars.push({ x: Math.random() * W, y: Math.random() * H * 0.55, r: 0.4 + Math.random() * 1.1, phase: Math.random() * Math.PI * 2 });
+/** Mini room doodles inside a lit window */
+function drawRoom(wx, wy, ww, wh, room, col, t, phase) {
+  const ink = blend(col, [20, 20, 30], 0.55);
+  ctx.fillStyle = rgba(ink, 0.85);
+  ctx.strokeStyle = rgba(ink, 0.9);
+  ctx.lineWidth = 1;
+
+  switch (room) {
+    case "tv": {
+      // TV set + screen flicker
+      const tw = ww * 0.7, th = wh * 0.45;
+      const tx = wx + (ww - tw) / 2, ty = wy + wh * 0.2;
+      ctx.strokeRect(tx, ty, tw, th);
+      const flick = 0.4 + 0.6 * Math.abs(Math.sin(t * 3 + phase));
+      ctx.fillStyle = rgba(col, 0.35 * flick);
+      ctx.fillRect(tx + 1, ty + 1, tw - 2, th - 2);
+      // stand
+      ctx.fillStyle = rgba(ink, 0.85);
+      ctx.fillRect(wx + ww * 0.4, ty + th, ww * 0.2, 2);
+      break;
+    }
+    case "cat": {
+      // sitting cat silhouette
+      const cx = wx + ww * 0.5, cy = wy + wh * 0.7;
+      ctx.beginPath();
+      ctx.arc(cx, cy, Math.min(ww, wh) * 0.28, 0, Math.PI * 2);
+      ctx.fill();
+      // head
+      ctx.beginPath();
+      ctx.arc(cx, cy - wh * 0.28, Math.min(ww, wh) * 0.18, 0, Math.PI * 2);
+      ctx.fill();
+      // ears
+      ctx.beginPath();
+      ctx.moveTo(cx - 3, cy - wh * 0.35);
+      ctx.lineTo(cx - 5, cy - wh * 0.5);
+      ctx.lineTo(cx - 1, cy - wh * 0.38);
+      ctx.moveTo(cx + 3, cy - wh * 0.35);
+      ctx.lineTo(cx + 5, cy - wh * 0.5);
+      ctx.lineTo(cx + 1, cy - wh * 0.38);
+      ctx.fill();
+      break;
+    }
+    case "plant": {
+      // pot + leaves
+      const px = wx + ww * 0.5;
+      ctx.fillRect(px - 2, wy + wh * 0.65, 4, wh * 0.25);
+      ctx.beginPath();
+      ctx.ellipse(px, wy + wh * 0.45, ww * 0.28, wh * 0.28, 0, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.beginPath();
+      ctx.ellipse(px - 3, wy + wh * 0.35, 2.5, 4, -0.4, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.beginPath();
+      ctx.ellipse(px + 3, wy + wh * 0.35, 2.5, 4, 0.4, 0, Math.PI * 2);
+      ctx.fill();
+      break;
+    }
+    case "desk": {
+      // monitor + person blob
+      ctx.fillRect(wx + 1, wy + wh * 0.35, ww - 2, 1.5); // desk
+      ctx.strokeRect(wx + ww * 0.25, wy + wh * 0.12, ww * 0.5, wh * 0.22);
+      // head
+      ctx.beginPath();
+      ctx.arc(wx + ww * 0.5, wy + wh * 0.55, 2, 0, Math.PI * 2);
+      ctx.fill();
+      // body
+      ctx.fillRect(wx + ww * 0.35, wy + wh * 0.6, ww * 0.3, wh * 0.25);
+      break;
+    }
+    case "lamp": {
+      // desk lamp arc + glow
+      ctx.beginPath();
+      ctx.moveTo(wx + ww * 0.2, wy + wh * 0.85);
+      ctx.quadraticCurveTo(wx + ww * 0.2, wy + wh * 0.2, wx + ww * 0.7, wy + wh * 0.3);
+      ctx.stroke();
+      ctx.beginPath();
+      ctx.arc(wx + ww * 0.7, wy + wh * 0.3, 2.5, 0, Math.PI * 2);
+      ctx.fillStyle = rgba(col, 0.9);
+      ctx.fill();
+      break;
+    }
+    case "fish": {
+      // bowl + fish
+      ctx.beginPath();
+      ctx.arc(wx + ww * 0.5, wy + wh * 0.55, Math.min(ww, wh) * 0.32, 0, Math.PI * 2);
+      ctx.stroke();
+      const fx = wx + ww * 0.5 + Math.sin(t * 1.5 + phase) * 2;
+      ctx.beginPath();
+      ctx.ellipse(fx, wy + wh * 0.55, 2.5, 1.5, 0, 0, Math.PI * 2);
+      ctx.fill();
+      break;
+    }
+    case "pizza": {
+      // pizza slice
+      ctx.beginPath();
+      ctx.moveTo(wx + ww * 0.5, wy + wh * 0.2);
+      ctx.lineTo(wx + ww * 0.15, wy + wh * 0.85);
+      ctx.lineTo(wx + ww * 0.85, wy + wh * 0.85);
+      ctx.closePath();
+      ctx.fill();
+      // pepperoni dots
+      ctx.fillStyle = rgba(blend(col, [180, 40, 40], 0.5), 0.9);
+      ctx.beginPath();
+      ctx.arc(wx + ww * 0.45, wy + wh * 0.5, 1.2, 0, Math.PI * 2);
+      ctx.arc(wx + ww * 0.6, wy + wh * 0.65, 1.2, 0, Math.PI * 2);
+      ctx.fill();
+      break;
+    }
+    case "alien": {
+      // classic alien head
+      const ax = wx + ww * 0.5, ay = wy + wh * 0.45;
+      ctx.beginPath();
+      ctx.ellipse(ax, ay, ww * 0.28, wh * 0.32, 0, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.fillStyle = rgba(theme.surface || [12, 20, 27], 0.9);
+      ctx.beginPath();
+      ctx.ellipse(ax - 2, ay, 1.8, 2.5, -0.3, 0, Math.PI * 2);
+      ctx.ellipse(ax + 2, ay, 1.8, 2.5, 0.3, 0, Math.PI * 2);
+      ctx.fill();
+      break;
+    }
+    case "dance": {
+      // stick figure with moving arms
+      const dx = wx + ww * 0.5;
+      const arm = Math.sin(t * 4 + phase) * 3;
+      ctx.beginPath();
+      ctx.arc(dx, wy + wh * 0.3, 1.8, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.beginPath();
+      ctx.moveTo(dx, wy + wh * 0.35);
+      ctx.lineTo(dx, wy + wh * 0.65);
+      ctx.moveTo(dx, wy + wh * 0.45);
+      ctx.lineTo(dx - 3, wy + wh * 0.45 + arm);
+      ctx.moveTo(dx, wy + wh * 0.45);
+      ctx.lineTo(dx + 3, wy + wh * 0.45 - arm);
+      ctx.moveTo(dx, wy + wh * 0.65);
+      ctx.lineTo(dx - 2.5, wy + wh * 0.85);
+      ctx.moveTo(dx, wy + wh * 0.65);
+      ctx.lineTo(dx + 2.5, wy + wh * 0.85);
+      ctx.stroke();
+      break;
+    }
+    case "moon": {
+      // poster circle moon
+      ctx.beginPath();
+      ctx.arc(wx + ww * 0.5, wy + wh * 0.45, Math.min(ww, wh) * 0.28, 0, Math.PI * 2);
+      ctx.fillStyle = rgba(col, 0.5);
+      ctx.fill();
+      ctx.beginPath();
+      ctx.arc(wx + ww * 0.58, wy + wh * 0.4, Math.min(ww, wh) * 0.2, 0, Math.PI * 2);
+      ctx.fillStyle = rgba(theme.surface || [12, 20, 27], 0.5);
+      ctx.fill();
+      break;
+    }
+    case "books": {
+      // bookshelf lines
+      for (let i = 0; i < 3; i++) {
+        const bx = wx + 1.5 + i * (ww / 3);
+        ctx.fillRect(bx, wy + wh * 0.25, ww * 0.22, wh * 0.55);
+      }
+      break;
+    }
+    default:
+      break;
   }
 }
 
-let start = performance.now();
+function makeStars() {
+  stars = [];
+  const count = Math.min(170, Math.floor((W * H * 0.42) / 9000));
+  for (let i = 0; i < count; i++) {
+    const roll = Math.random();
+    let color;
+    if (roll < 0.58)      color = [255, 255, 255];
+    else if (roll < 0.8)  color = theme.primary || [200, 220, 255];
+    else                  color = theme.secondary || [200, 210, 240];
+
+    stars.push({
+      x: Math.random() * W,
+      y: Math.random() * H * 0.5,
+      r: 0.35 + Math.random() * 1.1,
+      phase: Math.random() * Math.PI * 2,
+      twinkle: 0.3 + Math.random() * 0.6,
+      color
+    });
+  }
+}
 
 function frame(now) {
   const t = ((now - start) / 1000) * speedMul;
 
-  ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+  ctx.setTransform(DPR, 0, 0, DPR, 0, 0);
+
   const sky = ctx.createLinearGradient(0, 0, 0, H);
-  const surfLow = theme.surfaceLow || [7, 15, 21];
+  const low = theme.surfaceLow || [7, 15, 21];
   const surf = theme.surface || [12, 20, 27];
-  sky.addColorStop(0, `rgb(${surfLow.join(',')})`);
-  sky.addColorStop(1, `rgb(${surf.join(',')})`);
+  sky.addColorStop(0, rgba(low, 1));
+  sky.addColorStop(0.55, rgba(surf, 1));
+  sky.addColorStop(1, rgba(surf, 1));
   ctx.fillStyle = sky;
   ctx.fillRect(0, 0, W, H);
 
   for (const s of stars) {
-    const tw = 0.35 + 0.65 * Math.abs(Math.sin(t * 0.4 + s.phase));
+    const tw = 0.28 + 0.72 * Math.abs(Math.sin(t * s.twinkle + s.phase));
     ctx.beginPath();
     ctx.arc(s.x, s.y, s.r, 0, Math.PI * 2);
-    ctx.fillStyle = `rgba(255,255,255,${tw * 0.7})`;
+    ctx.fillStyle = rgba(s.color, tw * 0.7);
     ctx.fill();
   }
 
-  // moon
+  const mx = W * 0.8, my = H * 0.14, mr = 24;
+  const moonGlow = ctx.createRadialGradient(mx, my, 0, mx, my, mr * 2.4);
+  moonGlow.addColorStop(0, "rgba(255,250,235,0.5)");
+  moonGlow.addColorStop(1, "transparent");
+  ctx.fillStyle = moonGlow;
   ctx.beginPath();
-  ctx.arc(W * 0.82, H * 0.16, 30, 0, Math.PI * 2);
-  const moonGrad = ctx.createRadialGradient(W * 0.82, H * 0.16, 0, W * 0.82, H * 0.16, 55);
-  moonGrad.addColorStop(0, 'rgba(255,250,235,0.9)');
-  moonGrad.addColorStop(1, 'rgba(255,250,235,0)');
-  ctx.fillStyle = moonGrad;
+  ctx.arc(mx, my, mr * 2.4, 0, Math.PI * 2);
   ctx.fill();
   ctx.beginPath();
-  ctx.arc(W * 0.82, H * 0.16, 22, 0, Math.PI * 2);
-  ctx.fillStyle = 'rgb(255,250,235)';
+  ctx.arc(mx, my, mr, 0, Math.PI * 2);
+  ctx.fillStyle = "rgb(255,250,235)";
   ctx.fill();
 
   for (const b of buildings) {
     const baseY = H - b.height;
-    ctx.fillStyle = `rgb(${8 + b.tint},${10 + b.tint},${14 + b.tint})`;
+    ctx.fillStyle = rgba(b.color, 1);
     ctx.fillRect(b.x, baseY, b.width, b.height);
     drawRoof(b, baseY);
 
     for (const w of b.windows) {
       if (t >= w.nextToggle) {
-        w.on = Math.random() < 0.55;
-        w.nextToggle = t + (4 + Math.random() * 20) * speedMul;
+        // Feature rooms stay on more often
+        w.on = w.room !== "empty" ? Math.random() < 0.75 : Math.random() < 0.48;
+        w.nextToggle = t + (3.5 + Math.random() * 16) * (reduceMotion ? 1.3 : 1);
       }
-      if (w.on) {
-        ctx.fillStyle = rgba(windowColors[w.colorIdx], 0.85);
-        ctx.fillRect(b.x + w.x, baseY + w.y, b.winW, b.winH);
+      if (!w.on) continue;
+
+      const col = windowColors[w.colorIdx] || theme.primary;
+      const wx = b.x + w.x;
+      const wy = baseY + w.y;
+
+      ctx.fillStyle = rgba(col, 0.78);
+      ctx.fillRect(wx, wy, b.winW, b.winH);
+
+      if (w.room !== "empty") {
+        drawRoom(wx, wy, b.winW, b.winH, w.room, col, t, w.phase);
       }
     }
   }
@@ -248,22 +497,54 @@ function frame(now) {
   requestAnimationFrame(frame);
 }
 
-let clockVisible = true;
-window.addEventListener('keydown', (e) => {
-  if (e.key.toLowerCase() === 'c') {
-    clockVisible = !clockVisible;
-    clockEl.classList.toggle('hidden', !clockVisible);
-    dateEl.classList.toggle('hidden', !clockVisible);
+addEventListener("pointermove", () => {
+  document.body.classList.add("show-cursor");
+  clearTimeout(cursorTimer);
+  cursorTimer = setTimeout(() => document.body.classList.remove("show-cursor"), 2500);
+}, { passive: true });
+
+addEventListener("keydown", e => {
+  if (e.key.toLowerCase() === "c") {
+    clockEl.classList.toggle("hidden");
+    dateEl.classList.toggle("hidden");
   }
 });
 
-hintEl.classList.add('show');
-setTimeout(() => hintEl.classList.remove('show'), 4000);
+function fallbackClock() {
+  function update() {
+    const n = new Date();
+    let h = n.getHours();
+    const ap = h >= 12 ? "PM" : "AM";
+    h = h % 12 || 12;
+    clockEl.innerHTML =
+      `${String(h).padStart(2,"0")}:${String(n.getMinutes()).padStart(2,"0")}` +
+      `<span class="ampm">${ap}</span>`;
+    dateEl.textContent = n.toLocaleDateString("en-US", {
+      weekday: "short", month: "short", day: "numeric"
+    }).toUpperCase();
+  }
+  update();
+  setInterval(update, 1000);
+}
 
-window.addEventListener('load', async () => {
-  await loadMatugenColors();
+addEventListener("load", () => {
+  loadTheme();
   resize();
-  startClock(clockEl, dateEl);
+
+  const s = document.createElement("script");
+  s.src = "clock-shared.js";
+  s.onload = () => {
+    try {
+      if (typeof startClock === "function") startClock(clockEl, dateEl);
+      else fallbackClock();
+    } catch { fallbackClock(); }
+  };
+  s.onerror = fallbackClock;
+  document.head.appendChild(s);
+
+  hintEl.classList.add("show");
+  setTimeout(() => hintEl.classList.remove("show"), 4000);
+
   requestAnimationFrame(frame);
 });
 </script>

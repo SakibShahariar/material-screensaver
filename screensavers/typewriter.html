@@ -2,102 +2,144 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Material Screensaver — Typewriter</title>
 <style>
-  :root {
-    --primary_rgb: 138 206 255;
-    --secondary_rgb: 180 199 233;
-    --surface_rgb: 12 20 27;
-    --on_surface_variant_rgb: 191 199 209;
-    --outline_rgb: 137 146 154;
-  }
-  html, body {
-    margin: 0; padding: 0; width: 100%; height: 100%;
-    overflow: hidden; background: rgb(var(--surface_rgb)); cursor: none;
-    display: flex; align-items: center; justify-content: center;
-  }
-  #stage {
-    font-family: "Google Sans", "Segoe UI", Roboto, system-ui, sans-serif;
-    font-size: clamp(28px, 4.2vw, 64px);
-    font-weight: 400;
-    text-align: center;
-    padding: 0 8vw;
-    max-width: 80vw;
-  }
-  #cursor {
-    display: inline-block;
-    width: 0.05em;
-    margin-left: 4px;
-    animation: blink 1s steps(1) infinite;
-  }
-  @keyframes blink { 50% { opacity: 0; } }
-  #clock {
-    position: fixed; left: 32px; bottom: 28px;
-    font-family: "Google Sans", "Segoe UI", Roboto, system-ui, sans-serif;
-    font-weight: 400; font-variant-numeric: tabular-nums; letter-spacing: 0.5px;
-    font-size: clamp(22px, 3vw, 40px);
-    text-shadow: 0 0 24px rgba(0,0,0,0.4);
-    pointer-events: none; transition: opacity 0.6s ease;
-  }
-  #clock .ampm {
-    font-size: 0.36em;
-    margin-left: 6px;
-    opacity: 0.82;
-    vertical-align: middle;
-  }
-  #date {
-    position: fixed; left: 34px; bottom: 14px;
-    font-family: "Google Sans", "Segoe UI", Roboto, system-ui, sans-serif;
-    font-size: clamp(11px, 1vw, 14px); letter-spacing: 1.5px; text-transform: uppercase;
-    pointer-events: none; transition: opacity 0.6s ease;
-  }
-  #hint {
-    position: fixed; right: 28px; bottom: 26px;
-    font-family: "Google Sans", "Segoe UI", Roboto, system-ui, sans-serif;
-    font-size: 13px; letter-spacing: 0.5px;
-    pointer-events: none; opacity: 0; transition: opacity 0.8s ease;
-  }
-  #hint.show { opacity: 1; }
-  #clock.hidden, #date.hidden { opacity: 0; }
+:root {
+  --primary_rgb: 138 206 255;
+  --secondary_rgb: 180 199 233;
+  --tertiary_rgb: 186 196 250;
+  --surface_rgb: 12 20 27;
+  --outline_rgb: 137 146 154;
+}
+* { margin: 0; padding: 0; box-sizing: border-box; }
+html, body {
+  width: 100%; height: 100%; overflow: hidden;
+  background: rgb(var(--surface_rgb));
+  cursor: none;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-family: "Google Sans", "Segoe UI", system-ui, sans-serif;
+}
+body.show-cursor { cursor: default; }
+
+#stage {
+  font-size: clamp(28px, 4.4vw, 68px);
+  font-weight: 300;
+  text-align: center;
+  padding: 0 9vw;
+  max-width: 85vw;
+  line-height: 1.4;
+  color: rgb(var(--primary_rgb));
+  text-shadow: 0 0 48px rgb(var(--primary_rgb) / .22);
+  letter-spacing: -0.02em;
+}
+
+#cursor {
+  display: inline-block;
+  width: 0.07em;
+  height: 1.05em;
+  margin-left: 4px;
+  vertical-align: -0.08em;
+  background: rgb(var(--primary_rgb));
+  box-shadow: 0 0 16px rgb(var(--primary_rgb) / .5);
+  animation: blink 1.15s steps(1) infinite;
+}
+@keyframes blink {
+  0%, 48% { opacity: 1; }
+  50%, 100% { opacity: 0; }
+}
+
+#clock {
+  position: fixed;
+  left: clamp(28px, 3vw, 48px);
+  bottom: clamp(40px, 4.5vw, 56px);
+  font-weight: 200;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: -2px;
+  font-size: clamp(36px, 4.8vw, 64px);
+  color: rgb(var(--primary_rgb));
+  text-shadow:
+    0 0 36px rgb(var(--primary_rgb) / .35),
+    0 2px 14px rgba(0,0,0,.55);
+  pointer-events: none;
+  transition: opacity .7s ease;
+}
+#clock .ampm {
+  font-size: .28em;
+  margin-left: 9px;
+  opacity: .72;
+  vertical-align: 20%;
+  letter-spacing: 1.5px;
+  font-weight: 400;
+}
+#date {
+  position: fixed;
+  left: clamp(30px, 3.1vw, 50px);
+  bottom: clamp(18px, 2.2vw, 28px);
+  font-size: clamp(11px, 1.05vw, 14px);
+  letter-spacing: 4px;
+  text-transform: uppercase;
+  color: rgb(var(--secondary_rgb) / .88);
+  text-shadow: 0 1px 10px rgba(0,0,0,.5);
+  pointer-events: none;
+  transition: opacity .7s ease;
+}
+#clock.hidden, #date.hidden { opacity: 0; }
+
+#hint {
+  position: fixed; right: 28px; bottom: 24px;
+  font-size: 11px; letter-spacing: 1.5px;
+  color: rgb(var(--outline_rgb) / .55);
+  opacity: 0; transition: opacity 1s ease;
+  text-transform: uppercase;
+  pointer-events: none;
+}
+#hint.show { opacity: .7; }
 </style>
 <link rel="stylesheet" href="file:///home/sakib/.config/matugen/matugen-colors.css">
 </head>
 <body>
-<div id="stage"><span id="text"></span><span id="cursor">|</span></div>
-<div id="clock">00:00</div>
-<div id="date">Mon, Jan 1</div>
-<div id="hint">press C to toggle clock</div>
+<div id="stage">
+  <span id="text"></span><span id="cursor"></span>
+</div>
+<div id="clock">00:00<span class="ampm">AM</span></div>
+<div id="date">MON, JAN 1</div>
+<div id="hint">C · toggle clock</div>
 
-<script src="clock-shared.js"></script>
 <script>
-const stageEl = document.getElementById('stage');
-const textEl = document.getElementById('text');
-const cursorEl = document.getElementById('cursor');
-const clockEl = document.getElementById('clock');
-const dateEl = document.getElementById('date');
-const hintEl = document.getElementById('hint');
+"use strict";
 
-function readRGB(name) {
-  const raw = getComputedStyle(document.documentElement).getPropertyValue(name).trim();
-  const parts = raw.split(/\s+/).map(Number);
-  if (parts.length === 3 && parts.every(n => !isNaN(n))) return parts;
-  return [200, 200, 200];
+const textEl   = document.getElementById("text");
+const cursorEl = document.getElementById("cursor");
+const clockEl  = document.getElementById("clock");
+const dateEl   = document.getElementById("date");
+const hintEl   = document.getElementById("hint");
+
+function readRGB(name, fb = [180, 180, 180]) {
+  const r = getComputedStyle(document.documentElement).getPropertyValue(name).trim();
+  const p = r.split(/\s+/).map(Number);
+  return (p.length === 3 && p.every(n => !isNaN(n))) ? p : fb;
 }
-function rgbCss(rgb) { return `rgb(${rgb[0]}, ${rgb[1]}, ${rgb[2]})`; }
+function rgbCss(c) {
+  return `rgb(${c[0]},${c[1]},${c[2]})`;
+}
 
-const theme = {
-  primary: readRGB('--primary_rgb'),
-  secondary: readRGB('--secondary_rgb'),
-  onSurfaceVariant: readRGB('--on_surface_variant_rgb'),
-  outline: readRGB('--outline_rgb'),
-};
-textEl.style.color = rgbCss(theme.primary);
-cursorEl.style.background = rgbCss(theme.primary);
-clockEl.style.color = rgbCss(theme.secondary);
-dateEl.style.color = rgbCss(theme.onSurfaceVariant);
-hintEl.style.color = rgbCss(theme.outline);
+function loadTheme() {
+  const primary   = readRGB("--primary_rgb", [138, 206, 255]);
+  const secondary = readRGB("--secondary_rgb", [180, 199, 233]);
+  const outline   = readRGB("--outline_rgb", [137, 146, 154]);
+  const surface   = readRGB("--surface_rgb", [12, 20, 27]);
 
-// original phrases — no quoted or attributed material
+  document.body.style.background = rgbCss(surface);
+  textEl.style.color = rgbCss(primary);
+  cursorEl.style.background = rgbCss(primary);
+  clockEl.style.color = rgbCss(primary);
+  dateEl.style.color = `rgba(${secondary[0]},${secondary[1]},${secondary[2]},0.88)`;
+  hintEl.style.color = `rgba(${outline[0]},${outline[1]},${outline[2]},0.6)`;
+}
+
 const PHRASES = [
   "Take a slow breath.",
   "Good things take time.",
@@ -109,14 +151,42 @@ const PHRASES = [
   "You've got this.",
   "Quiet moments count.",
   "Tomorrow is unwritten.",
+  "Be kind to your mind.",
+  "Progress doesn't have to be loud.",
+  "This moment is enough.",
+  "Let the day unfold gently.",
+  "You don't have to rush.",
+  "Soft focus is still focus.",
+  "There is time.",
+  "Notice the quiet.",
+  "You're allowed to pause.",
+  "Simple is often better.",
+  "Keep going, gently.",
+  "The best ideas arrive slowly.",
+  "Nothing urgent is happening here.",
+  "Breathe in. Breathe out.",
+  "Presence over perfection.",
+  "Even stillness is movement.",
+  "You are already enough.",
+  "Let go of the next thing.",
+  "This is a soft place to land.",
+  "Curiosity over certainty.",
+  "Less noise. More signal.",
+  "The pause is part of the work.",
+  "Gently does it.",
+  "Space to think is a gift.",
+  "Return to the present.",
 ];
 
-const reduceMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
-const TYPE_MS = reduceMotion ? 90 : 55;
-const HOLD_MS = 3200;
-const ERASE_MS = reduceMotion ? 45 : 28;
+const reduceMotion = matchMedia("(prefers-reduced-motion: reduce)").matches;
+const TYPE_MS  = reduceMotion ? 115 : 82;
+const HOLD_MS  = 4500;
+const ERASE_MS = reduceMotion ? 58 : 40;
+const GAP_MS   = 500; // brief pause before next phrase
 
 let order = [];
+let orderIdx = 0;
+
 function shuffledOrder() {
   const arr = PHRASES.map((_, i) => i);
   for (let i = arr.length - 1; i > 0; i--) {
@@ -126,12 +196,12 @@ function shuffledOrder() {
   return arr;
 }
 
-let orderIdx = 0;
 function nextPhrase() {
-  if (orderIdx >= order.length) order = shuffledOrder(), orderIdx = 0;
-  const phrase = PHRASES[order[orderIdx]];
-  orderIdx++;
-  return phrase;
+  if (orderIdx >= order.length) {
+    order = shuffledOrder();
+    orderIdx = 0;
+  }
+  return PHRASES[order[orderIdx++]];
 }
 
 function typeText(str, onDone) {
@@ -140,7 +210,7 @@ function typeText(str, onDone) {
     if (i <= str.length) {
       textEl.textContent = str.slice(0, i);
       i++;
-      setTimeout(step, TYPE_MS);
+      setTimeout(step, TYPE_MS + (Math.random() * 18 - 6)); // slight human variation
     } else {
       onDone();
     }
@@ -166,25 +236,60 @@ function cycle() {
   const phrase = nextPhrase();
   typeText(phrase, () => {
     setTimeout(() => {
-      eraseText(phrase, cycle);
+      eraseText(phrase, () => {
+        setTimeout(cycle, GAP_MS);
+      });
     }, HOLD_MS);
   });
 }
 
-let clockVisible = true;
-window.addEventListener('keydown', (e) => {
-  if (e.key.toLowerCase() === 'c') {
-    clockVisible = !clockVisible;
-    clockEl.classList.toggle('hidden', !clockVisible);
-    dateEl.classList.toggle('hidden', !clockVisible);
+addEventListener("pointermove", () => {
+  document.body.classList.add("show-cursor");
+  clearTimeout(window.__ct);
+  window.__ct = setTimeout(() => document.body.classList.remove("show-cursor"), 2500);
+}, { passive: true });
+
+addEventListener("keydown", e => {
+  if (e.key.toLowerCase() === "c") {
+    clockEl.classList.toggle("hidden");
+    dateEl.classList.toggle("hidden");
   }
 });
 
-hintEl.classList.add('show');
-setTimeout(() => hintEl.classList.remove('show'), 4000);
+function fallbackClock() {
+  function update() {
+    const n = new Date();
+    let h = n.getHours();
+    const ap = h >= 12 ? "PM" : "AM";
+    h = h % 12 || 12;
+    clockEl.innerHTML =
+      `${String(h).padStart(2,"0")}:${String(n.getMinutes()).padStart(2,"0")}` +
+      `<span class="ampm">${ap}</span>`;
+    dateEl.textContent = n.toLocaleDateString("en-US", {
+      weekday: "short", month: "short", day: "numeric"
+    }).toUpperCase();
+  }
+  update();
+  setInterval(update, 1000);
+}
 
-window.addEventListener('load', () => {
-  startClock(clockEl, dateEl);
+addEventListener("load", () => {
+  loadTheme();
+
+  const s = document.createElement("script");
+  s.src = "clock-shared.js";
+  s.onload = () => {
+    try {
+      if (typeof startClock === "function") startClock(clockEl, dateEl);
+      else fallbackClock();
+    } catch { fallbackClock(); }
+  };
+  s.onerror = fallbackClock;
+  document.head.appendChild(s);
+
+  hintEl.classList.add("show");
+  setTimeout(() => hintEl.classList.remove("show"), 4000);
+
   order = shuffledOrder();
   cycle();
 });

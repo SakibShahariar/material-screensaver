@@ -2,139 +2,187 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Material Screensaver — Circuit Board</title>
 <style>
-  :root {
-    --primary_rgb: 138 206 255; --primary_container_rgb: 0 75 111;
-    --secondary_rgb: 180 199 233; --secondary_container_rgb: 53 72 99;
-    --tertiary_rgb: 186 196 250; --tertiary_container_rgb: 58 68 114;
-    --surface_rgb: 10 16 12; --outline_rgb: 137 146 154;
-  }
-  html, body { margin: 0; padding: 0; width: 100%; height: 100%; overflow: hidden; background: rgb(var(--surface_rgb, 10 16 12)); cursor: none; }
-  body.show-cursor { cursor: default; }
-  canvas { display: block; width: 100vw; height: 100vh; }
-  #clock { position: fixed; left: 32px; bottom: 28px; font-family: "Google Sans","Segoe UI",Roboto,system-ui,sans-serif; font-weight: 400; font-variant-numeric: tabular-nums; letter-spacing: 0.5px; font-size: clamp(28px,4vw,56px); text-shadow: 0 0 24px rgba(0,0,0,0.4); pointer-events: none; transition: opacity 0.6s ease; }
-  #clock .ampm { font-size: 0.36em; margin-left: 6px; opacity: 0.82; vertical-align: middle; }
-  #date { position: fixed; left: 34px; bottom: 14px; font-family: "Google Sans","Segoe UI",Roboto,system-ui,sans-serif; font-size: clamp(12px,1.2vw,16px); letter-spacing: 1.5px; text-transform: uppercase; pointer-events: none; transition: opacity 0.6s ease; }
-  #hint { position: fixed; right: 28px; bottom: 26px; font-family: "Google Sans","Segoe UI",Roboto,system-ui,sans-serif; font-size: 13px; letter-spacing: 0.5px; pointer-events: none; opacity: 0; transition: opacity 0.8s ease; }
-  #hint.show { opacity: 1; }
-  #clock.hidden, #date.hidden { opacity: 0; }
+:root {
+  --primary_rgb: 138 206 255;
+  --primary_container_rgb: 0 75 111;
+  --secondary_rgb: 180 199 233;
+  --secondary_container_rgb: 53 72 99;
+  --tertiary_rgb: 186 196 250;
+  --surface_rgb: 10 16 12;
+  --outline_rgb: 137 146 154;
+}
+* { margin: 0; padding: 0; box-sizing: border-box; }
+html, body {
+  width: 100%; height: 100%; overflow: hidden;
+  background: rgb(var(--surface_rgb));
+  cursor: none;
+  font-family: "Google Sans", "Segoe UI", system-ui, sans-serif;
+}
+body.show-cursor { cursor: default; }
+canvas { display: block; width: 100vw; height: 100vh; }
+
+#clock {
+  position: fixed;
+  left: clamp(28px, 3vw, 48px);
+  bottom: clamp(40px, 4.5vw, 56px);
+  font-weight: 200;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: -2px;
+  font-size: clamp(40px, 5.5vw, 78px);
+  color: rgb(var(--primary_rgb));
+  text-shadow:
+    0 0 40px rgb(var(--primary_rgb) / .4),
+    0 2px 16px rgba(0,0,0,.6);
+  pointer-events: none;
+  transition: opacity .7s ease;
+}
+#clock .ampm {
+  font-size: .26em;
+  margin-left: 10px;
+  opacity: .7;
+  vertical-align: 22%;
+  letter-spacing: 2px;
+  font-weight: 400;
+}
+#date {
+  position: fixed;
+  left: clamp(30px, 3.1vw, 50px);
+  bottom: clamp(18px, 2.2vw, 28px);
+  font-size: clamp(11px, 1.05vw, 14px);
+  letter-spacing: 4px;
+  text-transform: uppercase;
+  color: rgb(var(--secondary_rgb) / .88);
+  text-shadow: 0 1px 10px rgba(0,0,0,.5);
+  pointer-events: none;
+  transition: opacity .7s ease;
+}
+#clock.hidden, #date.hidden { opacity: 0; }
+
+#hint {
+  position: fixed; right: 28px; bottom: 24px;
+  font-size: 11px; letter-spacing: 1.5px;
+  color: rgb(var(--outline_rgb) / .55);
+  opacity: 0; transition: opacity 1s ease;
+  text-transform: uppercase;
+  pointer-events: none;
+}
+#hint.show { opacity: .7; }
 </style>
 <link rel="stylesheet" href="file:///home/sakib/.config/matugen/matugen-colors.css">
 </head>
 <body>
 <canvas id="c"></canvas>
-<div id="clock">00:00</div>
-<div id="date">Mon, Jan 1</div>
-<div id="hint">press C to toggle clock</div>
-<script src="clock-shared.js"></script>
+<div id="clock">00:00<span class="ampm">AM</span></div>
+<div id="date">MON, JAN 1</div>
+<div id="hint">C · toggle clock</div>
+
 <script>
-const canvas = document.getElementById('c');
-const ctx = canvas.getContext('2d');
-const clockEl = document.getElementById('clock');
-const dateEl = document.getElementById('date');
-const hintEl = document.getElementById('hint');
+"use strict";
 
-let mouse = { x: -1000, y: -1000 };
-let cursorTimeout;
-window.addEventListener('pointermove', (e) => {
-  document.body.classList.add('show-cursor');
-  clearTimeout(cursorTimeout);
-  cursorTimeout = setTimeout(() => {
-    document.body.classList.remove('show-cursor');
-  }, 2500);
-  mouse.x = e.clientX;
-  mouse.y = e.clientY;
-});
+const canvas = document.getElementById("c");
+const ctx = canvas.getContext("2d", { alpha: false, desynchronized: true });
+const clockEl = document.getElementById("clock");
+const dateEl  = document.getElementById("date");
+const hintEl  = document.getElementById("hint");
 
-let dpr = Math.min(window.devicePixelRatio || 1, 2);
-let W, H;
-function resize() {
-  W = window.innerWidth; H = window.innerHeight;
-  canvas.width = W * dpr; canvas.height = H * dpr;
-  ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
-  makeTraces();
-}
-window.addEventListener('resize', resize);
-
-const reduceMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
-const speedMul = reduceMotion ? 0.25 : 1;
-const GRID = 32;
-
-function readRGB(name, fallback) {
-  const raw = getComputedStyle(document.documentElement).getPropertyValue(name).trim();
-  const parts = raw.split(/\s+/).map(Number);
-  if (parts.length === 3 && parts.every(n => !isNaN(n))) return parts;
-  return fallback;
-}
-function rgba(rgb, a) {
-  const c = rgb || [200, 200, 200];
-  return `rgba(${c[0]}, ${c[1]}, ${c[2]}, ${a})`;
-}
-
+let W = 0, H = 0, DPR = 1;
 let theme = {};
 let roleList = [];
-
-async function loadMatugenColors() {
-  try {
-    const res = await fetch('file:///home/sakib/.config/matugen/matugen-colors.css');
-    if (res.ok) {
-      const cssText = await res.text();
-      const styleTag = document.createElement('style');
-      styleTag.textContent = cssText;
-      document.head.appendChild(styleTag);
-    }
-  } catch (e) {}
-  applyTheme();
-}
-
-function applyTheme() {
-  theme = {
-    surface: readRGB('--surface_rgb', [10, 16, 12]),
-    primary: readRGB('--primary_rgb', [138, 206, 255]),
-    secondary: readRGB('--secondary_rgb', [180, 199, 233]),
-    tertiary: readRGB('--tertiary_rgb', [186, 196, 250]),
-    primaryContainer: readRGB('--primary_container_rgb', [0, 75, 111]),
-    secondaryContainer: readRGB('--secondary_container_rgb', [53, 72, 99]),
-    outline: readRGB('--outline_rgb', [137, 146, 154]),
-  };
-  roleList = [theme.primary, theme.secondary, theme.tertiary, theme.primaryContainer];
-  
-  clockEl.style.color = rgba(theme.primary, 0.92);
-  dateEl.style.color = rgba(theme.secondary, 0.85);
-  hintEl.style.color = rgba(theme.outline, 0.9);
-  document.body.style.backgroundColor = `rgb(${theme.surface.join(',')})`;
-}
-
 let traces = [];
 let nodes = [];
+let pulses = [];
+let mouse = { x: -1000, y: -1000 };
+let start = performance.now();
+let lastT = 0;
+let nextPulse = 0;
+let cursorTimer;
+
+const GRID = 36;
+const reduceMotion = matchMedia("(prefers-reduced-motion: reduce)").matches;
+const speedMul = reduceMotion ? 0.28 : 0.85;
+
+function readRGB(name, fb = [160, 160, 160]) {
+  const r = getComputedStyle(document.documentElement).getPropertyValue(name).trim();
+  const p = r.split(/\s+/).map(Number);
+  return (p.length === 3 && p.every(n => !isNaN(n))) ? p : fb;
+}
+function rgba(c, a = 1) {
+  return `rgba(${c[0]},${c[1]},${c[2]},${a})`;
+}
+
+function loadTheme() {
+  theme = {
+    surface:            readRGB("--surface_rgb", [10, 16, 12]),
+    primary:            readRGB("--primary_rgb", [138, 206, 255]),
+    secondary:          readRGB("--secondary_rgb", [180, 199, 233]),
+    tertiary:           readRGB("--tertiary_rgb", [186, 196, 250]),
+    primaryContainer:   readRGB("--primary_container_rgb", [0, 75, 111]),
+    secondaryContainer: readRGB("--secondary_container_rgb", [53, 72, 99]),
+    outline:            readRGB("--outline_rgb", [137, 146, 154])
+  };
+
+  roleList = [
+    theme.primary,
+    theme.secondary,
+    theme.tertiary,
+    theme.primaryContainer,
+    theme.secondaryContainer
+  ];
+
+  document.body.style.background = rgba(theme.surface);
+  clockEl.style.color = rgba(theme.primary, 0.97);
+  dateEl.style.color  = rgba(theme.secondary, 0.88);
+  hintEl.style.color  = rgba(theme.outline, 0.6);
+}
+
+function resize() {
+  W = innerWidth; H = innerHeight;
+  DPR = Math.min(devicePixelRatio || 1, 2);
+  canvas.width  = Math.floor(W * DPR);
+  canvas.height = Math.floor(H * DPR);
+  ctx.setTransform(DPR, 0, 0, DPR, 0, 0);
+  makeTraces();
+}
+addEventListener("resize", resize, { passive: true });
+
 function makeTraces() {
   traces = [];
   nodes = [];
-  const cols = Math.ceil(W / GRID), rows = Math.ceil(H / GRID);
-  const traceCount = 30;
+  const cols = Math.ceil(W / GRID);
+  const rows = Math.ceil(H / GRID);
+  const count = 34;
 
-  for (let n = 0; n < traceCount; n++) {
-    let gx = Math.floor(Math.random() * cols), gy = Math.floor(Math.random() * rows);
+  for (let n = 0; n < count; n++) {
+    let gx = Math.floor(Math.random() * cols);
+    let gy = Math.floor(Math.random() * rows);
     const path = [[gx, gy]];
     let dir = Math.floor(Math.random() * 4);
-    const steps = 6 + Math.floor(Math.random() * 10);
+    const steps = 7 + Math.floor(Math.random() * 12);
+
     for (let s = 0; s < steps; s++) {
-      if (Math.random() < 0.35) dir = (dir + (Math.random() < 0.5 ? 1 : 3)) % 4;
-      const dx = [1, 0, -1, 0][dir], dy = [0, 1, 0, -1][dir];
+      if (Math.random() < 0.3) dir = (dir + (Math.random() < 0.5 ? 1 : 3)) % 4;
+      const dx = [1, 0, -1, 0][dir];
+      const dy = [0, 1, 0, -1][dir];
       gx = Math.max(0, Math.min(cols - 1, gx + dx));
       gy = Math.max(0, Math.min(rows - 1, gy + dy));
       path.push([gx, gy]);
     }
-    traces.push(path.map(([x, y]) => [x * GRID, y * GRID]));
-    nodes.push([path[0][0] * GRID, path[0][1] * GRID]);
-    nodes.push([path[path.length - 1][0] * GRID, path[path.length - 1][1] * GRID]);
+
+    const pts = path.map(([x, y]) => [x * GRID, y * GRID]);
+    traces.push(pts);
+    nodes.push(pts[0]);
+    nodes.push(pts[pts.length - 1]);
   }
 }
 
 function traceLength(path) {
   let len = 0;
-  for (let i = 1; i < path.length; i++) len += Math.hypot(path[i][0] - path[i - 1][0], path[i][1] - path[i - 1][1]);
+  for (let i = 1; i < path.length; i++) {
+    len += Math.hypot(path[i][0] - path[i - 1][0], path[i][1] - path[i - 1][1]);
+  }
   return len;
 }
 
@@ -144,103 +192,146 @@ function pointAtDistance(path, dist) {
     const segLen = Math.hypot(path[i][0] - path[i - 1][0], path[i][1] - path[i - 1][1]);
     if (remaining <= segLen) {
       const u = segLen === 0 ? 0 : remaining / segLen;
-      return [path[i - 1][0] + (path[i][0] - path[i - 1][0]) * u, path[i - 1][1] + (path[i][1] - path[i - 1][1]) * u];
+      return [
+        path[i - 1][0] + (path[i][0] - path[i - 1][0]) * u,
+        path[i - 1][1] + (path[i][1] - path[i - 1][1]) * u
+      ];
     }
     remaining -= segLen;
   }
   return path[path.length - 1];
 }
 
-let pulses = [];
 function spawnPulse() {
-  const traceIdx = Math.floor(Math.random() * traces.length);
+  if (!traces.length || !roleList.length) return;
   pulses.push({
-    traceIdx, dist: 0, speed: 100 + Math.random() * 70,
-    color: roleList[Math.floor(Math.random() * roleList.length)],
+    traceIdx: Math.floor(Math.random() * traces.length),
+    dist: 0,
+    speed: 90 + Math.random() * 80,
+    color: roleList[Math.floor(Math.random() * roleList.length)]
   });
 }
 
-let start = performance.now();
-let lastT = 0;
-let nextPulse = 0;
-
 function frame(now) {
   const t = ((now - start) / 1000) * speedMul;
-  const dt = Math.min(0.05, t - lastT);
+  const dt = Math.min(0.05, t - lastT || 0.016);
   lastT = t;
 
   if (t >= nextPulse) {
     spawnPulse();
-    nextPulse = t + 0.12 + Math.random() * 0.28;
+    nextPulse = t + 0.09 + Math.random() * 0.22;
   }
 
-  ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
-  const surf = theme.surface || [10, 16, 12];
-  ctx.fillStyle = `rgb(${surf.join(',')})`;
+  ctx.setTransform(DPR, 0, 0, DPR, 0, 0);
+  ctx.fillStyle = rgba(theme.surface, 1);
   ctx.fillRect(0, 0, W, H);
 
-  // Draw traces
-  ctx.strokeStyle = rgba(theme.secondaryContainer || [53, 72, 99], 0.6);
-  ctx.lineWidth = 1.8;
+  // Traces
+  ctx.strokeStyle = rgba(theme.secondaryContainer || [53, 72, 99], 0.55);
+  ctx.lineWidth = 1.7;
+  ctx.lineCap = "round";
+  ctx.lineJoin = "round";
   for (const path of traces) {
+    if (path.length < 2) continue;
     ctx.beginPath();
     ctx.moveTo(path[0][0], path[0][1]);
-    for (let i = 1; i < path.length; i++) ctx.lineTo(path[i][0], path[i][1]);
+    for (let i = 1; i < path.length; i++) {
+      ctx.lineTo(path[i][0], path[i][1]);
+    }
     ctx.stroke();
   }
 
-  // Draw nodes (solder points) with mouse hover highlight
+  // Nodes + soft mouse highlight
   for (const n of nodes) {
     const dist = Math.hypot(n[0] - mouse.x, n[1] - mouse.y);
-    const highlight = dist < 120 ? (1 - dist / 120) * 0.8 : 0;
-    
+    const highlight = dist < 110 ? (1 - dist / 110) * 0.75 : 0;
+
     ctx.beginPath();
-    ctx.arc(n[0], n[1], 2.6 + highlight * 2, 0, Math.PI * 2);
-    ctx.fillStyle = rgba(theme.secondaryContainer || [53, 72, 99], 0.8 + highlight);
+    ctx.arc(n[0], n[1], 2.4 + highlight * 2.2, 0, Math.PI * 2);
+    ctx.fillStyle = rgba(theme.secondaryContainer || [53, 72, 99], 0.75 + highlight * 0.25);
     ctx.fill();
   }
 
-  // Update & draw pulses
+  // Pulses
   pulses = pulses.filter(p => {
     const path = traces[p.traceIdx];
+    if (!path) return false;
     const len = traceLength(path);
-    p.dist += p.speed * dt * speedMul;
+    p.dist += p.speed * dt;
     if (p.dist >= len) return false;
+
     const [x, y] = pointAtDistance(path, p.dist);
 
-    const grad = ctx.createRadialGradient(x, y, 0, x, y, 14);
-    grad.addColorStop(0, rgba(p.color, 0.95));
-    grad.addColorStop(1, rgba(p.color, 0));
+    const grad = ctx.createRadialGradient(x, y, 0, x, y, 15);
+    grad.addColorStop(0, rgba(p.color, 0.9));
+    grad.addColorStop(0.4, rgba(p.color, 0.3));
+    grad.addColorStop(1, "transparent");
     ctx.fillStyle = grad;
     ctx.beginPath();
-    ctx.arc(x, y, 14, 0, Math.PI * 2);
+    ctx.arc(x, y, 15, 0, Math.PI * 2);
     ctx.fill();
 
     ctx.beginPath();
-    ctx.arc(x, y, 2.2, 0, Math.PI * 2);
+    ctx.arc(x, y, 2.3, 0, Math.PI * 2);
     ctx.fillStyle = rgba(p.color, 1);
     ctx.fill();
+
     return true;
   });
 
   requestAnimationFrame(frame);
 }
 
-let clockVisible = true;
-window.addEventListener('keydown', (e) => {
-  if (e.key.toLowerCase() === 'c') {
-    clockVisible = !clockVisible;
-    clockEl.classList.toggle('hidden', !clockVisible);
-    dateEl.classList.toggle('hidden', !clockVisible);
+addEventListener("pointermove", e => {
+  mouse.x = e.clientX;
+  mouse.y = e.clientY;
+  document.body.classList.add("show-cursor");
+  clearTimeout(cursorTimer);
+  cursorTimer = setTimeout(() => document.body.classList.remove("show-cursor"), 2500);
+}, { passive: true });
+
+addEventListener("keydown", e => {
+  if (e.key.toLowerCase() === "c") {
+    clockEl.classList.toggle("hidden");
+    dateEl.classList.toggle("hidden");
   }
 });
-hintEl.classList.add('show');
-setTimeout(() => hintEl.classList.remove('show'), 4000);
 
-window.addEventListener('load', async () => {
+function fallbackClock() {
+  function update() {
+    const n = new Date();
+    let h = n.getHours();
+    const ap = h >= 12 ? "PM" : "AM";
+    h = h % 12 || 12;
+    clockEl.innerHTML =
+      `${String(h).padStart(2,"0")}:${String(n.getMinutes()).padStart(2,"0")}` +
+      `<span class="ampm">${ap}</span>`;
+    dateEl.textContent = n.toLocaleDateString("en-US", {
+      weekday: "short", month: "short", day: "numeric"
+    }).toUpperCase();
+  }
+  update();
+  setInterval(update, 1000);
+}
+
+addEventListener("load", () => {
+  loadTheme();
   resize();
-  await loadMatugenColors();
-  startClock(clockEl, dateEl);
+
+  const s = document.createElement("script");
+  s.src = "clock-shared.js";
+  s.onload = () => {
+    try {
+      if (typeof startClock === "function") startClock(clockEl, dateEl);
+      else fallbackClock();
+    } catch { fallbackClock(); }
+  };
+  s.onerror = fallbackClock;
+  document.head.appendChild(s);
+
+  hintEl.classList.add("show");
+  setTimeout(() => hintEl.classList.remove("show"), 4000);
+
   requestAnimationFrame(frame);
 });
 </script>

@@ -2,232 +2,245 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Material Screensaver — DNA</title>
 <style>
-  :root {
-    --primary_rgb: 138 206 255;
-    --secondary_rgb: 180 199 233;
-    --tertiary_rgb: 186 196 250;
-    --primary_container_rgb: 0 75 111;
-    --tertiary_container_rgb: 58 68 114;
-    --surface_rgb: 12 20 27;
-    --outline_rgb: 137 146 154;
-  }
-  html, body {
-    margin: 0; padding: 0; width: 100%; height: 100%;
-    overflow: hidden; background: rgb(var(--surface_rgb)); cursor: none;
-  }
-  body.show-cursor { cursor: default; }
-  canvas { display: block; width: 100vw; height: 100vh; }
-  #clock {
-    position: fixed; left: 32px; bottom: 28px;
-    font-family: "Google Sans", "Segoe UI", Roboto, system-ui, sans-serif;
-    font-weight: 400; font-variant-numeric: tabular-nums; letter-spacing: 0.5px;
-    font-size: clamp(28px, 4vw, 56px);
-    text-shadow: 0 0 24px rgba(0,0,0,0.4);
-    pointer-events: none; transition: opacity 0.6s ease;
-  }
-  #clock .ampm {
-    font-size: 0.36em;
-    margin-left: 6px;
-    opacity: 0.82;
-    vertical-align: middle;
-  }
-  #date {
-    position: fixed; left: 34px; bottom: 14px;
-    font-family: "Google Sans", "Segoe UI", Roboto, system-ui, sans-serif;
-    font-size: clamp(12px, 1.2vw, 16px); letter-spacing: 1.5px; text-transform: uppercase;
-    pointer-events: none; transition: opacity 0.6s ease;
-  }
-  #hint {
-    position: fixed; right: 28px; bottom: 26px;
-    font-family: "Google Sans", "Segoe UI", Roboto, system-ui, sans-serif;
-    font-size: 13px; letter-spacing: 0.5px;
-    pointer-events: none; opacity: 0; transition: opacity 0.8s ease;
-  }
-  #hint.show { opacity: 1; }
-  #clock.hidden, #date.hidden { opacity: 0; }
+:root {
+  --primary_rgb: 138 206 255;
+  --secondary_rgb: 180 199 233;
+  --tertiary_rgb: 186 196 250;
+  --primary_container_rgb: 0 75 111;
+  --tertiary_container_rgb: 58 68 114;
+  --surface_rgb: 12 20 27;
+  --outline_rgb: 137 146 154;
+}
+* { margin: 0; padding: 0; box-sizing: border-box; }
+html, body {
+  width: 100%; height: 100%; overflow: hidden;
+  background: rgb(var(--surface_rgb));
+  cursor: none;
+  font-family: "Google Sans", "Segoe UI", system-ui, sans-serif;
+}
+body.show-cursor { cursor: default; }
+canvas { display: block; width: 100vw; height: 100vh; }
+
+#clock {
+  position: fixed;
+  left: clamp(28px, 3vw, 48px);
+  bottom: clamp(40px, 4.5vw, 56px);
+  font-weight: 200;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: -2px;
+  font-size: clamp(40px, 5.5vw, 78px);
+  color: rgb(var(--primary_rgb));
+  text-shadow:
+    0 0 40px rgb(var(--primary_rgb) / .4),
+    0 2px 16px rgba(0,0,0,.6);
+  pointer-events: none;
+  transition: opacity .7s ease;
+}
+#clock .ampm {
+  font-size: .26em;
+  margin-left: 10px;
+  opacity: .7;
+  vertical-align: 22%;
+  letter-spacing: 2px;
+  font-weight: 400;
+}
+#date {
+  position: fixed;
+  left: clamp(30px, 3.1vw, 50px);
+  bottom: clamp(18px, 2.2vw, 28px);
+  font-size: clamp(11px, 1.05vw, 14px);
+  letter-spacing: 4px;
+  text-transform: uppercase;
+  color: rgb(var(--secondary_rgb) / .88);
+  text-shadow: 0 1px 10px rgba(0,0,0,.5);
+  pointer-events: none;
+  transition: opacity .7s ease;
+}
+#clock.hidden, #date.hidden { opacity: 0; }
+
+#hint {
+  position: fixed; right: 28px; bottom: 24px;
+  font-size: 11px; letter-spacing: 1.5px;
+  color: rgb(var(--outline_rgb) / .55);
+  opacity: 0; transition: opacity 1s ease;
+  text-transform: uppercase;
+  pointer-events: none;
+}
+#hint.show { opacity: .7; }
 </style>
 <link rel="stylesheet" href="file:///home/sakib/.config/matugen/matugen-colors.css">
 </head>
 <body>
 <canvas id="c"></canvas>
-<div id="clock">00:00</div>
-<div id="date">Mon, Jan 1</div>
-<div id="hint">press C to toggle clock</div>
+<div id="clock">00:00<span class="ampm">AM</span></div>
+<div id="date">MON, JAN 1</div>
+<div id="hint">C · toggle clock</div>
 
-<script src="clock-shared.js"></script>
 <script>
-const canvas = document.getElementById('c');
-const ctx = canvas.getContext('2d');
-const clockEl = document.getElementById('clock');
-const dateEl = document.getElementById('date');
-const hintEl = document.getElementById('hint');
+"use strict";
 
-let cursorTimeout;
-window.addEventListener('pointermove', () => {
-  document.body.classList.add('show-cursor');
-  clearTimeout(cursorTimeout);
-  cursorTimeout = setTimeout(() => {
-    document.body.classList.remove('show-cursor');
-  }, 2500);
-});
+const canvas = document.getElementById("c");
+const ctx = canvas.getContext("2d", { alpha: false, desynchronized: true });
+const clockEl = document.getElementById("clock");
+const dateEl  = document.getElementById("date");
+const hintEl  = document.getElementById("hint");
 
-let dpr = Math.min(window.devicePixelRatio || 1, 2);
-let W, H, cx, cy;
-function resize() {
-  W = window.innerWidth;
-  H = window.innerHeight;
-  cx = W / 2;
-  cy = H / 2;
-  canvas.width = W * dpr;
-  canvas.height = H * dpr;
-  ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
-}
-window.addEventListener('resize', resize);
-resize();
-
-const reduceMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
-const speedMul = reduceMotion ? 0.2 : 1;
-
-function readRGB(name, fallback) {
-  const raw = getComputedStyle(document.documentElement).getPropertyValue(name).trim();
-  const parts = raw.split(/\s+/).map(Number);
-  if (parts.length === 3 && parts.every(n => !isNaN(n))) return parts;
-  return fallback;
-}
-function rgba(rgb, a) { return `rgba(${rgb[0]}, ${rgb[1]}, ${rgb[2]}, ${a})`; }
-
+let W = 0, H = 0, DPR = 1, cx = 0, cy = 0;
 let theme = {};
 let rungPairs = [];
+let start = performance.now();
+let cursorTimer;
 
-async function loadMatugenColors() {
-  try {
-    const res = await fetch('file:///home/sakib/.config/matugen/matugen-colors.css');
-    if (res.ok) {
-      const cssText = await res.text();
-      const styleTag = document.createElement('style');
-      styleTag.textContent = cssText;
-      document.head.appendChild(styleTag);
-    }
-  } catch (e) {}
-  applyTheme();
+const HELIX_RADIUS = 135;
+const TOTAL_POINTS = 80;
+const VERTICAL_SPACING = 22;
+const reduceMotion = matchMedia("(prefers-reduced-motion: reduce)").matches;
+const speedMul = reduceMotion ? 0.22 : 0.85;
+
+function readRGB(name, fb = [160, 160, 160]) {
+  const r = getComputedStyle(document.documentElement).getPropertyValue(name).trim();
+  const p = r.split(/\s+/).map(Number);
+  return (p.length === 3 && p.every(n => !isNaN(n))) ? p : fb;
+}
+function rgba(c, a = 1) {
+  return `rgba(${c[0]},${c[1]},${c[2]},${a})`;
 }
 
-function applyTheme() {
+function loadTheme() {
   theme = {
-    surface: readRGB('--surface_rgb', [12, 20, 27]),
-    primary: readRGB('--primary_rgb', [138, 206, 255]),
-    secondary: readRGB('--secondary_rgb', [180, 199, 233]),
-    tertiary: readRGB('--tertiary_rgb', [186, 196, 250]),
-    primaryContainer: readRGB('--primary_container_rgb', [0, 75, 111]),
-    tertiaryContainer: readRGB('--tertiary_container_rgb', [58, 68, 114]),
-    outline: readRGB('--outline_rgb', [137, 146, 154]),
+    surface:           readRGB("--surface_rgb", [12, 20, 27]),
+    primary:           readRGB("--primary_rgb", [138, 206, 255]),
+    secondary:         readRGB("--secondary_rgb", [180, 199, 233]),
+    tertiary:          readRGB("--tertiary_rgb", [186, 196, 250]),
+    primaryContainer:  readRGB("--primary_container_rgb", [0, 75, 111]),
+    tertiaryContainer: readRGB("--tertiary_container_rgb", [58, 68, 114]),
+    outline:           readRGB("--outline_rgb", [137, 146, 154])
   };
-  clockEl.style.color = rgba(theme.primary, 0.92);
-  dateEl.style.color = rgba(theme.secondary, 0.85);
-  hintEl.style.color = rgba(theme.outline, 0.9);
-  document.body.style.backgroundColor = `rgb(${theme.surface.join(',')})`;
+
   rungPairs = [
     [theme.primary, theme.secondary],
     [theme.tertiary, theme.primaryContainer],
     [theme.secondary, theme.tertiaryContainer]
   ];
+
+  document.body.style.background = rgba(theme.surface);
+  clockEl.style.color = rgba(theme.primary, 0.97);
+  dateEl.style.color  = rgba(theme.secondary, 0.88);
+  hintEl.style.color  = rgba(theme.outline, 0.6);
 }
 
-const HELIX_RADIUS = 130;
-const TOTAL_POINTS = 75;
-const VERTICAL_SPACING = 24;
+function resize() {
+  W = innerWidth; H = innerHeight;
+  cx = W * 0.5; cy = H * 0.5;
+  DPR = Math.min(devicePixelRatio || 1, 2);
+  canvas.width  = Math.floor(W * DPR);
+  canvas.height = Math.floor(H * DPR);
+  ctx.setTransform(DPR, 0, 0, DPR, 0, 0);
+}
+addEventListener("resize", resize, { passive: true });
 
-let start = performance.now();
+function project3D(x, y, z, rx, ry) {
+  const x1 = x * Math.cos(ry) + z * Math.sin(ry);
+  const z1 = -x * Math.sin(ry) + z * Math.cos(ry);
+  const y2 = y * Math.cos(rx) - z1 * Math.sin(rx);
+  const z2 = y * Math.sin(rx) + z1 * Math.cos(rx);
+  return { x: x1, y: y2, z: z2 };
+}
 
 function frame(now) {
   const t = ((now - start) / 1000) * speedMul;
-  const scrollOffset = (t * 40) % (TOTAL_POINTS * VERTICAL_SPACING);
+  const cycle = TOTAL_POINTS * VERTICAL_SPACING;
+  const scrollOffset = (t * 36) % cycle;
 
-  ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+  ctx.setTransform(DPR, 0, 0, DPR, 0, 0);
+
+  // Soft radial background
   const surf = theme.surface || [12, 20, 27];
-  const bg = ctx.createRadialGradient(cx, cy, 0, cx, cy, Math.max(W, H) * 0.75);
-  bg.addColorStop(0, `rgb(${surf.map((v, i) => Math.min(255, v + (i === 2 ? 14 : 8))).join(',')})`);
-  bg.addColorStop(1, `rgb(${surf.join(',')})`);
+  const bg = ctx.createRadialGradient(cx, cy, 0, cx, cy, Math.max(W, H) * 0.7);
+  bg.addColorStop(0, rgba([
+    Math.min(255, surf[0] + 6),
+    Math.min(255, surf[1] + 8),
+    Math.min(255, surf[2] + 12)
+  ], 1));
+  bg.addColorStop(1, rgba(surf, 1));
   ctx.fillStyle = bg;
   ctx.fillRect(0, 0, W, H);
 
-  const tiltX = Math.sin(t * 0.3) * 0.25;
-  const tiltY = Math.cos(t * 0.2) * 0.15;
-  const twistSpeed = t * 1.2;
+  const tiltX = Math.sin(t * 0.28) * 0.22;
+  const tiltY = Math.cos(t * 0.18) * 0.14;
+  const twist = t * 1.05;
 
-  // Generate 3D points for strands and rungs
-  let renderQueue = [];
+  const queue = [];
 
   for (let i = 0; i < TOTAL_POINTS; i++) {
-    const baseY = (i * VERTICAL_SPACING) - scrollOffset + (TOTAL_POINTS * VERTICAL_SPACING / 2);
-    // Wrap around screen seamlessly
-    let screenY = baseY;
-    while (screenY < -100) screenY += TOTAL_POINTS * VERTICAL_SPACING;
-    while (screenY > H + 100) screenY -= TOTAL_POINTS * VERTICAL_SPACING;
+    let screenY = i * VERTICAL_SPACING - scrollOffset + cycle * 0.5;
+    // seamless wrap
+    while (screenY < -120) screenY += cycle;
+    while (screenY > H + 120) screenY -= cycle;
 
-    const angle = (i * 0.18) + twistSpeed;
+    const angle = i * 0.175 + twist;
 
-    // Strand A
     const x1 = Math.sin(angle) * HELIX_RADIUS;
     const z1 = Math.cos(angle) * HELIX_RADIUS;
-    // Strand B (Pi offset)
     const x2 = Math.sin(angle + Math.PI) * HELIX_RADIUS;
     const z2 = Math.cos(angle + Math.PI) * HELIX_RADIUS;
 
-    // Apply 3D rotation / projection
     const p1 = project3D(x1, screenY - cy, z1, tiltX, tiltY);
     const p2 = project3D(x2, screenY - cy, z2, tiltX, tiltY);
+    const pair = rungPairs[i % rungPairs.length] || [theme.primary, theme.secondary];
 
-    const pair = rungPairs[i % rungPairs.length];
-
-    // Push Rung & Nodes to queue for depth sorting
-    renderQueue.push({
-      type: 'rung',
-      z: (p1.z + p2.z) / 2,
+    queue.push({
+      type: "rung",
+      z: (p1.z + p2.z) * 0.5,
       x1: p1.x + cx, y1: p1.y + cy,
       x2: p2.x + cx, y2: p2.y + cy,
-      colorA: pair[0], colorB: pair[1],
-      z1: p1.z, z2: p2.z
+      colorA: pair[0], colorB: pair[1]
     });
-
-    renderQueue.push({
-      type: 'node',
+    queue.push({
+      type: "node",
       z: p1.z,
       x: p1.x + cx, y: p1.y + cy,
       color: pair[0],
-      radius: Math.max(2, 4 + p1.z * 0.015)
+      radius: Math.max(2.2, 4.2 + p1.z * 0.014)
     });
-
-    renderQueue.push({
-      type: 'node',
+    queue.push({
+      type: "node",
       z: p2.z,
       x: p2.x + cx, y: p2.y + cy,
       color: pair[1],
-      radius: Math.max(2, 4 + p2.z * 0.015)
+      radius: Math.max(2.2, 4.2 + p2.z * 0.014)
     });
   }
 
-  // Sort back-to-front (Painter's algorithm)
-  renderQueue.sort((a, b) => a.z - b.z);
+  queue.sort((a, b) => a.z - b.z);
 
-  for (const item of renderQueue) {
-    if (item.type === 'rung') {
-      const depthFactor = (item.z + HELIX_RADIUS) / (2 * HELIX_RADIUS);
+  ctx.lineCap = "round";
+  for (const item of queue) {
+    const depth = (item.z + HELIX_RADIUS) / (2 * HELIX_RADIUS);
+    const d = Math.max(0, Math.min(1, depth));
+
+    if (item.type === "rung") {
       ctx.beginPath();
       ctx.moveTo(item.x1, item.y1);
       ctx.lineTo(item.x2, item.y2);
-      ctx.strokeStyle = rgba(item.colorA, 0.15 + depthFactor * 0.3);
-      ctx.lineWidth = 1.5 + depthFactor * 1.5;
+      // Gradient-ish: average the pair with depth alpha
+      const mid = [
+        (item.colorA[0] + item.colorB[0]) * 0.5,
+        (item.colorA[1] + item.colorB[1]) * 0.5,
+        (item.colorA[2] + item.colorB[2]) * 0.5
+      ];
+      ctx.strokeStyle = rgba(mid, 0.12 + d * 0.38);
+      ctx.lineWidth = 1.4 + d * 1.8;
       ctx.stroke();
-    } else if (item.type === 'node') {
-      const depthFactor = (item.z + HELIX_RADIUS) / (2 * HELIX_RADIUS);
+    } else {
       ctx.beginPath();
       ctx.arc(item.x, item.y, item.radius, 0, Math.PI * 2);
-      ctx.fillStyle = rgba(item.color, 0.4 + depthFactor * 0.6);
-      ctx.shadowColor = rgba(item.color, depthFactor * 0.9);
-      ctx.shadowBlur = depthFactor * 12;
+      ctx.shadowColor = rgba(item.color, d * 0.85);
+      ctx.shadowBlur = 6 + d * 10;
+      ctx.fillStyle = rgba(item.color, 0.35 + d * 0.65);
       ctx.fill();
       ctx.shadowBlur = 0;
     }
@@ -236,32 +249,54 @@ function frame(now) {
   requestAnimationFrame(frame);
 }
 
-function project3D(x, y, z, rx, ry) {
-  // Rotate around Y
-  const x1 = x * Math.cos(ry) + z * Math.sin(ry);
-  const z1 = -x * Math.sin(ry) + z * Math.cos(ry);
-  // Rotate around X
-  const y2 = y * Math.cos(rx) - z1 * Math.sin(rx);
-  const z2 = y * Math.sin(rx) + z1 * Math.cos(rx);
-  return { x: x1, y: y2, z: z2 };
-}
+addEventListener("pointermove", () => {
+  document.body.classList.add("show-cursor");
+  clearTimeout(cursorTimer);
+  cursorTimer = setTimeout(() => document.body.classList.remove("show-cursor"), 2500);
+}, { passive: true });
 
-let clockVisible = true;
-window.addEventListener('keydown', (e) => {
-  if (e.key.toLowerCase() === 'c') {
-    clockVisible = !clockVisible;
-    clockEl.classList.toggle('hidden', !clockVisible);
-    dateEl.classList.toggle('hidden', !clockVisible);
+addEventListener("keydown", e => {
+  if (e.key.toLowerCase() === "c") {
+    clockEl.classList.toggle("hidden");
+    dateEl.classList.toggle("hidden");
   }
 });
 
-hintEl.classList.add('show');
-setTimeout(() => hintEl.classList.remove('show'), 4000);
+function fallbackClock() {
+  function update() {
+    const n = new Date();
+    let h = n.getHours();
+    const ap = h >= 12 ? "PM" : "AM";
+    h = h % 12 || 12;
+    clockEl.innerHTML =
+      `${String(h).padStart(2,"0")}:${String(n.getMinutes()).padStart(2,"0")}` +
+      `<span class="ampm">${ap}</span>`;
+    dateEl.textContent = n.toLocaleDateString("en-US", {
+      weekday: "short", month: "short", day: "numeric"
+    }).toUpperCase();
+  }
+  update();
+  setInterval(update, 1000);
+}
 
-window.addEventListener('load', async () => {
-  await loadMatugenColors();
+addEventListener("load", () => {
+  loadTheme();
   resize();
-  startClock(clockEl, dateEl);
+
+  const s = document.createElement("script");
+  s.src = "clock-shared.js";
+  s.onload = () => {
+    try {
+      if (typeof startClock === "function") startClock(clockEl, dateEl);
+      else fallbackClock();
+    } catch { fallbackClock(); }
+  };
+  s.onerror = fallbackClock;
+  document.head.appendChild(s);
+
+  hintEl.classList.add("show");
+  setTimeout(() => hintEl.classList.remove("show"), 4000);
+
   requestAnimationFrame(frame);
 });
 </script>

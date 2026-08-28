@@ -2,123 +2,222 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Material Screensaver — Paper Cranes</title>
 <style>
-  :root {
-    --primary_rgb: 138 206 255; --primary_container_rgb: 0 75 111;
-    --secondary_rgb: 180 199 233; --secondary_container_rgb: 53 72 99;
-    --tertiary_rgb: 186 196 250; --tertiary_container_rgb: 58 68 114;
-    --surface_rgb: 12 20 27; --surface_bright_rgb: 50 58 65; --outline_rgb: 137 146 154;
-  }
-  html, body { margin: 0; padding: 0; width: 100%; height: 100%; overflow: hidden; background: rgb(var(--surface_rgb)); cursor: none; }
-  canvas { display: block; width: 100vw; height: 100vh; }
-  #clock { position: fixed; left: 32px; bottom: 28px; font-family: "Google Sans","Segoe UI",Roboto,system-ui,sans-serif; font-weight: 400; font-variant-numeric: tabular-nums; letter-spacing: 0.5px; font-size: clamp(28px,4vw,56px); text-shadow: 0 0 24px rgba(0,0,0,0.4); pointer-events: none; transition: opacity 0.6s ease; }
-  #clock .ampm { font-size: 0.36em; margin-left: 6px; opacity: 0.82; vertical-align: middle; }
-  #date { position: fixed; left: 34px; bottom: 14px; font-family: "Google Sans","Segoe UI",Roboto,system-ui,sans-serif; font-size: clamp(12px,1.2vw,16px); letter-spacing: 1.5px; text-transform: uppercase; pointer-events: none; transition: opacity 0.6s ease; }
-  #hint { position: fixed; right: 28px; bottom: 26px; font-family: "Google Sans","Segoe UI",Roboto,system-ui,sans-serif; font-size: 13px; letter-spacing: 0.5px; pointer-events: none; opacity: 0; transition: opacity 0.8s ease; }
-  #hint.show { opacity: 1; }
-  #clock.hidden, #date.hidden { opacity: 0; }
+:root {
+  --primary_rgb: 138 206 255;
+  --secondary_rgb: 180 199 233;
+  --tertiary_rgb: 186 196 250;
+  --primary_container_rgb: 0 75 111;
+  --secondary_container_rgb: 53 72 99;
+  --tertiary_container_rgb: 58 68 114;
+  --surface_rgb: 12 20 27;
+  --surface_bright_rgb: 50 58 65;
+  --outline_rgb: 137 146 154;
+}
+* { margin: 0; padding: 0; box-sizing: border-box; }
+html, body {
+  width: 100%; height: 100%; overflow: hidden;
+  background: rgb(var(--surface_rgb));
+  cursor: none;
+  font-family: "Google Sans", "Segoe UI", system-ui, sans-serif;
+}
+body.show-cursor { cursor: default; }
+canvas { display: block; width: 100vw; height: 100vh; }
+
+#clock-wrap {
+  position: fixed;
+  left: clamp(20px, 2.5vw, 40px);
+  bottom: clamp(16px, 2vw, 28px);
+  padding: 18px 26px 14px;
+  border-radius: 20px;
+  background: radial-gradient(
+    ellipse at 30% 70%,
+    rgb(var(--surface_rgb) / .88) 0%,
+    rgb(var(--surface_rgb) / .55) 55%,
+    transparent 100%
+  );
+  pointer-events: none;
+  transition: opacity .7s ease;
+  z-index: 10;
+}
+#clock-wrap.hidden { opacity: 0; }
+
+#clock {
+  font-weight: 200;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: -2px;
+  font-size: clamp(40px, 5.5vw, 78px);
+  color: rgb(var(--primary_rgb));
+  text-shadow:
+    0 0 2px rgb(var(--surface_rgb)),
+    0 0 14px rgb(var(--surface_rgb) / .95),
+    0 0 36px rgb(var(--primary_rgb) / .5),
+    0 2px 14px rgba(0,0,0,.85);
+  line-height: 1;
+}
+#clock .ampm {
+  font-size: .26em;
+  margin-left: 10px;
+  opacity: .78;
+  vertical-align: 22%;
+  letter-spacing: 2px;
+  font-weight: 400;
+}
+#date {
+  margin-top: 8px;
+  font-size: clamp(11px, 1.05vw, 14px);
+  letter-spacing: 4px;
+  text-transform: uppercase;
+  color: rgb(var(--secondary_rgb));
+  text-shadow:
+    0 0 8px rgb(var(--surface_rgb) / .9),
+    0 1px 8px rgba(0,0,0,.7);
+  opacity: .95;
+}
+
+#hint {
+  position: fixed; right: 28px; bottom: 24px; z-index: 10;
+  font-size: 11px; letter-spacing: 1.5px;
+  color: rgb(var(--outline_rgb) / .55);
+  opacity: 0; transition: opacity 1s ease;
+  text-transform: uppercase;
+  pointer-events: none;
+  text-shadow: 0 1px 8px rgb(var(--surface_rgb));
+}
+#hint.show { opacity: .7; }
 </style>
 <link rel="stylesheet" href="file:///home/sakib/.config/matugen/matugen-colors.css">
 </head>
 <body>
 <canvas id="c"></canvas>
-<div id="clock">00:00</div>
-<div id="date">Mon, Jan 1</div>
-<div id="hint">press C to toggle clock</div>
-<script src="clock-shared.js"></script>
+<div id="clock-wrap">
+  <div id="clock">00:00<span class="ampm">AM</span></div>
+  <div id="date">MON, JAN 1</div>
+</div>
+<div id="hint">C · toggle clock</div>
+
 <script>
-const canvas = document.getElementById('c');
-const ctx = canvas.getContext('2d');
-const clockEl = document.getElementById('clock');
-const dateEl = document.getElementById('date');
-const hintEl = document.getElementById('hint');
+"use strict";
 
-let dpr = Math.min(window.devicePixelRatio || 1, 2);
-let W, H;
-function resize() {
-  W = window.innerWidth; H = window.innerHeight;
-  canvas.width = W * dpr; canvas.height = H * dpr;
-  ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
-}
-window.addEventListener('resize', resize);
-resize();
+const canvas = document.getElementById("c");
+const ctx = canvas.getContext("2d", { alpha: false, desynchronized: true });
+const clockEl = document.getElementById("clock");
+const dateEl  = document.getElementById("date");
+const hintEl  = document.getElementById("hint");
+const clockWrap = document.getElementById("clock-wrap");
 
-const reduceMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
-const speedMul = reduceMotion ? 0.3 : 1;
-
-function readRGB(name) {
-  const raw = getComputedStyle(document.documentElement).getPropertyValue(name).trim();
-  const parts = raw.split(/\s+/).map(Number);
-  if (parts.length === 3 && parts.every(n => !isNaN(n))) return parts;
-  return [200, 200, 200];
-}
-function rgba(rgb, a) { return `rgba(${rgb[0]}, ${rgb[1]}, ${rgb[2]}, ${a})`; }
-
+let W = 0, H = 0, DPR = 1;
 let theme = {};
 let roleList = [];
-function loadTheme() {
-  theme = {
-    surface: readRGB('--surface_rgb'), surfaceBright: readRGB('--surface_bright_rgb'),
-    primary: readRGB('--primary_rgb'), secondary: readRGB('--secondary_rgb'), tertiary: readRGB('--tertiary_rgb'),
-    primaryContainer: readRGB('--primary_container_rgb'), secondaryContainer: readRGB('--secondary_container_rgb'),
-    tertiaryContainer: readRGB('--tertiary_container_rgb'), outline: readRGB('--outline_rgb'),
-  };
-  roleList = [theme.primary, theme.secondary, theme.tertiary, theme.primaryContainer, theme.secondaryContainer, theme.tertiaryContainer];
-  clockEl.style.color = rgba(theme.primary, 0.92);
-  dateEl.style.color = rgba(theme.secondary, 0.85);
-  hintEl.style.color = rgba(theme.outline, 0.9);
-  cranes.forEach((c, i) => { c.color = roleList[i % roleList.length]; });
-}
+let cranes = [];
+let start = performance.now();
+let lastT = 0;
+let cursorTimer;
 
-// boids flocking: separation (avoid crowding), alignment (match neighbor heading),
-// cohesion (steer toward local flock center) — three simple local rules that
-// produce convincing emergent flock movement with no scripted paths at all
 const NEIGHBOR_R = 130;
 const SEPARATION_R = 45;
-let cranes = [];
+const reduceMotion = matchMedia("(prefers-reduced-motion: reduce)").matches;
+const speedMul = reduceMotion ? 0.3 : 0.85;
+
+function readRGB(name, fb = [160, 160, 160]) {
+  const r = getComputedStyle(document.documentElement).getPropertyValue(name).trim();
+  const p = r.split(/\s+/).map(Number);
+  return (p.length === 3 && p.every(n => !isNaN(n))) ? p : fb;
+}
+function rgba(c, a = 1) {
+  return `rgba(${c[0]},${c[1]},${c[2]},${a})`;
+}
+
+function loadTheme() {
+  theme = {
+    surface:            readRGB("--surface_rgb", [12, 20, 27]),
+    surfaceBright:      readRGB("--surface_bright_rgb", [50, 58, 65]),
+    primary:            readRGB("--primary_rgb", [138, 206, 255]),
+    secondary:          readRGB("--secondary_rgb", [180, 199, 233]),
+    tertiary:           readRGB("--tertiary_rgb", [186, 196, 250]),
+    primaryContainer:   readRGB("--primary_container_rgb", [0, 75, 111]),
+    secondaryContainer: readRGB("--secondary_container_rgb", [53, 72, 99]),
+    tertiaryContainer:  readRGB("--tertiary_container_rgb", [58, 68, 114]),
+    outline:            readRGB("--outline_rgb", [137, 146, 154])
+  };
+
+  roleList = [
+    theme.primary,
+    theme.secondary,
+    theme.tertiary,
+    theme.primaryContainer,
+    theme.secondaryContainer,
+    theme.tertiaryContainer
+  ];
+
+  cranes.forEach((c, i) => {
+    c.color = roleList[i % roleList.length];
+  });
+
+  document.body.style.background = rgba(theme.surface);
+  clockEl.style.color = rgba(theme.primary, 1);
+  dateEl.style.color  = rgba(theme.secondary, 0.95);
+  hintEl.style.color  = rgba(theme.outline, 0.6);
+}
+
+function resize() {
+  W = innerWidth; H = innerHeight;
+  DPR = Math.min(devicePixelRatio || 1, 2);
+  canvas.width  = Math.floor(W * DPR);
+  canvas.height = Math.floor(H * DPR);
+  ctx.setTransform(DPR, 0, 0, DPR, 0, 0);
+}
+addEventListener("resize", resize, { passive: true });
 
 function makeCranes() {
   cranes = [];
   for (let i = 0; i < 18; i++) {
     const angle = Math.random() * Math.PI * 2;
     cranes.push({
-      x: Math.random() * W, y: Math.random() * H,
-      vx: Math.cos(angle) * 40, vy: Math.sin(angle) * 40,
+      x: Math.random() * W,
+      y: Math.random() * H,
+      vx: Math.cos(angle) * 40,
+      vy: Math.sin(angle) * 40,
       flapPhase: Math.random() * Math.PI * 2,
-      flapFreq: 3 + Math.random() * 1.5,
-      color: [200, 200, 200],
+      flapFreq: 2.8 + Math.random() * 1.6,
+      color: roleList[i % Math.max(1, roleList.length)] || [140, 200, 255]
     });
   }
 }
 
 function limitSpeed(c, min, max) {
   const sp = Math.hypot(c.vx, c.vy);
-  if (sp > max) { c.vx = (c.vx / sp) * max; c.vy = (c.vy / sp) * max; }
-  else if (sp < min && sp > 0.001) { c.vx = (c.vx / sp) * min; c.vy = (c.vy / sp) * min; }
+  if (sp > max) {
+    c.vx = (c.vx / sp) * max;
+    c.vy = (c.vy / sp) * max;
+  } else if (sp < min && sp > 0.001) {
+    c.vx = (c.vx / sp) * min;
+    c.vy = (c.vy / sp) * min;
+  }
 }
 
 function drawCrane(c, t) {
   const angle = Math.atan2(c.vy, c.vx);
   const flap = Math.sin(t * c.flapFreq + c.flapPhase);
-  const wingAngle = 0.3 + Math.abs(flap) * 0.9;
+  const wingAngle = 0.28 + Math.abs(flap) * 0.85;
   const size = 12;
 
   ctx.save();
   ctx.translate(c.x, c.y);
   ctx.rotate(angle);
-
-  ctx.strokeStyle = rgba(c.color, 0.85);
+  ctx.strokeStyle = rgba(c.color, 0.88);
   ctx.lineWidth = 1.6;
-  ctx.lineCap = 'round';
+  ctx.lineCap = "round";
 
-  // body
+  // Body
   ctx.beginPath();
   ctx.moveTo(-size, 0);
   ctx.lineTo(size, 0);
   ctx.stroke();
 
-  // wings (fold up/down for flap)
+  // Wings
   ctx.beginPath();
   ctx.moveTo(0, 0);
   ctx.lineTo(-size * 0.7, -size * wingAngle);
@@ -126,63 +225,72 @@ function drawCrane(c, t) {
   ctx.lineTo(-size * 0.7, size * wingAngle);
   ctx.stroke();
 
-  // head/beak fold
+  // Beak
   ctx.beginPath();
   ctx.moveTo(size, 0);
-  ctx.lineTo(size * 1.4, -size * 0.15);
+  ctx.lineTo(size * 1.35, -size * 0.14);
   ctx.stroke();
 
   ctx.restore();
 }
 
-let start = performance.now();
-let lastT = 0;
-
 function frame(now) {
   const t = ((now - start) / 1000) * speedMul;
-  const dt = Math.min(0.05, t - lastT);
+  const dt = Math.min(0.05, t - lastT || 0.016);
   lastT = t;
 
-  ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+  ctx.setTransform(DPR, 0, 0, DPR, 0, 0);
+
   const sky = ctx.createLinearGradient(0, 0, 0, H);
-  sky.addColorStop(0, `rgb(${(theme.surface || [12, 20, 27]).join(',')})`);
-  sky.addColorStop(1, `rgb(${(theme.surfaceBright || [40, 46, 52]).map(v => v * 0.6).join(',')})`);
+  sky.addColorStop(0, rgba(theme.surface, 1));
+  const bright = (theme.surfaceBright || theme.surface).map(v => Math.round(v * 0.65));
+  sky.addColorStop(1, rgba(bright, 1));
   ctx.fillStyle = sky;
   ctx.fillRect(0, 0, W, H);
 
   for (const c of cranes) {
-    let sepX = 0, sepY = 0, aliX = 0, aliY = 0, cohX = 0, cohY = 0, count = 0, sepCount = 0;
+    let sepX = 0, sepY = 0, aliX = 0, aliY = 0, cohX = 0, cohY = 0;
+    let count = 0, sepCount = 0;
+
     for (const other of cranes) {
       if (other === c) continue;
-      const dx = other.x - c.x, dy = other.y - c.y;
+      const dx = other.x - c.x;
+      const dy = other.y - c.y;
       const d = Math.hypot(dx, dy);
       if (d < NEIGHBOR_R && d > 0.001) {
-        aliX += other.vx; aliY += other.vy;
-        cohX += other.x; cohY += other.y;
+        aliX += other.vx;
+        aliY += other.vy;
+        cohX += other.x;
+        cohY += other.y;
         count++;
-        if (d < SEPARATION_R) { sepX -= dx / d; sepY -= dy / d; sepCount++; }
+        if (d < SEPARATION_R) {
+          sepX -= dx / d;
+          sepY -= dy / d;
+          sepCount++;
+        }
       }
     }
 
     if (count > 0) {
-      aliX /= count; aliY /= count;
-      cohX = cohX / count - c.x; cohY = cohY / count - c.y;
+      aliX /= count;
+      aliY /= count;
+      cohX = cohX / count - c.x;
+      cohY = cohY / count - c.y;
       c.vx += (aliX * 0.04 + cohX * 0.0025) * dt * 60;
       c.vy += (aliY * 0.04 + cohY * 0.0025) * dt * 60;
     }
     if (sepCount > 0) {
-      c.vx += sepX * 6 * dt * 60 / sepCount;
-      c.vy += sepY * 6 * dt * 60 / sepCount;
+      c.vx += (sepX * 6 * dt * 60) / sepCount;
+      c.vy += (sepY * 6 * dt * 60) / sepCount;
     }
 
-    // gentle pull back toward the screen if drifting far off it
     const margin = 80;
     if (c.x < margin) c.vx += 20 * dt;
     if (c.x > W - margin) c.vx -= 20 * dt;
     if (c.y < margin) c.vy += 20 * dt;
     if (c.y > H - margin) c.vy -= 20 * dt;
 
-    limitSpeed(c, 30, 70);
+    limitSpeed(c, 28, 68);
     c.x += c.vx * dt;
     c.y += c.vy * dt;
 
@@ -192,21 +300,55 @@ function frame(now) {
   requestAnimationFrame(frame);
 }
 
-let clockVisible = true;
-window.addEventListener('keydown', (e) => {
-  if (e.key.toLowerCase() === 'c') {
-    clockVisible = !clockVisible;
-    clockEl.classList.toggle('hidden', !clockVisible);
-    dateEl.classList.toggle('hidden', !clockVisible);
+addEventListener("pointermove", () => {
+  document.body.classList.add("show-cursor");
+  clearTimeout(cursorTimer);
+  cursorTimer = setTimeout(() => document.body.classList.remove("show-cursor"), 2500);
+}, { passive: true });
+
+addEventListener("keydown", e => {
+  if (e.key.toLowerCase() === "c") {
+    clockWrap.classList.toggle("hidden");
   }
 });
-hintEl.classList.add('show');
-setTimeout(() => hintEl.classList.remove('show'), 4000);
 
-window.addEventListener('load', () => {
+function fallbackClock() {
+  function update() {
+    const n = new Date();
+    let h = n.getHours();
+    const ap = h >= 12 ? "PM" : "AM";
+    h = h % 12 || 12;
+    clockEl.innerHTML =
+      `${String(h).padStart(2,"0")}:${String(n.getMinutes()).padStart(2,"0")}` +
+      `<span class="ampm">${ap}</span>`;
+    dateEl.textContent = n.toLocaleDateString("en-US", {
+      weekday: "short", month: "short", day: "numeric"
+    }).toUpperCase();
+  }
+  update();
+  setInterval(update, 1000);
+}
+
+addEventListener("load", () => {
+  loadTheme();
+  resize();
   makeCranes();
   loadTheme();
-  startClock(clockEl, dateEl);
+
+  const s = document.createElement("script");
+  s.src = "clock-shared.js";
+  s.onload = () => {
+    try {
+      if (typeof startClock === "function") startClock(clockEl, dateEl);
+      else fallbackClock();
+    } catch { fallbackClock(); }
+  };
+  s.onerror = fallbackClock;
+  document.head.appendChild(s);
+
+  hintEl.classList.add("show");
+  setTimeout(() => hintEl.classList.remove("show"), 4000);
+
   requestAnimationFrame(frame);
 });
 </script>

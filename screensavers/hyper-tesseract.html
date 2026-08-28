@@ -5,177 +5,117 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Material Screensaver — Hyper-Tesseract 4D</title>
 <style>
-  :root {
-    --primary_rgb: 138 206 255;
-    --primary_container_rgb: 0 75 111;
-    --secondary_rgb: 180 199 233;
-    --tertiary_rgb: 186 196 250;
-    --surface_rgb: 8 13 18;
-    --surface_bright_rgb: 50 58 65;
-    --on_surface_variant_rgb: 191 199 209;
-    --outline_rgb: 137 146 154;
-  }
-  html, body {
-    margin: 0; padding: 0; width: 100%; height: 100%;
-    overflow: hidden; background: rgb(var(--surface_rgb));
-    font-family: "Google Sans", "Segoe UI", Roboto, system-ui, sans-serif;
-    user-select: none;
-  }
+:root {
+  --primary_rgb: 138 206 255;
+  --secondary_rgb: 180 199 233;
+  --tertiary_rgb: 186 196 250;
+  --surface_rgb: 8 13 18;
+  --outline_rgb: 137 146 154;
+}
+* { margin: 0; padding: 0; box-sizing: border-box; }
+html, body {
+  width: 100%; height: 100%; overflow: hidden;
+  background: rgb(var(--surface_rgb));
+  cursor: none;
+  font-family: "Google Sans", "Segoe UI", system-ui, sans-serif;
+}
+body.show-cursor { cursor: default; }
+canvas { display: block; width: 100vw; height: 100vh; }
 
-  body { cursor: none; }
-  body.show-cursor { cursor: default; }
+#clock-wrap {
+  position: fixed;
+  left: clamp(20px, 2.5vw, 40px);
+  bottom: clamp(16px, 2vw, 28px);
+  padding: 18px 26px 14px;
+  border-radius: 20px;
+  background: radial-gradient(
+    ellipse at 30% 70%,
+    rgb(var(--surface_rgb) / .85) 0%,
+    rgb(var(--surface_rgb) / .5) 55%,
+    transparent 100%
+  );
+  pointer-events: none;
+  transition: opacity .7s ease;
+  z-index: 10;
+}
+#clock-wrap.hidden { opacity: 0; }
 
-  canvas { display: block; width: 100vw; height: 100vh; }
+#clock {
+  font-weight: 200;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: -2px;
+  font-size: clamp(40px, 5.5vw, 78px);
+  color: rgb(var(--primary_rgb));
+  text-shadow:
+    0 0 2px rgb(var(--surface_rgb)),
+    0 0 14px rgb(var(--surface_rgb) / .95),
+    0 0 36px rgb(var(--primary_rgb) / .5),
+    0 2px 14px rgba(0,0,0,.85);
+  line-height: 1;
+}
+#clock .ampm {
+  font-size: .26em;
+  margin-left: 10px;
+  opacity: .78;
+  vertical-align: 22%;
+  letter-spacing: 2px;
+  font-weight: 400;
+}
+#date {
+  margin-top: 8px;
+  font-size: clamp(11px, 1.05vw, 14px);
+  letter-spacing: 4px;
+  text-transform: uppercase;
+  color: rgb(var(--secondary_rgb));
+  text-shadow:
+    0 0 8px rgb(var(--surface_rgb) / .9),
+    0 1px 8px rgba(0,0,0,.7);
+  opacity: .95;
+}
 
-  #ui-container {
-    position: fixed; inset: 0; pointer-events: none; z-index: 10;
-    display: flex; flex-direction: column; justify-content: flex-end;
-    padding: 48px; box-sizing: border-box;
-    transition: opacity 0.6s cubic-bezier(0.16, 1, 0.3, 1), transform 0.6s cubic-bezier(0.16, 1, 0.3, 1);
-  }
-  #ui-container.hidden { opacity: 0; transform: translateY(12px); }
-
-  .vignette-card {
-    background: radial-gradient(circle at bottom left, rgb(var(--surface_rgb) / 0.75) 0%, rgb(var(--surface_rgb) / 0.2) 70%);
-    backdrop-filter: blur(16px);
-    -webkit-backdrop-filter: blur(16px);
-    padding: 28px 36px;
-    width: fit-content;
-    border-radius: 24px;
-    border: 1px solid rgb(var(--outline_rgb) / 0.15);
-    box-shadow: 0 16px 40px rgba(0, 0, 0, 0.5), inset 0 1px 0 rgba(255, 255, 255, 0.05);
-  }
-
-  #clock {
-    font-size: clamp(52px, 7vw, 84px);
-    font-weight: 200;
-    font-variant-numeric: tabular-nums;
-    letter-spacing: -2px;
-    line-height: 0.95;
-    text-shadow: 0 2px 12px rgba(0, 0, 0, 0.4);
-  }
-  #clock .ampm {
-    font-size: 0.28em;
-    margin-left: 8px;
-    opacity: 0.75;
-    font-weight: 500;
-    text-transform: uppercase;
-    vertical-align: super;
-    letter-spacing: 1.5px;
-  }
-  #date {
-    font-size: clamp(12px, 1.3vw, 15px);
-    letter-spacing: 3.5px;
-    text-transform: uppercase;
-    margin-top: 10px;
-    opacity: 0.9;
-    font-weight: 500;
-  }
-  #hint {
-    position: fixed; right: 36px; bottom: 36px;
-    font-size: 11px; letter-spacing: 2px; text-transform: uppercase;
-    opacity: 0; transition: opacity 0.8s ease;
-    padding: 10px 18px;
-    background: rgb(var(--surface_rgb) / 0.6);
-    backdrop-filter: blur(8px);
-    border: 1px solid rgb(var(--outline_rgb) / 0.1);
-    border-radius: 12px;
-    pointer-events: none;
-  }
-  #hint.show { opacity: 0.7; }
+#hint {
+  position: fixed; right: 28px; bottom: 24px; z-index: 10;
+  font-size: 11px; letter-spacing: 1.5px;
+  color: rgb(var(--outline_rgb) / .55);
+  opacity: 0; transition: opacity 1s ease;
+  text-transform: uppercase;
+  pointer-events: none;
+  text-shadow: 0 1px 8px rgb(var(--surface_rgb));
+}
+#hint.show { opacity: .7; }
 </style>
 <link rel="stylesheet" href="file:///home/sakib/.config/matugen/matugen-colors.css">
 </head>
 <body>
 <canvas id="c"></canvas>
-
-<div id="ui-container">
-  <div class="vignette-card">
-    <div id="clock">00:00</div>
-    <div id="date">Mon, Jan 1</div>
-  </div>
+<div id="clock-wrap">
+  <div id="clock">00:00<span class="ampm">AM</span></div>
+  <div id="date">MON, JAN 1</div>
 </div>
-<div id="hint">Press <b>C</b> to toggle UI</div>
+<div id="hint">C · toggle clock</div>
 
-<script src="clock-shared.js"></script>
 <script>
-const canvas = document.getElementById('c');
-const ctx = canvas.getContext('2d');
-const clockEl = document.getElementById('clock');
-const dateEl = document.getElementById('date');
-const hintEl = document.getElementById('hint');
-const uiContainer = document.getElementById('ui-container');
+"use strict";
 
-let cursorTimeout;
-function triggerCursor() {
-  document.body.classList.add('show-cursor');
-  clearTimeout(cursorTimeout);
-  cursorTimeout = setTimeout(() => {
-    document.body.classList.remove('show-cursor');
-  }, 2500);
-}
-window.addEventListener('pointermove', triggerCursor);
+const canvas = document.getElementById("c");
+const ctx = canvas.getContext("2d", { alpha: false, desynchronized: true });
+const clockEl = document.getElementById("clock");
+const dateEl  = document.getElementById("date");
+const hintEl  = document.getElementById("hint");
+const clockWrap = document.getElementById("clock-wrap");
 
-let dpr = Math.min(window.devicePixelRatio || 1, 2);
-let W, H, cx, cy;
-function resize() {
-  W = window.innerWidth;
-  H = window.innerHeight;
-  cx = W / 2;
-  cy = H / 2;
-  canvas.width = W * dpr;
-  canvas.height = H * dpr;
-  ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
-}
-window.addEventListener('resize', resize);
-resize();
-
-const reduceMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
-const speedMul = reduceMotion ? 0.2 : 1;
-
-function readRGB(name, fallback) {
-  const raw = getComputedStyle(document.documentElement).getPropertyValue(name).trim();
-  const parts = raw.split(/\s+/).map(Number);
-  return (parts.length === 3 && parts.every(n => !isNaN(n))) ? parts : fallback;
-}
-function rgba(rgb, a) {
-  const c = rgb || [200, 200, 200];
-  return `rgba(${c[0]}, ${c[1]}, ${c[2]}, ${a})`;
-}
-
+let W = 0, H = 0, DPR = 1, cx = 0, cy = 0;
 let theme = {};
-function applyTheme() {
-  theme = {
-    surface: readRGB('--surface_rgb', [8, 13, 18]),
-    primary: readRGB('--primary_rgb', [138, 206, 255]),
-    secondary: readRGB('--secondary_rgb', [180, 199, 233]),
-    tertiary: readRGB('--tertiary_rgb', [186, 196, 250]),
-    outline: readRGB('--outline_rgb', [137, 146, 154]),
-  };
+let start = performance.now();
+let cursorTimer;
 
-  document.body.style.backgroundColor = rgba(theme.surface, 1);
-  clockEl.style.color = rgba(theme.primary, 1);
-  dateEl.style.color = rgba(theme.secondary, 0.9);
-  hintEl.style.color = rgba(theme.outline, 1);
-}
+const reduceMotion = matchMedia("(prefers-reduced-motion: reduce)").matches;
+const speedMul = reduceMotion ? 0.22 : 0.7;
 
-async function loadMatugenColors() {
-  try {
-    const res = await fetch('file:///home/sakib/.config/matugen/matugen-colors.css');
-    if (res.ok) {
-      const cssText = await res.text();
-      const styleTag = document.createElement('style');
-      styleTag.textContent = cssText;
-      document.head.appendChild(styleTag);
-    }
-  } catch (e) {}
-  applyTheme();
-}
-
-// Generate the 16 vertices of a 4D Hypercube (Tesseract)
-const tesseractVertices = [];
+// 16 vertices of unit tesseract
+const verts4 = [];
 for (let i = 0; i < 16; i++) {
-  tesseractVertices.push([
+  verts4.push([
     (i & 1) ? 1 : -1,
     (i & 2) ? 1 : -1,
     (i & 4) ? 1 : -1,
@@ -183,157 +123,203 @@ for (let i = 0; i < 16; i++) {
   ]);
 }
 
-// Generate the 32 edges connecting vertices that differ by only one coordinate
-const tesseractEdges = [];
+// 32 edges (differ by one axis)
+const edges = [];
 for (let i = 0; i < 16; i++) {
   for (let j = i + 1; j < 16; j++) {
     let diff = 0;
     for (let c = 0; c < 4; c++) {
-      if (tesseractVertices[i][c] !== tesseractVertices[j][c]) diff++;
+      if (verts4[i][c] !== verts4[j][c]) diff++;
     }
-    if (diff === 1) {
-      tesseractEdges.push([i, j]);
-    }
+    if (diff === 1) edges.push([i, j]);
   }
 }
 
-let start = performance.now();
+function readRGB(name, fb = [160, 160, 160]) {
+  const r = getComputedStyle(document.documentElement).getPropertyValue(name).trim();
+  const p = r.split(/\s+/).map(Number);
+  return (p.length === 3 && p.every(n => !isNaN(n))) ? p : fb;
+}
+function rgba(c, a = 1) {
+  return `rgba(${c[0]},${c[1]},${c[2]},${a})`;
+}
+
+function loadTheme() {
+  theme = {
+    surface:   readRGB("--surface_rgb", [8, 13, 18]),
+    primary:   readRGB("--primary_rgb", [138, 206, 255]),
+    secondary: readRGB("--secondary_rgb", [180, 199, 233]),
+    tertiary:  readRGB("--tertiary_rgb", [186, 196, 250]),
+    outline:   readRGB("--outline_rgb", [137, 146, 154])
+  };
+  document.body.style.background = rgba(theme.surface);
+  clockEl.style.color = rgba(theme.primary, 1);
+  dateEl.style.color  = rgba(theme.secondary, 0.95);
+  hintEl.style.color  = rgba(theme.outline, 0.6);
+}
+
+function resize() {
+  W = innerWidth; H = innerHeight;
+  cx = W * 0.5; cy = H * 0.5;
+  DPR = Math.min(devicePixelRatio || 1, 2);
+  canvas.width  = Math.floor(W * DPR);
+  canvas.height = Math.floor(H * DPR);
+  ctx.setTransform(DPR, 0, 0, DPR, 0, 0);
+}
+addEventListener("resize", resize, { passive: true });
+
+function project4(v, aXY, aZW, aXW, aYZ) {
+  let x = v[0], y = v[1], z = v[2], w = v[3];
+
+  // XY
+  let c = Math.cos(aXY), s = Math.sin(aXY);
+  let x1 = x * c - y * s;
+  let y1 = x * s + y * c;
+  x = x1; y = y1;
+
+  // ZW
+  c = Math.cos(aZW); s = Math.sin(aZW);
+  let z1 = z * c - w * s;
+  let w1 = z * s + w * c;
+  z = z1; w = w1;
+
+  // XW
+  c = Math.cos(aXW); s = Math.sin(aXW);
+  let x2 = x * c - w * s;
+  let w2 = x * s + w * c;
+  x = x2; w = w2;
+
+  // YZ (extra plane for richer motion)
+  c = Math.cos(aYZ); s = Math.sin(aYZ);
+  let y2 = y * c - z * s;
+  let z2 = y * s + z * c;
+  y = y2; z = z2;
+
+  // 4D → 3D
+  const d4 = 2.6;
+  const ws = 1 / (d4 - w);
+  const x3 = x * ws;
+  const y3 = y * ws;
+  const z3 = z * ws;
+
+  // 3D → 2D
+  const d3 = 3.4;
+  const zs = 1 / (d3 - z3);
+  const scale = Math.min(W, H) * 0.3;
+
+  return {
+    x: cx + x3 * scale * zs * 2.15,
+    y: cy + y3 * scale * zs * 2.15,
+    depth: w + z3
+  };
+}
 
 function frame(now) {
-  const t = ((now - start) / 1000) * speedMul * 0.35;
+  const t = ((now - start) / 1000) * speedMul * 0.38;
 
-  ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
-  const surf = theme.surface || [8, 13, 18];
-  ctx.fillStyle = `rgba(${surf.join(',')}, 0.35)`;
+  ctx.setTransform(DPR, 0, 0, DPR, 0, 0);
+  ctx.fillStyle = rgba(theme.surface, 0.28);
   ctx.fillRect(0, 0, W, H);
 
-  // Rotation angles across multiple 4D planes
-  const angleXY = t * 0.7;
-  const angleZW = t * 0.45;
-  const angleXW = t * 0.25;
+  const aXY = t * 0.72;
+  const aZW = t * 0.48;
+  const aXW = t * 0.28;
+  const aYZ = t * 0.18;
 
-  const projectedVertices = [];
+  const projected = verts4.map(v => project4(v, aXY, aZW, aXW, aYZ));
 
-  // Matrix transformations for 4D -> 3D -> 2D
-  tesseractVertices.forEach(v => {
-    let x = v[0], y = v[1], z = v[2], w = v[3];
+  // Depth-sort edges back → front
+  const edgeDraw = edges.map((e, i) => {
+    const p1 = projected[e[0]];
+    const p2 = projected[e[1]];
+    return {
+      p1, p2,
+      depth: (p1.depth + p2.depth) * 0.5,
+      idx: i
+    };
+  }).sort((a, b) => a.depth - b.depth);
 
-    // 1. Rotate XY plane
-    let cos = Math.cos(angleXY), sin = Math.sin(angleXY);
-    let x1 = x * cos - y * sin;
-    let y1 = x * sin + y * cos;
-    x = x1; y = y1;
+  const roles = [theme.primary, theme.secondary, theme.tertiary];
+  ctx.lineCap = "round";
 
-    // 2. Rotate ZW plane
-    cos = Math.cos(angleZW); sin = Math.sin(angleZW);
-    let z1 = z * cos - w * sin;
-    let w1 = z * sin + w * cos;
-    z = z1; w = w1;
+  for (const e of edgeDraw) {
+    const alpha = Math.max(0.12, Math.min(0.9, (e.depth + 2.2) * 0.24));
+    const col = roles[e.idx % 3] || theme.primary;
 
-    // 3. Rotate XW plane
-    cos = Math.cos(angleXW); sin = Math.sin(angleXW);
-    let x2 = x * cos - w * sin;
-    let w2 = x * sin + w * cos;
-    x = x2; w = w2;
-
-    // 4D to 3D perspective projection
-    const distance4D = 2.5;
-    let wScale = 1 / (distance4D - w);
-    let x3 = x * wScale;
-    let y3 = y * wScale;
-    let z3 = z * wScale;
-
-    // 3D to 2D perspective projection
-    const distance3D = 3.5;
-    let zScale = 1 / (distance3D - z3);
-    const scaleFactor = Math.min(W, H) * 0.28;
-
-    projectedVertices.push({
-      x: cx + x3 * scaleFactor * zScale * 2.2,
-      y: cy + y3 * scaleFactor * zScale * 2.2,
-      depth: w + z3
-    });
-  });
-
-  // Draw 32 edges with enhanced depth-based styling
-  tesseractEdges.forEach((edge, idx) => {
-    const p1 = projectedVertices[edge[0]];
-    const p2 = projectedVertices[edge[1]];
-
-    const avgDepth = (p1.depth + p2.depth) / 2;
-    const alpha = Math.max(0.1, Math.min(0.85, (avgDepth + 2) * 0.22));
-    
-    const colKey = idx % 3 === 0 ? 'primary' : (idx % 3 === 1 ? 'secondary' : 'tertiary');
-    
     ctx.beginPath();
-    ctx.moveTo(p1.x, p1.y);
-    ctx.lineTo(p2.x, p2.y);
-    ctx.strokeStyle = rgba(theme[colKey], alpha);
-    ctx.lineWidth = 1.8;
+    ctx.moveTo(e.p1.x, e.p1.y);
+    ctx.lineTo(e.p2.x, e.p2.y);
+    ctx.strokeStyle = rgba(col, alpha);
+    ctx.lineWidth = 1.5 + alpha * 1.2;
     ctx.stroke();
-  });
+  }
 
-  // Draw glowing vertex nodes
-  projectedVertices.forEach(p => {
-    const glowAlpha = Math.max(0.15, Math.min(0.9, (p.depth + 2) * 0.28));
-    
-    const grad = ctx.createRadialGradient(p.x, p.y, 0, p.x, p.y, 14);
-    grad.addColorStop(0, rgba(theme.primary, glowAlpha));
-    grad.addColorStop(1, 'rgba(0,0,0,0)');
-    
+  // Vertices
+  for (const p of projected) {
+    const glow = Math.max(0.15, Math.min(0.95, (p.depth + 2.2) * 0.3));
+    const grad = ctx.createRadialGradient(p.x, p.y, 0, p.x, p.y, 12);
+    grad.addColorStop(0, rgba(theme.primary, glow * 0.7));
+    grad.addColorStop(1, "transparent");
     ctx.fillStyle = grad;
     ctx.beginPath();
-    ctx.arc(p.x, p.y, 14, 0, Math.PI * 2);
+    ctx.arc(p.x, p.y, 12, 0, Math.PI * 2);
     ctx.fill();
 
     ctx.beginPath();
-    ctx.arc(p.x, p.y, 3, 0, Math.PI * 2);
-    ctx.fillStyle = rgba(theme.primary, 1);
+    ctx.arc(p.x, p.y, 2.6, 0, Math.PI * 2);
+    ctx.fillStyle = rgba(theme.primary, 0.95);
     ctx.fill();
-  });
+  }
 
   requestAnimationFrame(frame);
 }
 
-function fallbackClock() {
-  const update = () => {
-    const now = new Date();
-    let hours = now.getHours();
-    const minutes = String(now.getMinutes()).padStart(2, '0');
-    const ampm = hours >= 12 ? 'PM' : 'AM';
-    hours = hours % 12 || 12;
-    clockEl.innerHTML = `${String(hours).padStart(2, '0')}:${minutes}<span class="ampm">${ampm}</span>`;
+addEventListener("pointermove", () => {
+  document.body.classList.add("show-cursor");
+  clearTimeout(cursorTimer);
+  cursorTimer = setTimeout(() => document.body.classList.remove("show-cursor"), 2500);
+}, { passive: true });
 
-    const options = { weekday: 'short', month: 'short', day: 'numeric' };
-    dateEl.textContent = now.toLocaleDateString('en-US', options);
-  };
+addEventListener("keydown", e => {
+  if (e.key.toLowerCase() === "c") {
+    clockWrap.classList.toggle("hidden");
+  }
+});
+
+function fallbackClock() {
+  function update() {
+    const n = new Date();
+    let h = n.getHours();
+    const ap = h >= 12 ? "PM" : "AM";
+    h = h % 12 || 12;
+    clockEl.innerHTML =
+      `${String(h).padStart(2,"0")}:${String(n.getMinutes()).padStart(2,"0")}` +
+      `<span class="ampm">${ap}</span>`;
+    dateEl.textContent = n.toLocaleDateString("en-US", {
+      weekday: "short", month: "short", day: "numeric"
+    }).toUpperCase();
+  }
   update();
   setInterval(update, 1000);
 }
 
-let uiVisible = true;
-window.addEventListener('keydown', (e) => {
-  if (e.key.toLowerCase() === 'c') {
-    uiVisible = !uiVisible;
-    uiContainer.classList.toggle('hidden', !uiVisible);
-  }
-});
+addEventListener("load", () => {
+  loadTheme();
+  resize();
 
-hintEl.classList.add('show');
-setTimeout(() => hintEl.classList.remove('show'), 4000);
+  const s = document.createElement("script");
+  s.src = "clock-shared.js";
+  s.onload = () => {
+    try {
+      if (typeof startClock === "function") startClock(clockEl, dateEl);
+      else fallbackClock();
+    } catch { fallbackClock(); }
+  };
+  s.onerror = fallbackClock;
+  document.head.appendChild(s);
 
-window.addEventListener('load', async () => {
-  await loadMatugenColors();
-
-  try {
-    if (typeof startClock === 'function') {
-      startClock(clockEl, dateEl);
-    } else {
-      fallbackClock();
-    }
-  } catch (err) {
-    fallbackClock();
-  }
+  hintEl.classList.add("show");
+  setTimeout(() => hintEl.classList.remove("show"), 4000);
 
   requestAnimationFrame(frame);
 });

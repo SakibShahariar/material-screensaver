@@ -5,297 +5,329 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Material Screensaver — Starfield</title>
 <style>
-  :root {
-    --primary_rgb: 138 206 255;
-    --primary_container_rgb: 0 75 111;
-    --secondary_rgb: 180 199 233;
-    --tertiary_rgb: 186 196 250;
-    --surface_rgb: 12 20 27;
-    --surface_bright_rgb: 50 58 65;
-    --on_surface_variant_rgb: 191 199 209;
-    --outline_rgb: 137 146 154;
-  }
-  html, body {
-    margin: 0; padding: 0; width: 100%; height: 100%;
-    overflow: hidden; background: rgb(var(--surface_rgb));
-    font-family: "Google Sans", "Segoe UI", Roboto, system-ui, sans-serif;
-    user-select: none;
-  }
+:root {
+  --primary_rgb: 138 206 255;
+  --primary_container_rgb: 0 75 111;
+  --secondary_rgb: 180 199 233;
+  --tertiary_rgb: 186 196 250;
+  --surface_rgb: 8 12 18;
+  --outline_rgb: 137 146 154;
+}
+* { margin: 0; padding: 0; box-sizing: border-box; }
+html, body {
+  width: 100%; height: 100%; overflow: hidden;
+  background: #080c12; cursor: none;
+  font-family: "Google Sans", "Segoe UI", system-ui, sans-serif;
+}
+body.show-cursor { cursor: default; }
+canvas { display: block; width: 100vw; height: 100vh; }
 
-  body { cursor: none; }
-  body.show-cursor { cursor: default; }
+#clock {
+  position: fixed;
+  left: clamp(28px, 3vw, 48px);
+  bottom: clamp(40px, 4.5vw, 56px);
+  font-weight: 200;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: -2px;
+  font-size: clamp(40px, 5.5vw, 78px);
+  color: rgb(var(--primary_rgb));
+  text-shadow:
+    0 0 40px rgb(var(--primary_rgb) / .4),
+    0 2px 16px rgba(0,0,0,.6);
+  pointer-events: none;
+  transition: opacity .7s ease;
+}
+#clock .ampm {
+  font-size: .26em;
+  margin-left: 10px;
+  opacity: .7;
+  vertical-align: 22%;
+  letter-spacing: 2px;
+  font-weight: 400;
+}
+#date {
+  position: fixed;
+  left: clamp(30px, 3.1vw, 50px);
+  bottom: clamp(18px, 2.2vw, 28px);
+  font-size: clamp(11px, 1.05vw, 14px);
+  letter-spacing: 4px;
+  text-transform: uppercase;
+  color: rgb(var(--secondary_rgb) / .85);
+  text-shadow: 0 1px 10px rgba(0,0,0,.5);
+  pointer-events: none;
+  transition: opacity .7s ease;
+}
+#clock.hidden, #date.hidden { opacity: 0; }
 
-  canvas { display: block; width: 100vw; height: 100vh; }
-
-  #ui-container {
-    position: fixed; inset: 0; pointer-events: none; z-index: 10;
-    display: flex; flex-direction: column; justify-content: flex-end;
-    padding: 36px; box-sizing: border-box;
-    transition: opacity 0.8s ease;
-  }
-  #ui-container.hidden { opacity: 0; }
-
-  .vignette-card {
-    background: radial-gradient(circle at center, rgba(12, 20, 27, 0.65) 0%, rgba(12, 20, 27, 0) 80%);
-    backdrop-filter: blur(10px);
-    -webkit-backdrop-filter: blur(10px);
-    padding: 24px 32px;
-    width: fit-content;
-    border-radius: 20px;
-  }
-
-  #clock {
-    font-size: clamp(32px, 4.5vw, 64px);
-    font-weight: 300;
-    font-variant-numeric: tabular-nums;
-    letter-spacing: -0.5px;
-    line-height: 1;
-    text-shadow: 0 2px 16px rgba(0, 0, 0, 0.7);
-  }
-  #clock .ampm {
-    font-size: 0.35em;
-    margin-left: 8px;
-    opacity: 0.8;
-    font-weight: 400;
-    text-transform: uppercase;
-  }
-  #date {
-    font-size: clamp(12px, 1.2vw, 15px);
-    letter-spacing: 2px;
-    text-transform: uppercase;
-    margin-top: 8px;
-    opacity: 0.85;
-    text-shadow: 0 2px 10px rgba(0, 0, 0, 0.7);
-  }
-  #hint {
-    position: fixed; right: 36px; bottom: 36px;
-    font-size: 12px; letter-spacing: 0.8px;
-    opacity: 0; transition: opacity 0.8s ease;
-    text-shadow: 0 2px 10px rgba(0, 0, 0, 0.7);
-  }
-  #hint.show { opacity: 0.75; }
+#hint {
+  position: fixed; right: 28px; bottom: 24px;
+  font-size: 11px; letter-spacing: 1.5px;
+  color: rgb(var(--outline_rgb) / .55);
+  opacity: 0; transition: opacity 1s ease;
+  text-transform: uppercase;
+  pointer-events: none;
+}
+#hint.show { opacity: .7; }
 </style>
 <link rel="stylesheet" href="file:///home/sakib/.config/matugen/matugen-colors.css">
 </head>
 <body>
-
 <canvas id="c"></canvas>
+<div id="clock">00:00<span class="ampm">AM</span></div>
+<div id="date">MON, JAN 1</div>
+<div id="hint">C · toggle clock</div>
 
-<div id="ui-container">
-  <div class="vignette-card">
-    <div id="clock">00:00</div>
-    <div id="date">Mon, Jan 1</div>
-  </div>
-  <div id="hint">Press <b>C</b> to toggle UI</div>
-</div>
-
-<script src="clock-shared.js"></script>
 <script>
-const canvas = document.getElementById('c');
-const ctx = canvas.getContext('2d');
-const clockEl = document.getElementById('clock');
-const dateEl = document.getElementById('date');
-const hintEl = document.getElementById('hint');
-const uiContainer = document.getElementById('ui-container');
+"use strict";
 
-let cursorTimeout;
-function triggerCursor() {
-  document.body.classList.add('show-cursor');
-  clearTimeout(cursorTimeout);
-  cursorTimeout = setTimeout(() => {
-    document.body.classList.remove('show-cursor');
-  }, 2500);
-}
-window.addEventListener('pointermove', triggerCursor);
+const canvas = document.getElementById("c");
+const ctx = canvas.getContext("2d", { alpha: false, desynchronized: true });
+const clockEl = document.getElementById("clock");
+const dateEl  = document.getElementById("date");
+const hintEl  = document.getElementById("hint");
 
-let dpr = Math.min(window.devicePixelRatio || 1, 2);
-let W, H, fov;
-
-function resize() {
-  W = window.innerWidth;
-  H = window.innerHeight;
-  canvas.width = W * dpr;
-  canvas.height = H * dpr;
-  ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
-  fov = Math.min(W, H) * 0.75;
-}
-window.addEventListener('resize', resize);
-
-const reduceMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
-const speedMul = reduceMotion ? 0.35 : 1.0;
-
-function readRGB(name, fallback) {
-  const raw = getComputedStyle(document.documentElement).getPropertyValue(name).trim();
-  const parts = raw.split(/\s+/).map(Number);
-  return (parts.length === 3 && parts.every(n => !isNaN(n))) ? parts : fallback;
-}
-function rgba(rgb, a) {
-  const c = rgb || [200, 200, 200];
-  return `rgba(${c[0]}, ${c[1]}, ${c[2]}, ${a})`;
-}
-
+let W, H, DPR, FOV;
 let theme = {};
+let stars = [];
+let dust = [];
+let mouse = { x: 0, y: 0, active: false };
+let focus = { x: 0, y: 0 };
+let start = performance.now();
+let last = start;
+let cursorTimer;
+
+const STAR_COUNT = 900;
+const DUST_COUNT = 120;
+const MAX_Z = 1400;
+const reduceMotion = matchMedia("(prefers-reduced-motion: reduce)").matches;
+const speedMul = reduceMotion ? 0.3 : 1;
+
+function readRGB(name, fb) {
+  const r = getComputedStyle(document.documentElement).getPropertyValue(name).trim();
+  const p = r.split(/\s+/).map(Number);
+  return (p.length === 3 && p.every(n => !isNaN(n))) ? p : fb;
+}
+function rgba(c, a = 1) {
+  return `rgba(${c[0]},${c[1]},${c[2]},${a})`;
+}
+
 function loadTheme() {
   theme = {
-    surface: readRGB('--surface_rgb', [12, 20, 27]),
-    surfaceBright: readRGB('--surface_bright_rgb', [50, 58, 65]),
-    primary: readRGB('--primary_rgb', [138, 206, 255]),
-    primaryContainer: readRGB('--primary_container_rgb', [0, 75, 111]),
-    secondary: readRGB('--secondary_rgb', [180, 199, 233]),
-    tertiary: readRGB('--tertiary_rgb', [186, 196, 250]),
-    outline: readRGB('--outline_rgb', [137, 146, 154]),
+    surface:          readRGB("--surface_rgb", [8, 12, 18]),
+    primary:          readRGB("--primary_rgb", [138, 206, 255]),
+    primaryContainer: readRGB("--primary_container_rgb", [0, 75, 111]),
+    secondary:        readRGB("--secondary_rgb", [180, 199, 233]),
+    tertiary:         readRGB("--tertiary_rgb", [186, 196, 250]),
+    outline:          readRGB("--outline_rgb", [137, 146, 154])
   };
-
-  clockEl.style.color = rgba(theme.primary, 0.95);
-  dateEl.style.color = rgba(theme.secondary, 0.85);
-  hintEl.style.color = rgba(theme.outline, 0.9);
+  document.body.style.background = rgba(theme.surface);
+  clockEl.style.color = rgba(theme.primary, 0.97);
+  dateEl.style.color  = rgba(theme.secondary, 0.88);
+  hintEl.style.color  = rgba(theme.outline, 0.6);
 }
 
-const STAR_COUNT = 700;
-const MAX_DEPTH = 1000;
-let stars = [];
+function resize() {
+  W = innerWidth; H = innerHeight;
+  DPR = Math.min(devicePixelRatio || 1, 2);
+  canvas.width  = Math.floor(W * DPR);
+  canvas.height = Math.floor(H * DPR);
+  ctx.setTransform(DPR, 0, 0, DPR, 0, 0);
+  FOV = Math.min(W, H) * 0.85;
+}
+addEventListener("resize", resize, { passive: true });
 
-function resetStar(s) {
-  s.x = (Math.random() - 0.5) * W * 2.5;
-  s.y = (Math.random() - 0.5) * H * 2.5;
-  s.z = MAX_DEPTH;
-  s.pz = MAX_DEPTH;
-  s.size = Math.random() * 1.5 + 0.5;
-  const colors = [theme.primary, theme.secondary, theme.tertiary, [255, 255, 255]];
-  s.color = colors[Math.floor(Math.random() * colors.length)];
+function resetStar(s, randomZ = false) {
+  s.x = (Math.random() - 0.5) * W * 3.2;
+  s.y = (Math.random() - 0.5) * H * 3.2;
+  s.z = randomZ ? Math.random() * MAX_Z : MAX_Z;
+  s.pz = s.z;
+  s.size = 0.4 + Math.random() * 1.8;
+
+  const roll = Math.random();
+  if (roll < 0.58)      s.color = theme.primary;
+  else if (roll < 0.78) s.color = theme.secondary;
+  else if (roll < 0.92) s.color = theme.tertiary;
+  else                   s.color = [255, 255, 255];
 }
 
 function initStars() {
   stars = [];
   for (let i = 0; i < STAR_COUNT; i++) {
     const s = {};
-    resetStar(s);
-    s.z = Math.random() * MAX_DEPTH;
-    s.pz = s.z;
+    resetStar(s, true);
     stars.push(s);
+  }
+  dust = [];
+  for (let i = 0; i < DUST_COUNT; i++) {
+    dust.push({
+      x: Math.random() * W,
+      y: Math.random() * H,
+      r: 0.6 + Math.random() * 2.4,
+      a: 0.03 + Math.random() * 0.07,
+      phase: Math.random() * Math.PI * 2
+    });
   }
 }
 
 function drawNebula(t) {
-  const cx = W * 0.5 + Math.sin(t * 0.15) * (W * 0.15);
-  const cy = H * 0.5 + Math.cos(t * 0.12) * (H * 0.15);
+  // Layered slow nebula using Material containers + accents
+  const layers = [
+    { cx: 0.5, cy: 0.45, rx: 0.7, ry: 0.55, speed: 0.07, color: theme.primaryContainer, a: 0.22 },
+    { cx: 0.28, cy: 0.62, rx: 0.5, ry: 0.4, speed: 0.05, color: theme.secondary, a: 0.1 },
+    { cx: 0.75, cy: 0.3, rx: 0.45, ry: 0.38, speed: 0.06, color: theme.tertiary, a: 0.09 },
+    { cx: 0.55, cy: 0.7, rx: 0.35, ry: 0.3, speed: 0.04, color: theme.primary, a: 0.06 }
+  ];
 
-  const nGrad1 = ctx.createRadialGradient(cx, cy, 10, cx, cy, Math.max(W, H) * 0.65);
-  nGrad1.addColorStop(0, rgba(theme.primaryContainer, 0.22));
-  nGrad1.addColorStop(0.5, rgba(theme.tertiary, 0.08));
-  nGrad1.addColorStop(1, rgba(theme.surface, 0));
+  for (const L of layers) {
+    const cx = W * (L.cx + Math.sin(t * L.speed) * 0.08);
+    const cy = H * (L.cy + Math.cos(t * L.speed * 0.85) * 0.07);
+    const rx = Math.max(W, H) * L.rx;
+    const ry = Math.max(W, H) * L.ry;
 
-  ctx.fillStyle = nGrad1;
-  ctx.fillRect(0, 0, W, H);
-
-  const cx2 = W * 0.3 + Math.cos(t * 0.1) * (W * 0.2);
-  const cy2 = H * 0.6 + Math.sin(t * 0.18) * (H * 0.2);
-
-  const nGrad2 = ctx.createRadialGradient(cx2, cy2, 20, cx2, cy2, Math.max(W, H) * 0.5);
-  nGrad2.addColorStop(0, rgba(theme.secondary, 0.12));
-  nGrad2.addColorStop(1, rgba(theme.surface, 0));
-
-  ctx.fillStyle = nGrad2;
-  ctx.fillRect(0, 0, W, H);
+    const g = ctx.createRadialGradient(cx, cy, 0, cx, cy, rx);
+    g.addColorStop(0, rgba(L.color, L.a));
+    g.addColorStop(0.45, rgba(L.color, L.a * 0.35));
+    g.addColorStop(1, "transparent");
+    ctx.fillStyle = g;
+    ctx.beginPath();
+    ctx.ellipse(cx, cy, rx, ry, 0, 0, Math.PI * 2);
+    ctx.fill();
+  }
 }
 
-let lastTime = performance.now();
-
 function frame(now) {
-  const dt = Math.min((now - lastTime) / 1000, 0.1);
-  lastTime = now;
-  const t = now / 1000;
+  const dt = Math.min((now - last) / 1000, 0.05);
+  last = now;
+  const t = (now - start) / 1000;
 
-  ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+  // Soft parallax
+  const tx = mouse.active ? (mouse.x - W * 0.5) * 0.035 : 0;
+  const ty = mouse.active ? (mouse.y - H * 0.5) * 0.035 : 0;
+  focus.x += (tx - focus.x) * 0.04;
+  focus.y += (ty - focus.y) * 0.04;
 
-  ctx.fillStyle = rgba(theme.surface, 0.4);
+  ctx.setTransform(DPR, 0, 0, DPR, 0, 0);
+
+  // Deep fade for motion trails
+  ctx.fillStyle = rgba(theme.surface, 0.28);
   ctx.fillRect(0, 0, W, H);
 
   drawNebula(t);
 
-  const speed = 280 * speedMul;
-  const halfW = W / 2;
-  const halfH = H / 2;
+  // Fine dust
+  for (const d of dust) {
+    const a = d.a * (0.6 + 0.4 * Math.sin(t * 0.3 + d.phase));
+    ctx.beginPath();
+    ctx.arc(d.x + focus.x * 0.3, d.y + focus.y * 0.3, d.r, 0, Math.PI * 2);
+    ctx.fillStyle = rgba(theme.primary, a);
+    ctx.fill();
+  }
 
-  for (let i = 0; i < stars.length; i++) {
-    const s = stars[i];
+  const speed = 320 * speedMul;
+  const hx = W * 0.5 + focus.x;
+  const hy = H * 0.5 + focus.y;
+
+  ctx.lineCap = "round";
+
+  for (const s of stars) {
     s.pz = s.z;
     s.z -= speed * dt;
 
-    if (s.z <= 1) {
+    if (s.z <= 2) {
       resetStar(s);
       continue;
     }
 
-    const k = fov / s.z;
-    const px = s.x * k + halfW;
-    const py = s.y * k + halfH;
+    const k  = FOV / s.z;
+    const pk = FOV / s.pz;
+    const px = s.x * k  + hx;
+    const py = s.y * k  + hy;
+    const ox = s.x * pk + hx;
+    const oy = s.y * pk + hy;
 
-    if (px < 0 || px >= W || py < 0 || py >= H) {
+    if (px < -60 || px > W + 60 || py < -60 || py > H + 60) {
       resetStar(s);
       continue;
     }
 
-    const pk = fov / s.pz;
-    const prevX = s.x * pk + halfW;
-    const prevY = s.y * pk + halfH;
+    const depth = 1 - s.z / MAX_Z;
+    const alpha = Math.min(1, depth * 1.7);
+    const size  = Math.max(0.6, depth * s.size * 2.8);
 
-    const alpha = Math.min(1, (1 - s.z / MAX_DEPTH) * 1.5);
-    const size = Math.max(0.8, (1 - s.z / MAX_DEPTH) * s.size * 2.2);
-
+    // Streak
     ctx.beginPath();
-    ctx.moveTo(prevX, prevY);
+    ctx.moveTo(ox, oy);
     ctx.lineTo(px, py);
-    ctx.strokeStyle = rgba(s.color || theme.primary, alpha * 0.85);
+    ctx.strokeStyle = rgba(s.color, alpha * 0.88);
     ctx.lineWidth = size;
-    ctx.lineCap = 'round';
     ctx.stroke();
+
+    // Core for nearby stars
+    if (depth > 0.5) {
+      ctx.beginPath();
+      ctx.arc(px, py, size * 0.4, 0, Math.PI * 2);
+      ctx.fillStyle = rgba(s.color, alpha * 0.75);
+      ctx.fill();
+    }
   }
 
   requestAnimationFrame(frame);
 }
 
-function fallbackClock() {
-  const update = () => {
-    const now = new Date();
-    let hours = now.getHours();
-    const minutes = String(now.getMinutes()).padStart(2, '0');
-    const ampm = hours >= 12 ? 'PM' : 'AM';
-    hours = hours % 12 || 12;
-    clockEl.innerHTML = `${String(hours).padStart(2, '0')}:${minutes}<span class="ampm">${ampm}</span>`;
+addEventListener("pointermove", e => {
+  mouse.x = e.clientX;
+  mouse.y = e.clientY;
+  mouse.active = true;
+  document.body.classList.add("show-cursor");
+  clearTimeout(cursorTimer);
+  cursorTimer = setTimeout(() => {
+    document.body.classList.remove("show-cursor");
+    mouse.active = false;
+  }, 2800);
+}, { passive: true });
 
-    const options = { weekday: 'short', month: 'short', day: 'numeric' };
-    dateEl.textContent = now.toLocaleDateString('en-US', options);
-  };
+addEventListener("keydown", e => {
+  if (e.key.toLowerCase() === "c") {
+    clockEl.classList.toggle("hidden");
+    dateEl.classList.toggle("hidden");
+  }
+});
+
+function fallbackClock() {
+  function update() {
+    const n = new Date();
+    let h = n.getHours();
+    const ap = h >= 12 ? "PM" : "AM";
+    h = h % 12 || 12;
+    clockEl.innerHTML =
+      `${String(h).padStart(2,"0")}:${String(n.getMinutes()).padStart(2,"0")}` +
+      `<span class="ampm">${ap}</span>`;
+    dateEl.textContent = n.toLocaleDateString("en-US", {
+      weekday: "short", month: "short", day: "numeric"
+    }).toUpperCase();
+  }
   update();
   setInterval(update, 1000);
 }
 
-let uiVisible = true;
-window.addEventListener('keydown', (e) => {
-  if (e.key.toLowerCase() === 'c') {
-    uiVisible = !uiVisible;
-    uiContainer.classList.toggle('hidden', !uiVisible);
-  }
-});
-
-hintEl.classList.add('show');
-setTimeout(() => hintEl.classList.remove('show'), 4000);
-
-window.addEventListener('load', () => {
-  resize();
+addEventListener("load", () => {
   loadTheme();
+  resize();
   initStars();
 
-  try {
-    if (typeof startClock === 'function') {
-      startClock(clockEl, dateEl);
-    } else {
-      fallbackClock();
-    }
-  } catch (err) {
-    fallbackClock();
-  }
+  const s = document.createElement("script");
+  s.src = "clock-shared.js";
+  s.onload = () => {
+    try {
+      if (typeof startClock === "function") startClock(clockEl, dateEl);
+      else fallbackClock();
+    } catch { fallbackClock(); }
+  };
+  s.onerror = fallbackClock;
+  document.head.appendChild(s);
+
+  hintEl.classList.add("show");
+  setTimeout(() => hintEl.classList.remove("show"), 4000);
 
   requestAnimationFrame(frame);
 });

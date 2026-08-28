@@ -5,220 +5,214 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Material Screensaver — Lorenz Attractor</title>
 <style>
-  :root {
-    --primary_rgb: 138 206 255;
-    --primary_container_rgb: 0 75 111;
-    --secondary_rgb: 180 199 233;
-    --secondary_container_rgb: 53 72 99;
-    --tertiary_rgb: 186 196 250;
-    --tertiary_container_rgb: 58 68 114;
-    --inverse_primary_rgb: 0 100 145;
-    --surface_rgb: 12 20 27;
-    --surface_bright_rgb: 50 58 65;
-    --on_surface_rgb: 219 227 237;
-    --on_surface_variant_rgb: 191 199 209;
-    --outline_rgb: 137 146 154;
-  }
-  html, body {
-    margin: 0; padding: 0; width: 100%; height: 100%;
-    overflow: hidden; background: rgb(var(--surface_rgb));
-    font-family: "Google Sans", "Segoe UI", Roboto, system-ui, sans-serif;
-    user-select: none;
-  }
+:root {
+  --primary_rgb: 138 206 255;
+  --secondary_rgb: 180 199 233;
+  --tertiary_rgb: 186 196 250;
+  --primary_container_rgb: 0 75 111;
+  --secondary_container_rgb: 53 72 99;
+  --tertiary_container_rgb: 58 68 114;
+  --inverse_primary_rgb: 0 100 145;
+  --surface_rgb: 12 20 27;
+  --outline_rgb: 137 146 154;
+}
+* { margin: 0; padding: 0; box-sizing: border-box; }
+html, body {
+  width: 100%; height: 100%; overflow: hidden;
+  background: rgb(var(--surface_rgb));
+  cursor: none;
+  font-family: "Google Sans", "Segoe UI", system-ui, sans-serif;
+}
+body.show-cursor { cursor: default; }
+canvas { display: block; width: 100vw; height: 100vh; }
 
-  body { cursor: none; }
-  body.show-cursor { cursor: default; }
+#clock-wrap {
+  position: fixed;
+  left: clamp(20px, 2.5vw, 40px);
+  bottom: clamp(16px, 2vw, 28px);
+  padding: 18px 26px 14px;
+  border-radius: 20px;
+  background: radial-gradient(
+    ellipse at 30% 70%,
+    rgb(var(--surface_rgb) / .88) 0%,
+    rgb(var(--surface_rgb) / .55) 55%,
+    transparent 100%
+  );
+  pointer-events: none;
+  transition: opacity .7s ease;
+  z-index: 10;
+}
+#clock-wrap.hidden { opacity: 0; }
 
-  canvas { display: block; width: 100vw; height: 100vh; background: rgb(var(--surface_rgb)); }
+#clock {
+  font-weight: 200;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: -2px;
+  font-size: clamp(40px, 5.5vw, 78px);
+  color: rgb(var(--primary_rgb));
+  text-shadow:
+    0 0 2px rgb(var(--surface_rgb)),
+    0 0 14px rgb(var(--surface_rgb) / .95),
+    0 0 36px rgb(var(--primary_rgb) / .5),
+    0 2px 14px rgba(0,0,0,.85);
+  line-height: 1;
+}
+#clock .ampm {
+  font-size: .26em;
+  margin-left: 10px;
+  opacity: .78;
+  vertical-align: 22%;
+  letter-spacing: 2px;
+  font-weight: 400;
+}
+#date {
+  margin-top: 8px;
+  font-size: clamp(11px, 1.05vw, 14px);
+  letter-spacing: 4px;
+  text-transform: uppercase;
+  color: rgb(var(--secondary_rgb));
+  text-shadow:
+    0 0 8px rgb(var(--surface_rgb) / .9),
+    0 1px 8px rgba(0,0,0,.7);
+  opacity: .95;
+}
 
-  #ui-container {
-    position: fixed; inset: 0; pointer-events: none; z-index: 10;
-    display: flex; flex-direction: column; justify-content: flex-end;
-    padding: 48px; box-sizing: border-box;
-    transition: opacity 0.6s cubic-bezier(0.16, 1, 0.3, 1), transform 0.6s cubic-bezier(0.16, 1, 0.3, 1);
-  }
-  #ui-container.hidden { opacity: 0; transform: translateY(12px); }
-
-  .vignette-card {
-    background: radial-gradient(circle at bottom left, rgb(var(--surface_rgb) / 0.8) 0%, rgb(var(--surface_rgb) / 0.25) 70%);
-    backdrop-filter: blur(16px);
-    -webkit-backdrop-filter: blur(16px);
-    padding: 28px 36px;
-    width: fit-content;
-    border-radius: 24px;
-    border: 1px solid rgb(var(--outline_rgb) / 0.15);
-    box-shadow: 0 16px 40px rgba(0, 0, 0, 0.6), inset 0 1px 0 rgba(255, 255, 255, 0.05);
-  }
-
-  #clock {
-    font-size: clamp(52px, 7vw, 84px);
-    font-weight: 200;
-    font-variant-numeric: tabular-nums;
-    letter-spacing: -2px;
-    line-height: 0.95;
-    text-shadow: 0 2px 12px rgba(0, 0, 0, 0.4);
-  }
-  #clock .ampm {
-    font-size: 0.28em;
-    margin-left: 8px;
-    opacity: 0.75;
-    font-weight: 500;
-    text-transform: uppercase;
-    vertical-align: super;
-    letter-spacing: 1.5px;
-  }
-  #date {
-    font-size: clamp(12px, 1.3vw, 15px);
-    letter-spacing: 3.5px;
-    text-transform: uppercase;
-    margin-top: 10px;
-    opacity: 0.9;
-    font-weight: 500;
-  }
-  #hint {
-    position: fixed; right: 36px; bottom: 36px;
-    font-size: 11px; letter-spacing: 2px; text-transform: uppercase;
-    opacity: 0; transition: opacity 0.8s ease;
-    padding: 10px 18px;
-    background: rgb(var(--surface_rgb) / 0.6);
-    backdrop-filter: blur(8px);
-    border: 1px solid rgb(var(--outline_rgb) / 0.1);
-    border-radius: 12px;
-    pointer-events: none;
-    z-index: 10;
-  }
-  #hint.show { opacity: 0.7; }
+#hint {
+  position: fixed; right: 28px; bottom: 24px; z-index: 10;
+  font-size: 11px; letter-spacing: 1.5px;
+  color: rgb(var(--outline_rgb) / .55);
+  opacity: 0; transition: opacity 1s ease;
+  text-transform: uppercase;
+  pointer-events: none;
+  text-shadow: 0 1px 8px rgb(var(--surface_rgb));
+}
+#hint.show { opacity: .7; }
 </style>
 <link rel="stylesheet" href="file:///home/sakib/.config/matugen/matugen-colors.css">
 </head>
 <body>
 <canvas id="c"></canvas>
-
-<div id="ui-container">
-  <div class="vignette-card">
-    <div id="clock">00:00</div>
-    <div id="date">Mon, Jan 1</div>
-  </div>
+<div id="clock-wrap">
+  <div id="clock">00:00<span class="ampm">AM</span></div>
+  <div id="date">MON, JAN 1</div>
 </div>
-<div id="hint">Press <b>C</b> to toggle UI</div>
+<div id="hint">C · toggle clock</div>
 
-<script src="clock-shared.js"></script>
 <script>
-const canvas = document.getElementById('c');
-const ctx = canvas.getContext('2d');
-const clockEl = document.getElementById('clock');
-const dateEl = document.getElementById('date');
-const hintEl = document.getElementById('hint');
-const uiContainer = document.getElementById('ui-container');
+"use strict";
 
-let cursorTimeout;
-function triggerCursor() {
-  document.body.classList.add('show-cursor');
-  clearTimeout(cursorTimeout);
-  cursorTimeout = setTimeout(() => {
-    document.body.classList.remove('show-cursor');
-  }, 2500);
-}
-window.addEventListener('pointermove', triggerCursor);
-window.addEventListener('pointerdown', triggerCursor);
+const canvas = document.getElementById("c");
+const ctx = canvas.getContext("2d", { alpha: false, desynchronized: true });
+const clockEl = document.getElementById("clock");
+const dateEl  = document.getElementById("date");
+const hintEl  = document.getElementById("hint");
+const clockWrap = document.getElementById("clock-wrap");
 
-let dpr = Math.min(window.devicePixelRatio || 1, 2);
-let W, H, cx, cy, scale;
-
-function readRGB(name, fallback) {
-  const raw = getComputedStyle(document.documentElement).getPropertyValue(name).trim();
-  const parts = raw.split(/\s+/).map(Number);
-  if (parts.length === 3 && parts.every(n => !isNaN(n))) return parts;
-  return fallback;
-}
-
+let W = 0, H = 0, DPR = 1, cx = 0, cy = 0, scale = 1;
 let theme = {};
+let roleList = [];
+let trajectories = [];
+let start = performance.now();
+let cursorTimer;
+
+const SIGMA = 10, RHO = 28, BETA = 8 / 3;
+const TRAJECTORY_COUNT = 6;
+const DT = 0.006;
+const SUBSTEPS = 4;
+
+const reduceMotion = matchMedia("(prefers-reduced-motion: reduce)").matches;
+const speedMul = reduceMotion ? 0.22 : 0.9;
+
+function readRGB(name, fb = [160, 160, 160]) {
+  const r = getComputedStyle(document.documentElement).getPropertyValue(name).trim();
+  const p = r.split(/\s+/).map(Number);
+  return (p.length === 3 && p.every(n => !isNaN(n))) ? p : fb;
+}
+function rgba(c, a = 1) {
+  return `rgba(${c[0]},${c[1]},${c[2]},${a})`;
+}
+
 function loadTheme() {
   theme = {
-    surface: readRGB('--surface_rgb', [12, 20, 27]),
-    primary: readRGB('--primary_rgb', [138, 206, 255]),
-    secondary: readRGB('--secondary_rgb', [180, 199, 233]),
-    tertiary: readRGB('--tertiary_rgb', [186, 196, 250]),
-    primaryContainer: readRGB('--primary_container_rgb', [0, 75, 111]),
-    secondaryContainer: readRGB('--secondary_container_rgb', [53, 72, 99]),
-    tertiaryContainer: readRGB('--tertiary_container_rgb', [58, 68, 114]),
-    inversePrimary: readRGB('--inverse_primary_rgb', [0, 100, 145]),
-    outline: readRGB('--outline_rgb', [137, 146, 154]),
+    surface:            readRGB("--surface_rgb", [12, 20, 27]),
+    primary:            readRGB("--primary_rgb", [138, 206, 255]),
+    secondary:          readRGB("--secondary_rgb", [180, 199, 233]),
+    tertiary:           readRGB("--tertiary_rgb", [186, 196, 250]),
+    primaryContainer:   readRGB("--primary_container_rgb", [0, 75, 111]),
+    secondaryContainer: readRGB("--secondary_container_rgb", [53, 72, 99]),
+    tertiaryContainer:  readRGB("--tertiary_container_rgb", [58, 68, 114]),
+    inversePrimary:     readRGB("--inverse_primary_rgb", [0, 100, 145]),
+    outline:            readRGB("--outline_rgb", [137, 146, 154])
   };
-  roleList = [theme.primary, theme.secondary, theme.tertiary, theme.primaryContainer, theme.secondaryContainer, theme.tertiaryContainer, theme.inversePrimary];
 
+  roleList = [
+    theme.primary,
+    theme.secondary,
+    theme.tertiary,
+    theme.primaryContainer,
+    theme.secondaryContainer,
+    theme.tertiaryContainer
+  ];
+
+  trajectories.forEach((tr, i) => {
+    tr.color = roleList[i % roleList.length];
+  });
+
+  document.body.style.background = rgba(theme.surface);
   clockEl.style.color = rgba(theme.primary, 1);
-  dateEl.style.color = rgba(theme.secondary, 0.9);
-  hintEl.style.color = rgba(theme.outline, 1);
-
-  document.body.style.backgroundColor = `rgb(${theme.surface.join(',')})`;
-  canvas.style.backgroundColor = `rgb(${theme.surface.join(',')})`;
-
-  ctx.fillStyle = `rgb(${theme.surface.join(',')})`;
-  ctx.fillRect(0, 0, W, H);
-
-  trajectories.forEach((tr, i) => { tr.color = roleList[i % roleList.length]; });
+  dateEl.style.color  = rgba(theme.secondary, 0.95);
+  hintEl.style.color  = rgba(theme.outline, 0.6);
 }
 
 function resize() {
-  W = window.innerWidth;
-  H = window.innerHeight;
-  cx = W / 2;
-  cy = H / 2;
-  scale = Math.min(W, H) / 55;
-  canvas.width = W * dpr;
-  canvas.height = H * dpr;
-  ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
-  
-  const surf = theme.surface || [12, 20, 27];
-  ctx.fillStyle = `rgb(${surf[0]}, ${surf[1]}, ${surf[2]})`;
+  W = innerWidth; H = innerHeight;
+  cx = W * 0.5; cy = H * 0.5;
+  scale = Math.min(W, H) / 52;
+  DPR = Math.min(devicePixelRatio || 1, 2);
+  canvas.width  = Math.floor(W * DPR);
+  canvas.height = Math.floor(H * DPR);
+  ctx.setTransform(DPR, 0, 0, DPR, 0, 0);
+  ctx.fillStyle = rgba(theme.surface || [12, 20, 27], 1);
   ctx.fillRect(0, 0, W, H);
 }
-window.addEventListener('resize', resize);
-
-const reduceMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
-const speedMul = reduceMotion ? 0.2 : 1;
-
-function rgba(rgb, a) {
-  const c = rgb || [200, 200, 200];
-  return `rgba(${c[0]}, ${c[1]}, ${c[2]}, ${a})`;
-}
-
-let roleList = [];
-const SIGMA = 10, RHO = 28, BETA = 8 / 3;
-const TRAJECTORY_COUNT = 5;
-let trajectories = [];
+addEventListener("resize", resize, { passive: true });
 
 function makeTrajectories() {
   trajectories = [];
   for (let i = 0; i < TRAJECTORY_COUNT; i++) {
     trajectories.push({
-      x: 0.1 + i * 0.0001,
+      x: 0.1 + i * 0.00015,
       y: 0,
       z: 0,
-      color: [200, 200, 200],
-      prevScreen: null,
+      color: roleList[i % Math.max(1, roleList.length)] || [140, 200, 255],
+      prevScreen: null
     });
   }
 }
 
 function derivatives(x, y, z) {
-  return [SIGMA * (y - x), x * (RHO - z) - y, x * y - BETA * z];
+  return [
+    SIGMA * (y - x),
+    x * (RHO - z) - y,
+    x * y - BETA * z
+  ];
 }
 
 function stepRK4(tr, dt) {
   const [k1x, k1y, k1z] = derivatives(tr.x, tr.y, tr.z);
-  const [k2x, k2y, k2z] = derivatives(tr.x + k1x * dt / 2, tr.y + k1y * dt / 2, tr.z + k1z * dt / 2);
-  const [k3x, k3y, k3z] = derivatives(tr.x + k2x * dt / 2, tr.y + k2y * dt / 2, tr.z + k2z * dt / 2);
-  const [k4x, k4y, k4z] = derivatives(tr.x + k3x * dt, tr.y + k3y * dt, tr.z + k3z * dt);
+  const [k2x, k2y, k2z] = derivatives(
+    tr.x + k1x * dt * 0.5, tr.y + k1y * dt * 0.5, tr.z + k1z * dt * 0.5
+  );
+  const [k3x, k3y, k3z] = derivatives(
+    tr.x + k2x * dt * 0.5, tr.y + k2y * dt * 0.5, tr.z + k2z * dt * 0.5
+  );
+  const [k4x, k4y, k4z] = derivatives(
+    tr.x + k3x * dt, tr.y + k3y * dt, tr.z + k3z * dt
+  );
   tr.x += (dt / 6) * (k1x + 2 * k2x + 2 * k3x + k4x);
   tr.y += (dt / 6) * (k1y + 2 * k2y + 2 * k3y + k4y);
   tr.z += (dt / 6) * (k1z + 2 * k2z + 2 * k3z + k4z);
 }
-
-const DT = 0.006;
-const SUBSTEPS = 4;
-let start = performance.now();
 
 function project(tr, rotAngle) {
   const zc = tr.z - 25;
@@ -228,27 +222,29 @@ function project(tr, rotAngle) {
   return {
     x: cx + rx * scale,
     y: cy - tr.y * scale * 0.75 - rz * scale * 0.15,
-    depth: Math.max(0.25, Math.min(1, depth)),
+    depth: Math.max(0.22, Math.min(1, depth))
   };
 }
 
 function frame(now) {
   const t = ((now - start) / 1000) * speedMul;
-  const rotAngle = t * 0.06;
+  const rotAngle = t * 0.055;
 
-  ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
-  ctx.globalCompositeOperation = 'source-over';
-  ctx.fillStyle = rgba(theme.surface || [12, 20, 27], 0.05);
+  ctx.setTransform(DPR, 0, 0, DPR, 0, 0);
+  ctx.globalCompositeOperation = "source-over";
+  ctx.fillStyle = rgba(theme.surface, 0.045);
   ctx.fillRect(0, 0, W, H);
 
-  ctx.globalCompositeOperation = 'lighter';
+  ctx.globalCompositeOperation = "lighter";
+  ctx.lineCap = "round";
+
   for (const tr of trajectories) {
     for (let s = 0; s < SUBSTEPS; s++) stepRK4(tr, DT * speedMul);
-
     const p = project(tr, rotAngle);
+
     if (tr.prevScreen) {
-      ctx.strokeStyle = rgba(tr.color, 0.55 * p.depth);
-      ctx.lineWidth = 1.4;
+      ctx.strokeStyle = rgba(tr.color, 0.5 * p.depth);
+      ctx.lineWidth = 1.2 + p.depth * 0.6;
       ctx.beginPath();
       ctx.moveTo(tr.prevScreen.x, tr.prevScreen.y);
       ctx.lineTo(p.x, p.y);
@@ -257,46 +253,64 @@ function frame(now) {
     tr.prevScreen = p;
 
     ctx.beginPath();
-    ctx.arc(p.x, p.y, 2, 0, Math.PI * 2);
-    ctx.fillStyle = rgba(tr.color, 0.9 * p.depth);
+    ctx.arc(p.x, p.y, 1.8, 0, Math.PI * 2);
+    ctx.fillStyle = rgba(tr.color, 0.85 * p.depth);
     ctx.fill();
   }
-  ctx.globalCompositeOperation = 'source-over';
 
+  ctx.globalCompositeOperation = "source-over";
   requestAnimationFrame(frame);
 }
 
-try {
-  startClock(clockEl, dateEl);
-} catch (e) {
-  const update = () => {
-    const now = new Date();
-    let hours = now.getHours();
-    const minutes = String(now.getMinutes()).padStart(2, '0');
-    const ampm = hours >= 12 ? 'PM' : 'AM';
-    hours = hours % 12 || 12;
-    clockEl.innerHTML = `${String(hours).padStart(2, '0')}:${minutes}<span class="ampm">${ampm}</span>`;
-    dateEl.textContent = now.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' });
-  };
+addEventListener("pointermove", () => {
+  document.body.classList.add("show-cursor");
+  clearTimeout(cursorTimer);
+  cursorTimer = setTimeout(() => document.body.classList.remove("show-cursor"), 2500);
+}, { passive: true });
+
+addEventListener("keydown", e => {
+  if (e.key.toLowerCase() === "c") {
+    clockWrap.classList.toggle("hidden");
+  }
+});
+
+function fallbackClock() {
+  function update() {
+    const n = new Date();
+    let h = n.getHours();
+    const ap = h >= 12 ? "PM" : "AM";
+    h = h % 12 || 12;
+    clockEl.innerHTML =
+      `${String(h).padStart(2,"0")}:${String(n.getMinutes()).padStart(2,"0")}` +
+      `<span class="ampm">${ap}</span>`;
+    dateEl.textContent = n.toLocaleDateString("en-US", {
+      weekday: "short", month: "short", day: "numeric"
+    }).toUpperCase();
+  }
   update();
   setInterval(update, 1000);
 }
 
-let uiVisible = true;
-window.addEventListener('keydown', (e) => {
-  if (e.key.toLowerCase() === 'c') {
-    uiVisible = !uiVisible;
-    uiContainer.classList.toggle('hidden', !uiVisible);
-  }
-});
-
-hintEl.classList.add('show');
-setTimeout(() => hintEl.classList.remove('show'), 4000);
-
-window.addEventListener('load', () => {
-  makeTrajectories();
+addEventListener("load", () => {
   loadTheme();
   resize();
+  makeTrajectories();
+  loadTheme();
+
+  const s = document.createElement("script");
+  s.src = "clock-shared.js";
+  s.onload = () => {
+    try {
+      if (typeof startClock === "function") startClock(clockEl, dateEl);
+      else fallbackClock();
+    } catch { fallbackClock(); }
+  };
+  s.onerror = fallbackClock;
+  document.head.appendChild(s);
+
+  hintEl.classList.add("show");
+  setTimeout(() => hintEl.classList.remove("show"), 4000);
+
   requestAnimationFrame(frame);
 });
 </script>

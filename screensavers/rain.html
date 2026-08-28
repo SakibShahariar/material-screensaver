@@ -2,158 +2,238 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Material Screensaver — Rain</title>
 <style>
-  :root {
-    --primary_rgb: 138 206 255; --secondary_rgb: 180 199 233; --tertiary_rgb: 186 196 250;
-    --surface_rgb: 12 20 27; --surface_bright_rgb: 50 58 65; --outline_rgb: 137 146 154;
-  }
-  html, body { margin: 0; padding: 0; width: 100%; height: 100%; overflow: hidden; background: rgb(var(--surface_rgb)); cursor: none; }
-  canvas { display: block; width: 100vw; height: 100vh; }
-  
-  /* Upgraded Floating Glass HUD */
-  #hud {
-    position: fixed; left: 40px; bottom: 40px; pointer-events: none;
-    background: linear-gradient(135deg, rgb(var(--surface_rgb) / 0.75) 0%, rgb(var(--surface_rgb) / 0.4) 100%);
-    backdrop-filter: blur(20px); -webkit-backdrop-filter: blur(20px);
-    padding: 28px 36px; border-radius: 24px; border: 1px solid rgb(var(--outline_rgb) / 0.12);
-    box-shadow: 0 24px 60px rgba(0, 0, 0, 0.5), inset 0 1px 0 rgba(255, 255, 255, 0.06);
-    transition: opacity 0.5s cubic-bezier(0.16, 1, 0.3, 1), transform 0.5s cubic-bezier(0.16, 1, 0.3, 1);
-  }
-  #hud.hidden { opacity: 0; transform: translateY(16px); }
+:root {
+  --primary_rgb: 138 206 255;
+  --secondary_rgb: 180 199 233;
+  --tertiary_rgb: 186 196 250;
+  --surface_rgb: 12 20 27;
+  --surface_bright_rgb: 50 58 65;
+  --outline_rgb: 137 146 154;
+}
+* { margin: 0; padding: 0; box-sizing: border-box; }
+html, body {
+  width: 100%; height: 100%; overflow: hidden;
+  background: rgb(var(--surface_rgb));
+  cursor: none;
+  font-family: "Google Sans", "Segoe UI", system-ui, sans-serif;
+}
+body.show-cursor { cursor: default; }
+canvas { display: block; width: 100vw; height: 100vh; }
 
-  #clock { font-family: "Google Sans","Segoe UI",Roboto,system-ui,sans-serif; font-weight: 200; font-variant-numeric: tabular-nums; letter-spacing: -2px; font-size: clamp(48px, 7vw, 80px); line-height: 0.9; text-shadow: 0 4px 24px rgba(0,0,0,0.45); }
-  #clock .ampm { font-size: 0.28em; margin-left: 8px; opacity: 0.7; font-weight: 500; text-transform: uppercase; vertical-align: super; letter-spacing: 2px; }
-  #date { font-family: "Google Sans","Segoe UI",Roboto,system-ui,sans-serif; font-size: clamp(12px, 1.2vw, 15px); letter-spacing: 3px; text-transform: uppercase; margin-top: 10px; opacity: 0.85; font-weight: 500; }
-  
-  #hint { position: fixed; right: 40px; bottom: 40px; font-family: "Google Sans","Segoe UI",Roboto,system-ui,sans-serif; font-size: 11px; letter-spacing: 2.5px; text-transform: uppercase; opacity: 0; transition: opacity 0.6s ease; padding: 10px 20px; background: rgb(var(--surface_rgb) / 0.5); backdrop-filter: blur(12px); border: 1px solid rgb(var(--outline_rgb) / 0.1); border-radius: 14px; pointer-events: none; }
-  #hint.show { opacity: 0.65; }
+#clock-wrap {
+  position: fixed;
+  left: clamp(20px, 2.5vw, 40px);
+  bottom: clamp(16px, 2vw, 28px);
+  padding: 18px 26px 14px;
+  border-radius: 20px;
+  background: radial-gradient(
+    ellipse at 30% 70%,
+    rgb(var(--surface_rgb) / .88) 0%,
+    rgb(var(--surface_rgb) / .55) 55%,
+    transparent 100%
+  );
+  pointer-events: none;
+  transition: opacity .7s ease;
+  z-index: 10;
+}
+#clock-wrap.hidden { opacity: 0; }
+
+#clock {
+  font-weight: 200;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: -2px;
+  font-size: clamp(40px, 5.5vw, 78px);
+  color: rgb(var(--primary_rgb));
+  text-shadow:
+    0 0 2px rgb(var(--surface_rgb)),
+    0 0 14px rgb(var(--surface_rgb) / .95),
+    0 0 36px rgb(var(--primary_rgb) / .5),
+    0 2px 14px rgba(0,0,0,.85);
+  line-height: 1;
+}
+#clock .ampm {
+  font-size: .26em;
+  margin-left: 10px;
+  opacity: .78;
+  vertical-align: 22%;
+  letter-spacing: 2px;
+  font-weight: 400;
+}
+#date {
+  margin-top: 8px;
+  font-size: clamp(11px, 1.05vw, 14px);
+  letter-spacing: 4px;
+  text-transform: uppercase;
+  color: rgb(var(--secondary_rgb));
+  text-shadow:
+    0 0 8px rgb(var(--surface_rgb) / .9),
+    0 1px 8px rgba(0,0,0,.7);
+  opacity: .95;
+}
+
+#hint {
+  position: fixed; right: 28px; bottom: 24px; z-index: 10;
+  font-size: 11px; letter-spacing: 1.5px;
+  color: rgb(var(--outline_rgb) / .55);
+  opacity: 0; transition: opacity 1s ease;
+  text-transform: uppercase;
+  pointer-events: none;
+  text-shadow: 0 1px 8px rgb(var(--surface_rgb));
+}
+#hint.show { opacity: .7; }
 </style>
 <link rel="stylesheet" href="file:///home/sakib/.config/matugen/matugen-colors.css">
 </head>
 <body>
 <canvas id="c"></canvas>
-<div id="hud">
-  <div id="clock">00:00</div>
-  <div id="date">Mon, Jan 1</div>
+<div id="clock-wrap">
+  <div id="clock">00:00<span class="ampm">AM</span></div>
+  <div id="date">MON, JAN 1</div>
 </div>
-<div id="hint">Press <b>C</b> to toggle UI</div>
-<script src="clock-shared.js"></script>
+<div id="hint">C · toggle clock</div>
+
 <script>
-const canvas = document.getElementById('c');
-const ctx = canvas.getContext('2d');
-const hudEl = document.getElementById('hud');
-const clockEl = document.getElementById('clock');
-const dateEl = document.getElementById('date');
-const hintEl = document.getElementById('hint');
+"use strict";
 
-let dpr = Math.min(window.devicePixelRatio || 1, 2);
-let W, H;
-function resize() {
-  W = window.innerWidth; H = window.innerHeight;
-  canvas.width = W * dpr; canvas.height = H * dpr;
-  ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
-  makeDrops();
-}
-window.addEventListener('resize', resize);
+const canvas = document.getElementById("c");
+const ctx = canvas.getContext("2d", { alpha: false, desynchronized: true });
+const clockEl = document.getElementById("clock");
+const dateEl  = document.getElementById("date");
+const hintEl  = document.getElementById("hint");
+const clockWrap = document.getElementById("clock-wrap");
 
-const reduceMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
-const speedMul = reduceMotion ? 0.25 : 1;
-
-function readRGB(name) {
-  const raw = getComputedStyle(document.documentElement).getPropertyValue(name).trim();
-  const parts = raw.split(/\s+/).map(Number);
-  if (parts.length === 3 && parts.every(n => !isNaN(n))) return parts;
-  return [200, 200, 200];
-}
-function rgba(rgb, a) { return `rgba(${rgb[0]}, ${rgb[1]}, ${rgb[2]}, ${a})`; }
-
+let W = 0, H = 0, DPR = 1;
 let theme = {};
+let streaks = [];
+let beads = [];
+let splashes = [];
+let bolts = [];
+let nextFlash = 6;
+let flashAlpha = 0;
+let start = performance.now();
+let lastT = 0;
+let cursorTimer;
+
+const reduceMotion = matchMedia("(prefers-reduced-motion: reduce)").matches;
+const speedMul = reduceMotion ? 0.25 : 0.9;
+
+function readRGB(name, fb = [160, 160, 160]) {
+  const r = getComputedStyle(document.documentElement).getPropertyValue(name).trim();
+  const p = r.split(/\s+/).map(Number);
+  return (p.length === 3 && p.every(n => !isNaN(n))) ? p : fb;
+}
+function rgba(c, a = 1) {
+  return `rgba(${c[0]},${c[1]},${c[2]},${a})`;
+}
+
 function loadTheme() {
   theme = {
-    surface: readRGB('--surface_rgb'), surfaceBright: readRGB('--surface_bright_rgb'),
-    primary: readRGB('--primary_rgb'), secondary: readRGB('--secondary_rgb'),
-    tertiary: readRGB('--tertiary_rgb'), outline: readRGB('--outline_rgb'),
+    surface:       readRGB("--surface_rgb", [12, 20, 27]),
+    surfaceBright: readRGB("--surface_bright_rgb", [50, 58, 65]),
+    primary:       readRGB("--primary_rgb", [138, 206, 255]),
+    secondary:     readRGB("--secondary_rgb", [180, 199, 233]),
+    tertiary:      readRGB("--tertiary_rgb", [186, 196, 250]),
+    outline:       readRGB("--outline_rgb", [137, 146, 154])
   };
-  clockEl.style.color = rgba(theme.primary, 0.98);
-  dateEl.style.color = rgba(theme.secondary, 0.9);
-  hintEl.style.color = rgba(theme.outline, 0.95);
+
+  document.body.style.background = rgba(theme.surface);
+  clockEl.style.color = rgba(theme.primary, 1);
+  dateEl.style.color  = rgba(theme.secondary, 0.95);
+  hintEl.style.color  = rgba(theme.outline, 0.6);
 }
 
-let streaks = [], beads = [], splashes = [];
 function makeDrops() {
   streaks = [];
   for (let i = 0; i < 240; i++) {
-    streaks.push({ x: Math.random() * W, y: Math.random() * H, len: 18 + Math.random() * 32, speed: 600 + Math.random() * 400, drift: -40 - Math.random() * 30, alpha: 0.15 + Math.random() * 0.3 });
+    streaks.push({
+      x: Math.random() * W,
+      y: Math.random() * H,
+      len: 16 + Math.random() * 30,
+      speed: 550 + Math.random() * 420,
+      drift: -35 - Math.random() * 30,
+      alpha: 0.18 + Math.random() * 0.32
+    });
   }
   beads = [];
-  for (let i = 0; i < 20; i++) {
-    beads.push({ x: Math.random() * W, y: Math.random() * H, speed: 30 + Math.random() * 35, wob: Math.random() * Math.PI * 2, r: 2 + Math.random() * 2.5 });
+  for (let i = 0; i < 18; i++) {
+    beads.push({
+      x: Math.random() * W,
+      y: Math.random() * H,
+      speed: 28 + Math.random() * 32,
+      wob: Math.random() * Math.PI * 2,
+      r: 2 + Math.random() * 2.2
+    });
   }
   splashes = [];
 }
-
-let nextFlash = 5 + Math.random() * 8;
-let flashAlpha = 0;
-let bolts = [];
 
 function makeBolt() {
   const x0 = Math.random() * W;
   const generateBranch = (x, y, targetY, spread) => {
     const points = [[x, y]];
     while (y < targetY) {
-      y += 15 + Math.random() * 25;
+      y += 14 + Math.random() * 24;
       x += (Math.random() - 0.5) * spread;
       points.push([x, y]);
     }
     return points;
   };
-
-  const main = generateBranch(x0, 0, H * 0.65, 50);
+  const main = generateBranch(x0, 0, H * 0.62, 48);
   const branches = [];
-  // Add a sub-branch midway down
   if (main.length > 5) {
     const forkIdx = Math.floor(main.length * 0.4);
-    const forkPoint = main[forkIdx];
-    branches.push(generateBranch(forkPoint[0], forkPoint[1], forkPoint[1] + H * 0.3, 60));
+    const fork = main[forkIdx];
+    branches.push(generateBranch(fork[0], fork[1], fork[1] + H * 0.28, 55));
   }
   return { main, branches };
 }
 
-let start = performance.now();
-let lastT = 0;
+function resize() {
+  W = innerWidth; H = innerHeight;
+  DPR = Math.min(devicePixelRatio || 1, 2);
+  canvas.width  = Math.floor(W * DPR);
+  canvas.height = Math.floor(H * DPR);
+  ctx.setTransform(DPR, 0, 0, DPR, 0, 0);
+  makeDrops();
+}
+addEventListener("resize", resize, { passive: true });
 
 function frame(now) {
   const t = ((now - start) / 1000) * speedMul;
-  const dt = Math.min(0.05, t - lastT);
+  const dt = Math.min(0.05, t - lastT || 0.016);
   lastT = t;
 
-  ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+  ctx.setTransform(DPR, 0, 0, DPR, 0, 0);
+
   const sky = ctx.createLinearGradient(0, 0, 0, H);
-  sky.addColorStop(0, `rgb(${(theme.surface || [12,20,27]).join(',')})`);
-  sky.addColorStop(1, `rgb(${(theme.surfaceBright || [40,46,52]).join(',')})`);
+  sky.addColorStop(0, rgba(theme.surface, 1));
+  sky.addColorStop(1, rgba(theme.surfaceBright || theme.surface, 1));
   ctx.fillStyle = sky;
   ctx.fillRect(0, 0, W, H);
 
+  // Lightning
   if (t >= nextFlash) {
-    flashAlpha = 0.6;
+    flashAlpha = 0.55;
     bolts = [makeBolt()];
-    if (Math.random() > 0.6) bolts.push(makeBolt());
-    nextFlash = t + 7 + Math.random() * 12;
+    if (Math.random() > 0.55) bolts.push(makeBolt());
+    nextFlash = t + 6 + Math.random() * 11;
   }
 
   if (flashAlpha > 0.001) {
-    ctx.fillStyle = `rgba(255,255,255,${flashAlpha})`;
+    ctx.fillStyle = `rgba(255,255,255,${flashAlpha * 0.35})`;
     ctx.fillRect(0, 0, W, H);
-    
+
     ctx.strokeStyle = `rgba(255,255,255,${flashAlpha * 0.9})`;
     ctx.lineWidth = 2;
+    ctx.lineCap = "round";
     for (const b of bolts) {
       ctx.beginPath();
       ctx.moveTo(b.main[0][0], b.main[0][1]);
       for (const p of b.main) ctx.lineTo(p[0], p[1]);
       ctx.stroke();
-
       for (const branch of b.branches) {
         ctx.beginPath();
         ctx.moveTo(branch[0][0], branch[0][1]);
@@ -161,73 +241,116 @@ function frame(now) {
         ctx.stroke();
       }
     }
-    flashAlpha *= 0.84;
+    flashAlpha *= 0.82;
   }
 
-  // Wind shear effect based on time
-  const wind = Math.sin(t * 0.5) * 15;
+  const wind = Math.sin(t * 0.45) * 18;
 
+  // Rain streaks
+  ctx.lineCap = "round";
   for (const s of streaks) {
     s.y += s.speed * dt;
     s.x += (s.drift + wind) * dt;
     if (s.y > H) {
-      if (Math.random() > 0.4) {
-        splashes.push({ x: s.x, y: H - Math.random() * 15, r: 2, maxR: 10 + Math.random() * 8, alpha: 0.4 });
+      if (Math.random() > 0.45) {
+        splashes.push({
+          x: s.x,
+          y: H - Math.random() * 12,
+          r: 2,
+          alpha: 0.45
+        });
       }
       s.y = -s.len;
       s.x = Math.random() * W;
     }
     ctx.beginPath();
     ctx.moveTo(s.x, s.y);
-    ctx.lineTo(s.x + (s.drift + wind) * 0.04, s.y - s.len);
+    ctx.lineTo(s.x + (s.drift + wind) * 0.035, s.y - s.len);
     ctx.strokeStyle = rgba(theme.primary, s.alpha);
-    ctx.lineWidth = 1.2;
+    ctx.lineWidth = 1.15;
     ctx.stroke();
   }
 
-  // Render splashes
+  // Splashes
   for (let i = splashes.length - 1; i >= 0; i--) {
     const sp = splashes[i];
-    sp.r += 60 * dt;
-    sp.alpha -= 1.2 * dt;
+    sp.r += 55 * dt;
+    sp.alpha -= 1.15 * dt;
     if (sp.alpha <= 0) {
       splashes.splice(i, 1);
       continue;
     }
     ctx.beginPath();
-    ctx.ellipse(sp.x, sp.y, sp.r, sp.r * 0.3, 0, 0, Math.PI * 2);
+    ctx.ellipse(sp.x, sp.y, sp.r, sp.r * 0.28, 0, 0, Math.PI * 2);
     ctx.strokeStyle = rgba(theme.secondary, sp.alpha);
     ctx.lineWidth = 1;
     ctx.stroke();
   }
 
+  // Slow beads
   for (const b of beads) {
     b.y += b.speed * dt;
-    const x = b.x + Math.sin(t * 1.5 + b.wob) * 2.5;
-    if (b.y > H) { b.y = -10; b.x = Math.random() * W; }
+    const x = b.x + Math.sin(t * 1.4 + b.wob) * 2.2;
+    if (b.y > H) {
+      b.y = -10;
+      b.x = Math.random() * W;
+    }
     ctx.beginPath();
     ctx.arc(x, b.y, b.r, 0, Math.PI * 2);
-    ctx.fillStyle = rgba(theme.secondary, 0.3);
+    ctx.fillStyle = rgba(theme.secondary, 0.28);
     ctx.fill();
   }
 
   requestAnimationFrame(frame);
 }
 
-let hudVisible = true;
-window.addEventListener('keydown', (e) => {
-  if (e.key.toLowerCase() === 'c') {
-    hudVisible = !hudVisible;
-    hudEl.classList.toggle('hidden', !hudVisible);
+addEventListener("pointermove", () => {
+  document.body.classList.add("show-cursor");
+  clearTimeout(cursorTimer);
+  cursorTimer = setTimeout(() => document.body.classList.remove("show-cursor"), 2500);
+}, { passive: true });
+
+addEventListener("keydown", e => {
+  if (e.key.toLowerCase() === "c") {
+    clockWrap.classList.toggle("hidden");
   }
 });
-hintEl.classList.add('show');
-setTimeout(() => hintEl.classList.remove('show'), 4000);
 
-window.addEventListener('load', () => {
-  resize();
+function fallbackClock() {
+  function update() {
+    const n = new Date();
+    let h = n.getHours();
+    const ap = h >= 12 ? "PM" : "AM";
+    h = h % 12 || 12;
+    clockEl.innerHTML =
+      `${String(h).padStart(2,"0")}:${String(n.getMinutes()).padStart(2,"0")}` +
+      `<span class="ampm">${ap}</span>`;
+    dateEl.textContent = n.toLocaleDateString("en-US", {
+      weekday: "short", month: "short", day: "numeric"
+    }).toUpperCase();
+  }
+  update();
+  setInterval(update, 1000);
+}
+
+addEventListener("load", () => {
   loadTheme();
-  startClock(clockEl, dateEl);
+  resize();
+
+  const s = document.createElement("script");
+  s.src = "clock-shared.js";
+  s.onload = () => {
+    try {
+      if (typeof startClock === "function") startClock(clockEl, dateEl);
+      else fallbackClock();
+    } catch { fallbackClock(); }
+  };
+  s.onerror = fallbackClock;
+  document.head.appendChild(s);
+
+  hintEl.classList.add("show");
+  setTimeout(() => hintEl.classList.remove("show"), 4000);
+
   requestAnimationFrame(frame);
 });
 </script>

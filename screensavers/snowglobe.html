@@ -5,348 +5,295 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Material Screensaver — Snow Globe</title>
 <style>
-  :root {
-    --surface_rgb: 12 20 27;
-    --primary_rgb: 138 206 255;
-    --primary_container_rgb: 0 75 111;
-    --secondary_rgb: 180 199 233;
-    --secondary_container_rgb: 53 72 99;
-    --tertiary_rgb: 186 196 250;
-    --tertiary_container_rgb: 58 68 114;
-    --surface_bright_rgb: 50 58 65;
-    --outline_rgb: 137 146 154;
-  }
-  html, body {
-    margin: 0; padding: 0; width: 100%; height: 100%;
-    overflow: hidden; background: rgb(var(--surface_rgb));
-    font-family: "Google Sans", "Segoe UI", Roboto, system-ui, sans-serif;
-    user-select: none;
-  }
+:root {
+  --primary_rgb: 138 206 255;
+  --secondary_rgb: 180 199 233;
+  --tertiary_rgb: 186 196 250;
+  --primary_container_rgb: 0 75 111;
+  --secondary_container_rgb: 53 72 99;
+  --tertiary_container_rgb: 58 68 114;
+  --surface_rgb: 12 20 27;
+  --outline_rgb: 137 146 154;
+}
+* { margin: 0; padding: 0; box-sizing: border-box; }
+html, body {
+  width: 100%; height: 100%; overflow: hidden;
+  background: rgb(var(--surface_rgb));
+  cursor: none;
+  font-family: "Google Sans", "Segoe UI", system-ui, sans-serif;
+}
+body.show-cursor { cursor: default; }
+canvas { display: block; width: 100vw; height: 100vh; }
 
-  body { cursor: none; }
-  body.show-cursor { cursor: default; }
+#clock-wrap {
+  position: fixed;
+  left: clamp(20px, 2.5vw, 40px);
+  bottom: clamp(16px, 2vw, 28px);
+  padding: 18px 26px 14px;
+  border-radius: 20px;
+  background: radial-gradient(
+    ellipse at 30% 70%,
+    rgb(var(--surface_rgb) / .88) 0%,
+    rgb(var(--surface_rgb) / .55) 55%,
+    transparent 100%
+  );
+  pointer-events: none;
+  transition: opacity .7s ease;
+  z-index: 10;
+}
+#clock-wrap.hidden { opacity: 0; }
 
-  canvas { display: block; width: 100vw; height: 100vh; }
+#clock {
+  font-weight: 200;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: -2px;
+  font-size: clamp(40px, 5.5vw, 78px);
+  color: rgb(var(--primary_rgb));
+  text-shadow:
+    0 0 2px rgb(var(--surface_rgb)),
+    0 0 14px rgb(var(--surface_rgb) / .95),
+    0 0 36px rgb(var(--primary_rgb) / .5),
+    0 2px 14px rgba(0,0,0,.85);
+  line-height: 1;
+}
+#clock .ampm {
+  font-size: .26em;
+  margin-left: 10px;
+  opacity: .78;
+  vertical-align: 22%;
+  letter-spacing: 2px;
+  font-weight: 400;
+}
+#date {
+  margin-top: 8px;
+  font-size: clamp(11px, 1.05vw, 14px);
+  letter-spacing: 4px;
+  text-transform: uppercase;
+  color: rgb(var(--secondary_rgb));
+  text-shadow:
+    0 0 8px rgb(var(--surface_rgb) / .9),
+    0 1px 8px rgba(0,0,0,.7);
+  opacity: .95;
+}
 
-  #ui-container {
-    position: fixed; inset: 0; pointer-events: none; z-index: 10;
-    display: flex; flex-direction: column; justify-content: space-between;
-    padding: 48px; box-sizing: border-box;
-    transition: opacity 0.6s cubic-bezier(0.16, 1, 0.3, 1);
-  }
-  #ui-container.hidden { opacity: 0; }
-
-  .glass-card {
-    background: rgb(var(--surface_rgb) / 0.55);
-    backdrop-filter: blur(20px);
-    -webkit-backdrop-filter: blur(20px);
-    border: 1px solid rgba(255, 255, 255, 0.08);
-    padding: 28px 36px;
-    width: fit-content;
-    border-radius: 24px;
-    box-shadow: 0 16px 40px rgba(0, 0, 0, 0.4), inset 0 1px 0 rgba(255, 255, 255, 0.08);
-  }
-
-  #clock {
-    font-size: clamp(36px, 5vw, 68px);
-    font-weight: 300;
-    font-variant-numeric: tabular-nums;
-    letter-spacing: -1px;
-    line-height: 1;
-    text-shadow: 0 2px 20px rgba(0, 0, 0, 0.6);
-  }
-  #clock .ampm {
-    font-size: 0.34em;
-    margin-left: 10px;
-    opacity: 0.75;
-    font-weight: 400;
-    text-transform: uppercase;
-    vertical-align: middle;
-    letter-spacing: 1px;
-  }
-  #date {
-    font-size: clamp(13px, 1.3vw, 16px);
-    letter-spacing: 2.5px;
-    text-transform: uppercase;
-    margin-top: 10px;
-    opacity: 0.8;
-    text-shadow: 0 2px 10px rgba(0, 0, 0, 0.6);
-  }
-  #hint {
-    position: fixed; right: 48px; bottom: 48px;
-    font-size: 12px; letter-spacing: 1px;
-    opacity: 0; transition: opacity 0.8s ease;
-    text-shadow: 0 2px 10px rgba(0, 0, 0, 0.6);
-    text-transform: uppercase;
-  }
-  #hint.show { opacity: 0.7; }
+#hint {
+  position: fixed; right: 28px; bottom: 24px; z-index: 10;
+  font-size: 11px; letter-spacing: 1.5px;
+  color: rgb(var(--outline_rgb) / .55);
+  opacity: 0; transition: opacity 1s ease;
+  text-transform: uppercase;
+  pointer-events: none;
+  text-shadow: 0 1px 8px rgb(var(--surface_rgb));
+}
+#hint.show { opacity: .7; }
 </style>
 <link rel="stylesheet" href="file:///home/sakib/.config/matugen/matugen-colors.css">
 </head>
 <body>
-
 <canvas id="c"></canvas>
-
-<div id="ui-container">
-  <div class="glass-card">
-    <div id="clock">00:00</div>
-    <div id="date">Mon, Jan 1</div>
-  </div>
-  <div id="hint">Press <b>C</b> to toggle UI</div>
+<div id="clock-wrap">
+  <div id="clock">00:00<span class="ampm">AM</span></div>
+  <div id="date">MON, JAN 1</div>
 </div>
+<div id="hint">C · toggle clock</div>
 
-<script src="clock-shared.js"></script>
 <script>
-const canvas = document.getElementById('c');
-const ctx = canvas.getContext('2d');
-const clockEl = document.getElementById('clock');
-const dateEl = document.getElementById('date');
-const hintEl = document.getElementById('hint');
-const uiContainer = document.getElementById('ui-container');
-const glassCardEl = document.querySelector('.glass-card');
+"use strict";
 
-let cursorTimeout;
-let shakeForce = 0;
-let mousePos = { x: -1000, y: -1000 };
+const canvas = document.getElementById("c");
+const ctx = canvas.getContext("2d", { alpha: false, desynchronized: true });
+const clockEl = document.getElementById("clock");
+const dateEl  = document.getElementById("date");
+const hintEl  = document.getElementById("hint");
+const clockWrap = document.getElementById("clock-wrap");
 
-function triggerCursor() {
-  document.body.classList.add('show-cursor');
-  clearTimeout(cursorTimeout);
-  cursorTimeout = setTimeout(() => {
-    document.body.classList.remove('show-cursor');
-  }, 2500);
-}
-
-function triggerShake() {
-  shakeForce = 1.0;
-  for (const f of flakes) {
-    f.vy = -(15 + Math.random() * 50);
-    f.vx = (Math.random() - 0.5) * 50;
-  }
-}
-
-window.addEventListener('pointermove', (e) => {
-  triggerCursor();
-  mousePos.x = e.clientX;
-  mousePos.y = e.clientY;
-  const speed = Math.hypot(e.movementX, e.movementY);
-  if (speed > 15) {
-    shakeForce = Math.min(1.0, shakeForce + speed * 0.008);
-  }
-});
-
-window.addEventListener('pointerdown', () => {
-  triggerCursor();
-  triggerShake();
-});
-
-let dpr = Math.min(window.devicePixelRatio || 1, 2);
-let W, H, cx, cy, globeR;
-
-function resize() {
-  W = window.innerWidth;
-  H = window.innerHeight;
-  cx = W / 2;
-  cy = H * 0.44;
-  globeR = Math.min(W, H) * 0.30;
-  canvas.width = W * dpr;
-  canvas.height = H * dpr;
-  ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
-  initPile();
-}
-window.addEventListener('resize', resize);
-
-const reduceMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
-const speedMul = reduceMotion ? 0.25 : 0.85;
-
-function readRGB(name, fallback) {
-  const raw = getComputedStyle(document.documentElement).getPropertyValue(name).trim();
-  const parts = raw.split(/\s+/).map(Number);
-  return (parts.length === 3 && parts.every(n => !isNaN(n))) ? parts : fallback;
-}
-function rgba(rgb, a) {
-  const c = rgb || [200, 200, 200];
-  return `rgba(${c[0]}, ${c[1]}, ${c[2]}, ${a})`;
-}
-
+let W = 0, H = 0, DPR = 1, cx = 0, cy = 0, globeR = 1;
 let theme = {};
-function loadTheme() {
-  theme = {
-    surface: readRGB('--surface_rgb', [12, 20, 27]),
-    primary: readRGB('--primary_rgb', [138, 206, 255]),
-    secondary: readRGB('--secondary_rgb', [180, 199, 233]),
-    tertiary: readRGB('--tertiary_rgb', [186, 196, 250]),
-    tertiaryContainer: readRGB('--tertiary_container_rgb', [58, 68, 114]),
-    secondaryContainer: readRGB('--secondary_container_rgb', [53, 72, 99]),
-    outline: readRGB('--outline_rgb', [137, 146, 154]),
-  };
-  document.body.style.backgroundColor = rgba(theme.surface, 1);
-  glassCardEl.style.backgroundColor = rgba(theme.surface, 0.55);
-  clockEl.style.color = rgba(theme.primary, 0.96);
-  dateEl.style.color = rgba(theme.secondary, 0.88);
-  hintEl.style.color = rgba(theme.outline, 0.85);
-}
-
 let flakes = [];
 let pile = [];
-const PILE_RES = 90;
+let shakeForce = 0;
+let mousePos = { x: -1000, y: -1000 };
+let start = performance.now();
+let lastT = 0;
+let lastReset = 0;
+let cursorTimer;
 
-function initPile() {
-  pile = new Array(PILE_RES).fill(0);
-  flakes = [];
-  for (let i = 0; i < 160; i++) {
-    const f = {};
-    spawnFlake(f);
-    f.y = cy - globeR + Math.random() * globeR * 1.8;
-    flakes.push(f);
-  }
+const PILE_RES = 90;
+const reduceMotion = matchMedia("(prefers-reduced-motion: reduce)").matches;
+const speedMul = reduceMotion ? 0.25 : 0.85;
+
+function readRGB(name, fb = [160, 160, 160]) {
+  const r = getComputedStyle(document.documentElement).getPropertyValue(name).trim();
+  const p = r.split(/\s+/).map(Number);
+  return (p.length === 3 && p.every(n => !isNaN(n))) ? p : fb;
+}
+function rgba(c, a = 1) {
+  return `rgba(${c[0]},${c[1]},${c[2]},${a})`;
 }
 
-function spawnFlake(f) {
-  const ang = Math.random() * Math.PI * 2;
-  const dist = Math.random() * globeR * 0.85;
-  f.x = cx + Math.cos(ang) * dist;
-  f.y = cy - globeR + 6;
-  f.vx = (Math.random() - 0.5) * 3;
-  f.vy = 10 + Math.random() * 16;
-  f.wobAmp = 4 + Math.random() * 12;
-  f.wobFreq = 0.5 + Math.random() * 1.5;
-  f.phase = Math.random() * Math.PI * 2;
-  f.r = 1 + Math.random() * 2.4;
-  f.alpha = 0.6 + Math.random() * 0.4;
+function loadTheme() {
+  theme = {
+    surface:            readRGB("--surface_rgb", [12, 20, 27]),
+    primary:            readRGB("--primary_rgb", [138, 206, 255]),
+    secondary:          readRGB("--secondary_rgb", [180, 199, 233]),
+    tertiary:           readRGB("--tertiary_rgb", [186, 196, 250]),
+    tertiaryContainer:  readRGB("--tertiary_container_rgb", [58, 68, 114]),
+    secondaryContainer: readRGB("--secondary_container_rgb", [53, 72, 99]),
+    outline:            readRGB("--outline_rgb", [137, 146, 154])
+  };
+
+  document.body.style.background = rgba(theme.surface);
+  clockEl.style.color = rgba(theme.primary, 1);
+  dateEl.style.color  = rgba(theme.secondary, 0.95);
+  hintEl.style.color  = rgba(theme.outline, 0.6);
 }
 
 function pileIndex(x) {
   const rel = (x - (cx - globeR)) / (globeR * 2);
   return Math.max(0, Math.min(PILE_RES - 1, Math.floor(rel * PILE_RES)));
 }
-
 function pileHeightAt(x) {
-  const idx = pileIndex(x);
-  return pile[idx] || 0;
+  return pile[pileIndex(x)] || 0;
 }
-
 function addSnowToPile(x) {
   const idx = pileIndex(x);
   if (idx < 0 || idx >= PILE_RES) return;
-
   const amount = 0.35;
-  pile[idx] = Math.min(globeR * 1.15, pile[idx] + amount);
-  if (idx > 0) pile[idx - 1] = Math.min(globeR * 1.15, pile[idx - 1] + amount * 0.5);
-  if (idx < PILE_RES - 1) pile[idx + 1] = Math.min(globeR * 1.15, pile[idx + 1] + amount * 0.5);
+  pile[idx] = Math.min(globeR * 1.1, pile[idx] + amount);
+  if (idx > 0) pile[idx - 1] = Math.min(globeR * 1.1, pile[idx - 1] + amount * 0.5);
+  if (idx < PILE_RES - 1) pile[idx + 1] = Math.min(globeR * 1.1, pile[idx + 1] + amount * 0.5);
+}
+
+function spawnFlake(f) {
+  const ang = Math.random() * Math.PI * 2;
+  const dist = Math.random() * globeR * 0.82;
+  f.x = cx + Math.cos(ang) * dist;
+  f.y = cy - globeR + 8;
+  f.vx = (Math.random() - 0.5) * 3;
+  f.vy = 10 + Math.random() * 15;
+  f.wobAmp = 4 + Math.random() * 11;
+  f.wobFreq = 0.5 + Math.random() * 1.4;
+  f.phase = Math.random() * Math.PI * 2;
+  f.r = 1 + Math.random() * 2.3;
+  f.alpha = 0.55 + Math.random() * 0.4;
+}
+
+function initPile() {
+  pile = new Array(PILE_RES).fill(0);
+  flakes = [];
+  for (let i = 0; i < 150; i++) {
+    const f = {};
+    spawnFlake(f);
+    f.y = cy - globeR + Math.random() * globeR * 1.7;
+    flakes.push(f);
+  }
 }
 
 function drawPineTree(tx, ty, scale) {
   ctx.save();
   ctx.translate(tx, ty);
   ctx.scale(scale, scale);
-
-  ctx.fillStyle = 'rgba(14, 22, 32, 0.95)';
+  ctx.fillStyle = "rgba(14, 22, 32, 0.95)";
   ctx.fillRect(-2.5, 0, 5, 14);
-
   ctx.beginPath();
   ctx.moveTo(0, -34); ctx.lineTo(15, -16); ctx.lineTo(-15, -16); ctx.closePath();
   ctx.moveTo(0, -23); ctx.lineTo(19, -3); ctx.lineTo(-19, -3); ctx.closePath();
   ctx.moveTo(0, -11); ctx.lineTo(23, 10); ctx.lineTo(-23, 10); ctx.closePath();
   ctx.fill();
-
   ctx.restore();
 }
 
 function drawCabin(bx, by, pulse) {
   ctx.save();
   ctx.translate(bx, by);
-
-  ctx.fillStyle = 'rgba(18, 26, 36, 0.96)';
+  ctx.fillStyle = "rgba(18, 26, 36, 0.96)";
   ctx.fillRect(-20, -15, 40, 15);
-  
   ctx.beginPath();
   ctx.moveTo(-24, -15); ctx.lineTo(0, -28); ctx.lineTo(24, -15); ctx.closePath();
   ctx.fill();
-
-  // Glowing Windows with breathing alpha pulse
-  ctx.fillStyle = rgba(theme.primary, 0.8 + Math.sin(pulse * 3) * 0.15);
+  ctx.fillStyle = rgba(theme.primary, 0.78 + Math.sin(pulse * 2.8) * 0.14);
   ctx.fillRect(-11, -11, 7, 7);
   ctx.fillRect(4, -11, 7, 7);
-
   ctx.restore();
 }
 
-let start = performance.now();
-let lastT = 0;
-let lastReset = 0;
+function resize() {
+  W = innerWidth; H = innerHeight;
+  cx = W * 0.5; cy = H * 0.44;
+  globeR = Math.min(W, H) * 0.3;
+  DPR = Math.min(devicePixelRatio || 1, 2);
+  canvas.width  = Math.floor(W * DPR);
+  canvas.height = Math.floor(H * DPR);
+  ctx.setTransform(DPR, 0, 0, DPR, 0, 0);
+  initPile();
+}
+addEventListener("resize", resize, { passive: true });
 
 function frame(now) {
   const t = ((now - start) / 1000) * speedMul;
-  const dt = Math.min(0.05, t - lastT);
+  const dt = Math.min(0.05, t - lastT || 0.016);
   lastT = t;
 
-  if (t - lastReset > 150) {
+  if (t - lastReset > 140) {
     initPile();
     lastReset = t;
   }
 
-  shakeForce *= 0.95;
+  shakeForce *= 0.94;
 
-  ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+  ctx.setTransform(DPR, 0, 0, DPR, 0, 0);
   ctx.fillStyle = rgba(theme.surface, 1);
   ctx.fillRect(0, 0, W, H);
 
-  const shakeX = (Math.random() - 0.5) * shakeForce * 14;
-  const shakeY = (Math.random() - 0.5) * shakeForce * 14;
+  const shakeX = (Math.random() - 0.5) * shakeForce * 12;
+  const shakeY = (Math.random() - 0.5) * shakeForce * 12;
 
   ctx.save();
   ctx.translate(shakeX, shakeY);
 
-  // Modernized Metallic Stand Base
+  // Base
   const baseTopY = cy + globeR * 0.82;
   ctx.beginPath();
-  ctx.ellipse(cx, baseTopY + 32, globeR * 0.72, globeR * 0.18, 0, 0, Math.PI * 2);
-  ctx.fillStyle = rgba(theme.tertiaryContainer, 0.95);
+  ctx.ellipse(cx, baseTopY + 30, globeR * 0.7, globeR * 0.16, 0, 0, Math.PI * 2);
+  ctx.fillStyle = rgba(theme.tertiaryContainer, 0.92);
   ctx.fill();
 
   ctx.beginPath();
-  ctx.moveTo(cx - globeR * 0.6, baseTopY);
-  ctx.lineTo(cx + globeR * 0.6, baseTopY);
-  ctx.lineTo(cx + globeR * 0.72, baseTopY + 32);
-  ctx.lineTo(cx - globeR * 0.72, baseTopY + 32);
+  ctx.moveTo(cx - globeR * 0.58, baseTopY);
+  ctx.lineTo(cx + globeR * 0.58, baseTopY);
+  ctx.lineTo(cx + globeR * 0.7, baseTopY + 30);
+  ctx.lineTo(cx - globeR * 0.7, baseTopY + 30);
   ctx.closePath();
-  ctx.fillStyle = rgba(theme.secondaryContainer, 0.92);
+  ctx.fillStyle = rgba(theme.secondaryContainer, 0.9);
   ctx.fill();
 
-  ctx.beginPath();
-  ctx.ellipse(cx, baseTopY + 10, globeR * 0.62, globeR * 0.08, 0, 0, Math.PI * 2);
-  ctx.strokeStyle = rgba(theme.primary, 0.5);
-  ctx.lineWidth = 3.5;
-  ctx.stroke();
-
-  // Glass Clipping Region
+  // Glass clip
   ctx.save();
   ctx.beginPath();
   ctx.arc(cx, cy, globeR, 0, Math.PI * 2);
   ctx.clip();
 
-  // Volumetric Inner Atmosphere with interactive cursor glow
-  const innerGrad = ctx.createRadialGradient(cx, cy - globeR * 0.3, 0, cx, cy, globeR);
-  innerGrad.addColorStop(0, rgba(theme.tertiaryContainer, 0.6));
-  innerGrad.addColorStop(0.65, rgba(theme.surface, 0.92));
-  innerGrad.addColorStop(1, rgba(theme.surface, 0.98));
-  ctx.fillStyle = innerGrad;
+  // Interior
+  const inner = ctx.createRadialGradient(cx, cy - globeR * 0.28, 0, cx, cy, globeR);
+  inner.addColorStop(0, rgba(theme.tertiaryContainer, 0.55));
+  inner.addColorStop(0.7, rgba(theme.surface, 0.94));
+  inner.addColorStop(1, rgba(theme.surface, 0.98));
+  ctx.fillStyle = inner;
   ctx.fillRect(cx - globeR, cy - globeR, globeR * 2, globeR * 2);
 
-  // Background Silhouettes
-  ctx.fillStyle = 'rgba(24, 34, 46, 0.9)';
+  // Hills
+  ctx.fillStyle = "rgba(24, 34, 46, 0.9)";
   ctx.beginPath();
-  ctx.arc(cx - globeR * 0.32, cy + globeR * 0.68, globeR * 0.52, 0, Math.PI * 2);
-  ctx.arc(cx + globeR * 0.38, cy + globeR * 0.74, globeR * 0.58, 0, Math.PI * 2);
+  ctx.arc(cx - globeR * 0.3, cy + globeR * 0.68, globeR * 0.5, 0, Math.PI * 2);
+  ctx.arc(cx + globeR * 0.36, cy + globeR * 0.72, globeR * 0.55, 0, Math.PI * 2);
   ctx.fill();
 
-  drawPineTree(cx - globeR * 0.44, cy + globeR * 0.3, 0.85);
-  drawPineTree(cx - globeR * 0.2, cy + globeR * 0.34, 1.15);
-  drawCabin(cx + globeR * 0.12, cy + globeR * 0.4, t);
-  drawPineTree(cx + globeR * 0.46, cy + globeR * 0.32, 0.95);
+  drawPineTree(cx - globeR * 0.42, cy + globeR * 0.28, 0.85);
+  drawPineTree(cx - globeR * 0.18, cy + globeR * 0.32, 1.1);
+  drawCabin(cx + globeR * 0.1, cy + globeR * 0.38, t);
+  drawPineTree(cx + globeR * 0.44, cy + globeR * 0.3, 0.95);
 
-  // Snow Accumulation Floor
+  // Snow pile
   ctx.beginPath();
   ctx.moveTo(cx - globeR, cy + globeR);
   for (let i = 0; i < PILE_RES; i++) {
@@ -355,37 +302,34 @@ function frame(now) {
   }
   ctx.lineTo(cx + globeR, cy + globeR);
   ctx.closePath();
-  ctx.fillStyle = 'rgba(240, 248, 255, 0.94)';
+  ctx.fillStyle = "rgba(240, 248, 255, 0.92)";
   ctx.fill();
 
-  // Snowflakes Simulation
+  // Flakes
   for (const f of flakes) {
     if (shakeForce > 0.05) {
-      f.vx += (Math.random() - 0.5) * shakeForce * 18;
-      f.vy += (Math.random() - 0.5) * shakeForce * 18;
+      f.vx += (Math.random() - 0.5) * shakeForce * 16;
+      f.vy += (Math.random() - 0.5) * shakeForce * 16;
     }
 
-    // Cursor proximity wind attraction
-    const mDistX = f.x - mousePos.x;
-    const mDistY = f.y - mousePos.y;
-    const mDistSq = mDistX * mDistX + mDistY * mDistY;
-    if (mDistSq < 150 * 150 && mDistSq > 1) {
-      const mDist = Math.sqrt(mDistSq);
-      f.vx += (mDistX / mDist) * 12;
-      f.vy += (mDistY / mDist) * 12;
+    const mdx = f.x - mousePos.x;
+    const mdy = f.y - mousePos.y;
+    const mds = mdx * mdx + mdy * mdy;
+    if (mds < 140 * 140 && mds > 1) {
+      const md = Math.sqrt(mds);
+      f.vx += (mdx / md) * 10;
+      f.vy += (mdy / md) * 10;
     }
 
-    f.vy += 7.5 * dt;
-    f.vy = Math.min(f.vy, 38);
+    f.vy += 7 * dt;
+    f.vy = Math.min(f.vy, 36);
     f.y += f.vy * dt;
-
     const sway = Math.sin(t * f.wobFreq + f.phase) * f.wobAmp;
-    f.x += (f.vx + sway * 0.2) * dt;
+    f.x += (f.vx + sway * 0.18) * dt;
 
-    const distFromCenter = Math.hypot(f.x - cx, f.y - cy);
+    const dist = Math.hypot(f.x - cx, f.y - cy);
     const floorY = cy + globeR - pileHeightAt(f.x);
-
-    if (f.y >= floorY || distFromCenter >= globeR - 2) {
+    if (f.y >= floorY || dist >= globeR - 2) {
       if (f.y >= floorY) addSnowToPile(f.x);
       spawnFlake(f);
       continue;
@@ -393,87 +337,105 @@ function frame(now) {
 
     ctx.beginPath();
     ctx.arc(f.x, f.y, f.r, 0, Math.PI * 2);
-    ctx.fillStyle = `rgba(255, 255, 255, ${f.alpha})`;
+    ctx.fillStyle = `rgba(255,255,255,${f.alpha})`;
     ctx.fill();
 
-    // Refractive sparkle glint on larger flakes
     if (f.r > 2) {
       ctx.beginPath();
-      ctx.arc(f.x - 0.5, f.y - 0.5, f.r * 0.4, 0, Math.PI * 2);
-      ctx.fillStyle = `rgba(138, 206, 255, ${f.alpha * 0.8})`;
+      ctx.arc(f.x - 0.4, f.y - 0.4, f.r * 0.35, 0, Math.PI * 2);
+      ctx.fillStyle = rgba(theme.primary, f.alpha * 0.7);
       ctx.fill();
     }
   }
 
-  ctx.restore(); // End Clip
+  ctx.restore(); // clip
 
-  // Glass Dome Refraction Rim
+  // Rim
   ctx.beginPath();
   ctx.arc(cx, cy, globeR, 0, Math.PI * 2);
-  ctx.strokeStyle = rgba(theme.primary, 0.42);
-  ctx.lineWidth = 3;
+  ctx.strokeStyle = rgba(theme.primary, 0.4);
+  ctx.lineWidth = 2.8;
   ctx.stroke();
 
-  // Primary Specular Highlights
+  // Specular
   ctx.beginPath();
-  ctx.arc(cx - globeR * 0.35, cy - globeR * 0.45, globeR * 0.32, -0.7, 0.9);
-  ctx.strokeStyle = 'rgba(255, 255, 255, 0.38)';
-  ctx.lineWidth = 8;
-  ctx.lineCap = 'round';
+  ctx.arc(cx - globeR * 0.34, cy - globeR * 0.42, globeR * 0.3, -0.7, 0.9);
+  ctx.strokeStyle = "rgba(255,255,255,0.35)";
+  ctx.lineWidth = 7;
+  ctx.lineCap = "round";
   ctx.stroke();
 
-  // Secondary Soft Ambient Reflection
   ctx.beginPath();
-  ctx.arc(cx + globeR * 0.45, cy + globeR * 0.2, globeR * 0.25, 0.8, 2.2);
-  ctx.strokeStyle = 'rgba(255, 255, 255, 0.16)';
-  ctx.lineWidth = 4;
+  ctx.arc(cx + globeR * 0.42, cy + globeR * 0.18, globeR * 0.22, 0.8, 2.2);
+  ctx.strokeStyle = "rgba(255,255,255,0.14)";
+  ctx.lineWidth = 3.5;
   ctx.stroke();
 
-  ctx.restore(); // End Shake
-
+  ctx.restore(); // shake
   requestAnimationFrame(frame);
 }
 
-function fallbackClock() {
-  const update = () => {
-    const now = new Date();
-    let hours = now.getHours();
-    const minutes = String(now.getMinutes()).padStart(2, '0');
-    const ampm = hours >= 12 ? 'PM' : 'AM';
-    hours = hours % 12 || 12;
-    clockEl.innerHTML = `${String(hours).padStart(2, '0')}:${minutes}<span class="ampm">${ampm}</span>`;
+addEventListener("pointermove", e => {
+  document.body.classList.add("show-cursor");
+  clearTimeout(cursorTimer);
+  cursorTimer = setTimeout(() => document.body.classList.remove("show-cursor"), 2500);
+  mousePos.x = e.clientX;
+  mousePos.y = e.clientY;
+  const speed = Math.hypot(e.movementX, e.movementY);
+  if (speed > 14) shakeForce = Math.min(1, shakeForce + speed * 0.007);
+}, { passive: true });
 
-    const options = { weekday: 'short', month: 'short', day: 'numeric' };
-    dateEl.textContent = now.toLocaleDateString('en-US', options);
-  };
+addEventListener("pointerdown", () => {
+  document.body.classList.add("show-cursor");
+  clearTimeout(cursorTimer);
+  cursorTimer = setTimeout(() => document.body.classList.remove("show-cursor"), 2500);
+  shakeForce = 1;
+  for (const f of flakes) {
+    f.vy = -(12 + Math.random() * 45);
+    f.vx = (Math.random() - 0.5) * 45;
+  }
+});
+
+addEventListener("keydown", e => {
+  if (e.key.toLowerCase() === "c") {
+    clockWrap.classList.toggle("hidden");
+  }
+});
+
+function fallbackClock() {
+  function update() {
+    const n = new Date();
+    let h = n.getHours();
+    const ap = h >= 12 ? "PM" : "AM";
+    h = h % 12 || 12;
+    clockEl.innerHTML =
+      `${String(h).padStart(2,"0")}:${String(n.getMinutes()).padStart(2,"0")}` +
+      `<span class="ampm">${ap}</span>`;
+    dateEl.textContent = n.toLocaleDateString("en-US", {
+      weekday: "short", month: "short", day: "numeric"
+    }).toUpperCase();
+  }
   update();
   setInterval(update, 1000);
 }
 
-let uiVisible = true;
-window.addEventListener('keydown', (e) => {
-  if (e.key.toLowerCase() === 'c') {
-    uiVisible = !uiVisible;
-    uiContainer.classList.toggle('hidden', !uiVisible);
-  }
-});
-
-hintEl.classList.add('show');
-setTimeout(() => hintEl.classList.remove('show'), 4000);
-
-window.addEventListener('load', () => {
-  resize();
+addEventListener("load", () => {
   loadTheme();
+  resize();
 
-  try {
-    if (typeof startClock === 'function') {
-      startClock(clockEl, dateEl);
-    } else {
-      fallbackClock();
-    }
-  } catch (err) {
-    fallbackClock();
-  }
+  const s = document.createElement("script");
+  s.src = "clock-shared.js";
+  s.onload = () => {
+    try {
+      if (typeof startClock === "function") startClock(clockEl, dateEl);
+      else fallbackClock();
+    } catch { fallbackClock(); }
+  };
+  s.onerror = fallbackClock;
+  document.head.appendChild(s);
+
+  hintEl.classList.add("show");
+  setTimeout(() => hintEl.classList.remove("show"), 4000);
 
   requestAnimationFrame(frame);
 });

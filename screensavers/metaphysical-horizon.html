@@ -5,199 +5,238 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Material Screensaver — Ambient Mesh</title>
 <style>
-  :root {
-    --primary_rgb: 138 206 255;
-    --secondary_rgb: 180 199 233;
-    --surface_rgb: 8 12 18;
-    --outline_rgb: 137 146 154;
-  }
-  
-  html, body {
-    margin: 0; padding: 0; width: 100%; height: 100%;
-    overflow: hidden; background: rgb(var(--surface_rgb, 8 12 18));
-    font-family: "Google Sans", "Segoe UI", Roboto, system-ui, sans-serif;
-    -webkit-font-smoothing: antialiased;
-    user-select: none;
-  }
+:root {
+  --primary_rgb: 138 206 255;
+  --secondary_rgb: 180 199 233;
+  --tertiary_rgb: 186 196 250;
+  --surface_rgb: 8 12 18;
+  --outline_rgb: 137 146 154;
+}
+* { margin: 0; padding: 0; box-sizing: border-box; }
+html, body {
+  width: 100%; height: 100%; overflow: hidden;
+  background: rgb(var(--surface_rgb));
+  cursor: none;
+  font-family: "Google Sans", "Segoe UI", system-ui, sans-serif;
+}
+body.show-cursor { cursor: default; }
+canvas { display: block; width: 100vw; height: 100vh; }
 
-  body { cursor: none; }
-  body.show-cursor { cursor: default; }
+#clock-wrap {
+  position: fixed;
+  left: clamp(28px, 3vw, 64px);
+  bottom: clamp(28px, 3.5vw, 64px);
+  pointer-events: none;
+  transition: opacity .7s ease;
+  z-index: 10;
+}
+#clock-wrap.hidden { opacity: 0; }
 
-  canvas {
-    position: absolute; inset: 0;
-    width: 100vw; height: 100vh;
-    z-index: 1; pointer-events: none;
-  }
+#clock {
+  font-weight: 100;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: -3px;
+  font-size: clamp(56px, 8vw, 120px);
+  color: rgb(var(--primary_rgb));
+  text-shadow:
+    0 0 40px rgb(var(--primary_rgb) / .25),
+    0 2px 20px rgba(0,0,0,.5);
+  line-height: .92;
+}
+#clock .ampm {
+  font-size: .22em;
+  margin-left: 12px;
+  opacity: .65;
+  vertical-align: 28%;
+  letter-spacing: 2px;
+  font-weight: 400;
+}
+#date {
+  margin-top: 10px;
+  font-size: clamp(12px, 1.15vw, 15px);
+  letter-spacing: 4px;
+  text-transform: uppercase;
+  color: rgb(var(--secondary_rgb));
+  opacity: .8;
+  text-shadow: 0 1px 12px rgba(0,0,0,.45);
+}
 
-  .content-wrapper {
-    position: absolute; inset: 0; z-index: 2;
-    display: flex; flex-direction: column; justify-content: flex-end;
-    padding: 96px;
-    box-sizing: border-box;
-    pointer-events: none;
-  }
-
-  #clock {
-    font-size: clamp(72px, 10vw, 150px);
-    font-weight: 100;
-    font-variant-numeric: tabular-nums;
-    letter-spacing: -3px;
-    line-height: 0.9;
-    color: rgb(var(--primary_rgb, 138 206 255));
-  }
-  #clock .ampm {
-    font-size: 0.22em;
-    margin-left: 14px;
-    font-weight: 400;
-    letter-spacing: 1.5px;
-    vertical-align: super;
-    opacity: 0.6;
-  }
-
-  #date {
-    font-size: clamp(13px, 1.3vw, 16px);
-    letter-spacing: 4px;
-    text-transform: uppercase;
-    color: rgb(var(--secondary_rgb, 180 199 233));
-    opacity: 0.75;
-    margin-top: 12px;
-  }
-
-  #hint {
-    position: fixed; right: 96px; top: 96px; z-index: 10;
-    font-size: 11px; letter-spacing: 1.5px;
-    color: rgb(var(--outline_rgb, 137 146 154));
-    opacity: 0; transition: opacity 0.6s ease;
-    text-transform: uppercase;
-    pointer-events: none;
-  }
-  #hint.show { opacity: 0.5; }
+#hint {
+  position: fixed; right: 36px; bottom: 28px; z-index: 10;
+  font-size: 11px; letter-spacing: 1.5px;
+  color: rgb(var(--outline_rgb) / .5);
+  opacity: 0; transition: opacity 1s ease;
+  text-transform: uppercase;
+  pointer-events: none;
+}
+#hint.show { opacity: .55; }
 </style>
 <link rel="stylesheet" href="file:///home/sakib/.config/matugen/matugen-colors.css">
 </head>
 <body>
-
-<canvas id="meshCanvas"></canvas>
-
-<div class="content-wrapper">
-  <div id="clock">00:00</div>
-  <div id="date">Mon, Jan 1</div>
+<canvas id="c"></canvas>
+<div id="clock-wrap">
+  <div id="clock">00:00<span class="ampm">AM</span></div>
+  <div id="date">MON, JAN 1</div>
 </div>
+<div id="hint">C · toggle clock</div>
 
-<div id="hint">Press <b>C</b> to Toggle UI</div>
-
-<script src="clock-shared.js"></script>
 <script>
-const canvas = document.getElementById('meshCanvas');
-const ctx = canvas.getContext('2d');
-const clockEl = document.getElementById('clock');
-const dateEl = document.getElementById('date');
-const hintEl = document.getElementById('hint');
+"use strict";
 
-let cursorTimeout;
-function triggerCursor() {
-  document.body.classList.add('show-cursor');
-  clearTimeout(cursorTimeout);
-  cursorTimeout = setTimeout(() => {
-    document.body.classList.remove('show-cursor');
-  }, 2500);
-}
-window.addEventListener('pointermove', triggerCursor);
+const canvas = document.getElementById("c");
+const ctx = canvas.getContext("2d", { alpha: false, desynchronized: true });
+const clockEl = document.getElementById("clock");
+const dateEl  = document.getElementById("date");
+const hintEl  = document.getElementById("hint");
+const clockWrap = document.getElementById("clock-wrap");
 
-let dpr = Math.min(window.devicePixelRatio || 1, 2);
-let W, H;
-function resize() {
-  W = window.innerWidth;
-  H = window.innerHeight;
-  canvas.width = W * dpr;
-  canvas.height = H * dpr;
-  ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
-}
-window.addEventListener('resize', resize);
-resize();
-
-function readRGB(name, fallback) {
-  const raw = getComputedStyle(document.documentElement).getPropertyValue(name).trim();
-  const parts = raw.split(/\s+/).map(Number);
-  return (parts.length === 3 && parts.every(n => !isNaN(n))) ? parts : fallback;
-}
-function rgba(rgb, a) {
-  const c = rgb || [138, 206, 255];
-  return `rgba(${c[0]}, ${c[1]}, ${c[2]}, ${a})`;
-}
-
+let W = 0, H = 0, DPR = 1;
 let theme = {};
+let nodes = [];
+let start = performance.now();
+let cursorTimer;
+
+const NODE_COUNT = 7;
+const reduceMotion = matchMedia("(prefers-reduced-motion: reduce)").matches;
+const speedMul = reduceMotion ? 0.15 : 0.55;
+
+function readRGB(name, fb = [160, 160, 160]) {
+  const r = getComputedStyle(document.documentElement).getPropertyValue(name).trim();
+  const p = r.split(/\s+/).map(Number);
+  return (p.length === 3 && p.every(n => !isNaN(n))) ? p : fb;
+}
+function rgba(c, a = 1) {
+  return `rgba(${c[0]},${c[1]},${c[2]},${a})`;
+}
+
 function loadTheme() {
   theme = {
-    surface: readRGB('--surface_rgb', [8, 12, 18]),
-    primary: readRGB('--primary_rgb', [138, 206, 255]),
-    secondary: readRGB('--secondary_rgb', [180, 199, 233]),
+    surface:   readRGB("--surface_rgb", [8, 12, 18]),
+    primary:   readRGB("--primary_rgb", [138, 206, 255]),
+    secondary: readRGB("--secondary_rgb", [180, 199, 233]),
+    tertiary:  readRGB("--tertiary_rgb", [186, 196, 250]),
+    outline:   readRGB("--outline_rgb", [137, 146, 154])
   };
+
+  const keys = ["primary", "secondary", "tertiary"];
+  nodes.forEach((n, i) => {
+    n.colorKey = keys[i % 3];
+  });
+
+  document.body.style.background = rgba(theme.surface);
+  clockEl.style.color = rgba(theme.primary, 1);
+  dateEl.style.color  = rgba(theme.secondary, 0.85);
+  hintEl.style.color  = rgba(theme.outline, 0.55);
 }
 
-let start = performance.now();
+function resize() {
+  W = innerWidth; H = innerHeight;
+  DPR = Math.min(devicePixelRatio || 1, 2);
+  canvas.width  = Math.floor(W * DPR);
+  canvas.height = Math.floor(H * DPR);
+  ctx.setTransform(DPR, 0, 0, DPR, 0, 0);
+}
+addEventListener("resize", resize, { passive: true });
 
-// Render an ultra-smooth, slow-breathing ambient color orb that drifts subtly in the background
+function makeNodes() {
+  nodes = [];
+  const keys = ["primary", "secondary", "tertiary"];
+  for (let i = 0; i < NODE_COUNT; i++) {
+    nodes.push({
+      bx: 0.15 + Math.random() * 0.7,
+      by: 0.15 + Math.random() * 0.7,
+      ampX: 0.08 + Math.random() * 0.12,
+      ampY: 0.06 + Math.random() * 0.1,
+      freqX: 0.08 + Math.random() * 0.12,
+      freqY: 0.07 + Math.random() * 0.11,
+      phase: Math.random() * Math.PI * 2,
+      radius: 0.28 + Math.random() * 0.22,
+      colorKey: keys[i % 3],
+      breatheSpeed: 0.15 + Math.random() * 0.2,
+      breathePhase: Math.random() * Math.PI * 2
+    });
+  }
+}
+
 function frame(now) {
-  const t = (now - start) / 1000 * 0.2;
+  const t = ((now - start) / 1000) * speedMul;
 
-  ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+  ctx.setTransform(DPR, 0, 0, DPR, 0, 0);
   ctx.fillStyle = rgba(theme.surface, 1);
   ctx.fillRect(0, 0, W, H);
 
-  const x1 = W * 0.75 + Math.sin(t * 0.5) * 120;
-  const y1 = H * 0.3 + Math.cos(t * 0.4) * 80;
-  const r1 = Math.max(W, H) * 0.6;
+  ctx.globalCompositeOperation = "lighter";
 
-  const grad = ctx.createRadialGradient(x1, y1, 0, x1, y1, r1);
-  grad.addColorStop(0, rgba(theme.primary, 0.08));
-  grad.addColorStop(0.5, rgba(theme.secondary, 0.03));
-  grad.addColorStop(1, 'rgba(0,0,0,0)');
+  for (const n of nodes) {
+    const x = (n.bx + Math.sin(t * n.freqX + n.phase) * n.ampX) * W;
+    const y = (n.by + Math.cos(t * n.freqY + n.phase * 1.3) * n.ampY) * H;
+    const breathe = 0.85 + 0.15 * Math.sin(t * n.breatheSpeed + n.breathePhase);
+    const r = Math.max(W, H) * n.radius * breathe;
+    const col = theme[n.colorKey] || theme.primary;
 
-  ctx.fillStyle = grad;
-  ctx.fillRect(0, 0, W, H);
+    const grad = ctx.createRadialGradient(x, y, 0, x, y, r);
+    grad.addColorStop(0, rgba(col, 0.14));
+    grad.addColorStop(0.45, rgba(col, 0.05));
+    grad.addColorStop(1, "transparent");
 
+    ctx.fillStyle = grad;
+    ctx.fillRect(0, 0, W, H);
+  }
+
+  ctx.globalCompositeOperation = "source-over";
   requestAnimationFrame(frame);
 }
 
-function fallbackClock() {
-  const update = () => {
-    const now = new Date();
-    let hours = now.getHours();
-    const minutes = String(now.getMinutes()).padStart(2, '0');
-    const ampm = hours >= 12 ? 'PM' : 'AM';
-    hours = hours % 12 || 12;
-    clockEl.innerHTML = `${String(hours).padStart(2, '0')}:${minutes}<span class="ampm">${ampm}</span>`;
+addEventListener("pointermove", () => {
+  document.body.classList.add("show-cursor");
+  clearTimeout(cursorTimer);
+  cursorTimer = setTimeout(() => document.body.classList.remove("show-cursor"), 2500);
+}, { passive: true });
 
-    const options = { weekday: 'short', month: 'short', day: 'numeric' };
-    dateEl.textContent = now.toLocaleDateString('en-US', options);
-  };
+addEventListener("keydown", e => {
+  if (e.key.toLowerCase() === "c") {
+    clockWrap.classList.toggle("hidden");
+  }
+});
+
+function fallbackClock() {
+  function update() {
+    const n = new Date();
+    let h = n.getHours();
+    const ap = h >= 12 ? "PM" : "AM";
+    h = h % 12 || 12;
+    clockEl.innerHTML =
+      `${String(h).padStart(2,"0")}:${String(n.getMinutes()).padStart(2,"0")}` +
+      `<span class="ampm">${ap}</span>`;
+    dateEl.textContent = n.toLocaleDateString("en-US", {
+      weekday: "short", month: "short", day: "numeric"
+    }).toUpperCase();
+  }
   update();
   setInterval(update, 1000);
 }
 
-let uiVisible = true;
-window.addEventListener('keydown', (e) => {
-  if (e.key.toLowerCase() === 'c') {
-    uiVisible = !uiVisible;
-    document.querySelector('.content-wrapper').style.opacity = uiVisible ? '1' : '0';
-  }
-});
-
-hintEl.classList.add('show');
-setTimeout(() => hintEl.classList.remove('show'), 3500);
-
-window.addEventListener('load', () => {
+addEventListener("load", () => {
   loadTheme();
-  try {
-    if (typeof startClock === 'function') {
-      startClock(clockEl, dateEl);
-    } else {
-      fallbackClock();
-    }
-  } catch (err) {
-    fallbackClock();
-  }
+  resize();
+  makeNodes();
+  loadTheme();
+
+  const s = document.createElement("script");
+  s.src = "clock-shared.js";
+  s.onload = () => {
+    try {
+      if (typeof startClock === "function") startClock(clockEl, dateEl);
+      else fallbackClock();
+    } catch { fallbackClock(); }
+  };
+  s.onerror = fallbackClock;
+  document.head.appendChild(s);
+
+  hintEl.classList.add("show");
+  setTimeout(() => hintEl.classList.remove("show"), 3500);
+
   requestAnimationFrame(frame);
 });
 </script>

@@ -2,200 +2,174 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Material Screensaver — Flow</title>
 <style>
-  :root {
-    /* fallback palette — overridden by the matugen stylesheet below if it loads */
-    --primary_rgb: 138 206 255;
-    --primary_container_rgb: 0 75 111;
-    --secondary_rgb: 180 199 233;
-    --secondary_container_rgb: 53 72 99;
-    --tertiary_rgb: 186 196 250;
-    --tertiary_container_rgb: 58 68 114;
-    --inverse_primary_rgb: 0 100 145;
-    --surface_rgb: 12 20 27;
-    --surface_bright_rgb: 50 58 65;
-    --on_surface_rgb: 219 227 237;
-    --on_surface_variant_rgb: 191 199 209;
-    --outline_rgb: 137 146 154;
-  }
-  html, body {
-    margin: 0;
-    padding: 0;
-    width: 100%;
-    height: 100%;
-    overflow: hidden;
-    background: rgb(var(--surface_rgb));
-    cursor: none;
-  }
-  body.show-cursor { cursor: default; }
-  canvas {
-    display: block;
-    width: 100vw;
-    height: 100vh;
-  }
-  #clock {
-    position: fixed;
-    left: 32px;
-    bottom: 28px;
-    font-family: "Google Sans", "Segoe UI", Roboto, system-ui, sans-serif;
-    font-weight: 400;
-    font-variant-numeric: tabular-nums;
-    letter-spacing: 0.5px;
-    font-size: clamp(28px, 4vw, 56px);
-    text-shadow: 0 0 24px rgba(0,0,0,0.4);
-    pointer-events: none;
-    transition: opacity 0.6s ease;
-  }
-  #clock .ampm {
-    font-size: 0.36em;
-    margin-left: 6px;
-    opacity: 0.82;
-    vertical-align: middle;
-  }
-  #date {
-    position: fixed;
-    left: 34px;
-    bottom: 14px;
-    font-family: "Google Sans", "Segoe UI", Roboto, system-ui, sans-serif;
-    font-size: clamp(12px, 1.2vw, 16px);
-    letter-spacing: 1.5px;
-    text-transform: uppercase;
-    pointer-events: none;
-    transition: opacity 0.6s ease;
-  }
-  #hint {
-    position: fixed;
-    right: 28px;
-    bottom: 26px;
-    font-family: "Google Sans", "Segoe UI", Roboto, system-ui, sans-serif;
-    font-size: 13px;
-    letter-spacing: 0.5px;
-    pointer-events: none;
-    opacity: 0;
-    transition: opacity 0.8s ease;
-  }
-  #hint.show { opacity: 1; }
-  #clock.hidden, #date.hidden { opacity: 0; }
+:root {
+  --primary_rgb: 138 206 255;
+  --primary_container_rgb: 0 75 111;
+  --secondary_rgb: 180 199 233;
+  --secondary_container_rgb: 53 72 99;
+  --tertiary_rgb: 186 196 250;
+  --tertiary_container_rgb: 58 68 114;
+  --inverse_primary_rgb: 0 100 145;
+  --surface_rgb: 12 20 27;
+  --outline_rgb: 137 146 154;
+}
+* { margin: 0; padding: 0; box-sizing: border-box; }
+html, body {
+  width: 100%; height: 100%; overflow: hidden;
+  background: rgb(var(--surface_rgb));
+  cursor: none;
+  font-family: "Google Sans", "Segoe UI", system-ui, sans-serif;
+}
+body.show-cursor { cursor: default; }
+canvas { display: block; width: 100vw; height: 100vh; }
+
+#clock {
+  position: fixed;
+  left: clamp(28px, 3vw, 48px);
+  bottom: clamp(40px, 4.5vw, 56px);
+  font-weight: 200;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: -2px;
+  font-size: clamp(40px, 5.5vw, 78px);
+  color: rgb(var(--primary_rgb));
+  text-shadow:
+    0 0 40px rgb(var(--primary_rgb) / .4),
+    0 2px 16px rgba(0,0,0,.6);
+  pointer-events: none;
+  transition: opacity .7s ease;
+}
+#clock .ampm {
+  font-size: .26em;
+  margin-left: 10px;
+  opacity: .7;
+  vertical-align: 22%;
+  letter-spacing: 2px;
+  font-weight: 400;
+}
+#date {
+  position: fixed;
+  left: clamp(30px, 3.1vw, 50px);
+  bottom: clamp(18px, 2.2vw, 28px);
+  font-size: clamp(11px, 1.05vw, 14px);
+  letter-spacing: 4px;
+  text-transform: uppercase;
+  color: rgb(var(--secondary_rgb) / .88);
+  text-shadow: 0 1px 10px rgba(0,0,0,.5);
+  pointer-events: none;
+  transition: opacity .7s ease;
+}
+#clock.hidden, #date.hidden { opacity: 0; }
+
+#hint {
+  position: fixed; right: 28px; bottom: 24px;
+  font-size: 11px; letter-spacing: 1.5px;
+  color: rgb(var(--outline_rgb) / .55);
+  opacity: 0; transition: opacity 1s ease;
+  text-transform: uppercase;
+  pointer-events: none;
+}
+#hint.show { opacity: .7; }
 </style>
 <link rel="stylesheet" href="file:///home/sakib/.config/matugen/matugen-colors.css">
 </head>
 <body>
 <canvas id="c"></canvas>
-<div id="clock">00:00</div>
-<div id="date">Mon, Jan 1</div>
-<div id="hint">press C to toggle clock</div>
+<div id="clock">00:00<span class="ampm">AM</span></div>
+<div id="date">MON, JAN 1</div>
+<div id="hint">C · toggle clock</div>
 
-<script src="clock-shared.js"></script>
 <script>
-const canvas = document.getElementById('c');
-const ctx = canvas.getContext('2d');
-const clockEl = document.getElementById('clock');
-const dateEl = document.getElementById('date');
-const hintEl = document.getElementById('hint');
+"use strict";
 
-let cursorTimeout;
-window.addEventListener('pointermove', () => {
-  document.body.classList.add('show-cursor');
-  clearTimeout(cursorTimeout);
-  cursorTimeout = setTimeout(() => {
-    document.body.classList.remove('show-cursor');
-  }, 2500);
-});
+const canvas = document.getElementById("c");
+const ctx = canvas.getContext("2d", { alpha: false, desynchronized: true });
+const clockEl = document.getElementById("clock");
+const dateEl  = document.getElementById("date");
+const hintEl  = document.getElementById("hint");
 
-let dpr = Math.min(window.devicePixelRatio || 1, 2);
-let W, H;
-function resize() {
-  W = window.innerWidth;
-  H = window.innerHeight;
-  canvas.width = W * dpr;
-  canvas.height = H * dpr;
-  ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
-  const surf = theme.surface || [12, 20, 27];
-  ctx.fillStyle = `rgb(${surf.join(',')})`;
-  ctx.fillRect(0, 0, W, H);
-}
-window.addEventListener('resize', resize);
-
-const reduceMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
-const speedMul = reduceMotion ? 0.15 : 1;
-
-function readRGB(name, fallback) {
-  const raw = getComputedStyle(document.documentElement).getPropertyValue(name).trim();
-  const parts = raw.split(/\s+/).map(Number);
-  if (parts.length === 3 && parts.every(n => !isNaN(n))) return parts;
-  return fallback;
-}
-
-function rgba(rgb, a) {
-  const c = rgb || [138, 206, 255];
-  return `rgba(${c[0]}, ${c[1]}, ${c[2]}, ${a})`;
-}
-
+let W = 0, H = 0, DPR = 1;
 let theme = {};
 let roleList = [];
+let particles = [];
+let start = performance.now();
+let cursorTimer;
 
-async function loadMatugenColors() {
-  try {
-    const res = await fetch('file:///home/sakib/.config/matugen/matugen-colors.css');
-    if (res.ok) {
-      const cssText = await res.text();
-      const styleTag = document.createElement('style');
-      styleTag.textContent = cssText;
-      document.head.appendChild(styleTag);
-    }
-  } catch (e) {}
-  applyTheme();
+const PARTICLE_COUNT = 280;
+const reduceMotion = matchMedia("(prefers-reduced-motion: reduce)").matches;
+const speedMul = reduceMotion ? 0.18 : 0.7;
+
+function readRGB(name, fb = [160, 160, 160]) {
+  const r = getComputedStyle(document.documentElement).getPropertyValue(name).trim();
+  const p = r.split(/\s+/).map(Number);
+  return (p.length === 3 && p.every(n => !isNaN(n))) ? p : fb;
+}
+function rgba(c, a = 1) {
+  return `rgba(${c[0]},${c[1]},${c[2]},${a})`;
 }
 
-function applyTheme() {
+function loadTheme() {
   theme = {
-    surface: readRGB('--surface_rgb', [12, 20, 27]),
-    primary: readRGB('--primary_rgb', [138, 206, 255]),
-    primaryContainer: readRGB('--primary_container_rgb', [0, 75, 111]),
-    secondary: readRGB('--secondary_rgb', [180, 199, 233]),
-    secondaryContainer: readRGB('--secondary_container_rgb', [53, 72, 99]),
-    tertiary: readRGB('--tertiary_rgb', [186, 196, 250]),
-    tertiaryContainer: readRGB('--tertiary_container_rgb', [58, 68, 114]),
-    inversePrimary: readRGB('--inverse_primary_rgb', [0, 100, 145]),
-    onSurface: readRGB('--on_surface_rgb', [219, 227, 237]),
-    onSurfaceVariant: readRGB('--on_surface_variant_rgb', [191, 199, 209]),
-    outline: readRGB('--outline_rgb', [137, 146, 154]),
+    surface:            readRGB("--surface_rgb", [12, 20, 27]),
+    primary:            readRGB("--primary_rgb", [138, 206, 255]),
+    primaryContainer:   readRGB("--primary_container_rgb", [0, 75, 111]),
+    secondary:          readRGB("--secondary_rgb", [180, 199, 233]),
+    secondaryContainer: readRGB("--secondary_container_rgb", [53, 72, 99]),
+    tertiary:           readRGB("--tertiary_rgb", [186, 196, 250]),
+    tertiaryContainer:  readRGB("--tertiary_container_rgb", [58, 68, 114]),
+    inversePrimary:     readRGB("--inverse_primary_rgb", [0, 100, 145]),
+    outline:            readRGB("--outline_rgb", [137, 146, 154])
   };
+
   roleList = [
-    theme.primary, theme.secondary, theme.tertiary,
-    theme.primaryContainer, theme.secondaryContainer, theme.tertiaryContainer,
-    theme.inversePrimary,
+    theme.primary,
+    theme.secondary,
+    theme.tertiary,
+    theme.primaryContainer,
+    theme.secondaryContainer,
+    theme.tertiaryContainer,
+    theme.inversePrimary
   ];
 
-  clockEl.style.color = rgba(theme.primary, 0.92);
-  dateEl.style.color = rgba(theme.secondary, 0.85);
-  hintEl.style.color = rgba(theme.outline, 0.9);
-  document.body.style.backgroundColor = `rgb(${theme.surface.join(',')})`;
+  document.body.style.background = rgba(theme.surface);
+  clockEl.style.color = rgba(theme.primary, 0.97);
+  dateEl.style.color  = rgba(theme.secondary, 0.88);
+  hintEl.style.color  = rgba(theme.outline, 0.6);
 
-  ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
-  ctx.fillStyle = rgba(theme.surface, 1);
-  ctx.fillRect(0, 0, W, H);
+  for (const p of particles) {
+    p.color = roleList[Math.floor(Math.random() * roleList.length)];
+  }
 }
+
+function resize() {
+  W = innerWidth; H = innerHeight;
+  DPR = Math.min(devicePixelRatio || 1, 2);
+  canvas.width  = Math.floor(W * DPR);
+  canvas.height = Math.floor(H * DPR);
+  ctx.setTransform(DPR, 0, 0, DPR, 0, 0);
+}
+addEventListener("resize", resize, { passive: true });
 
 function flowAngle(x, y, t) {
-  const a = Math.sin(x * 0.0032 + t * 0.15) * Math.cos(y * 0.0027 - t * 0.11);
-  const b = Math.sin((x + y) * 0.0021 + t * 0.08);
-  const c = Math.cos((x - y) * 0.0018 - t * 0.06);
-  return (a + b * 0.7 + c * 0.5) * Math.PI * 1.6;
+  const a = Math.sin(x * 0.003 + t * 0.12) * Math.cos(y * 0.0026 - t * 0.09);
+  const b = Math.sin((x + y) * 0.002 + t * 0.07);
+  const c = Math.cos((x - y) * 0.0017 - t * 0.05);
+  const d = Math.sin(x * 0.0011 - y * 0.0014 + t * 0.04);
+  return (a + b * 0.65 + c * 0.45 + d * 0.3) * Math.PI * 1.5;
 }
-
-const PARTICLE_COUNT = 260;
-let particles = [];
 
 function spawnParticle(p) {
   p.x = Math.random() * W;
   p.y = Math.random() * H;
   p.age = 0;
-  p.life = 260 + Math.random() * 340;
-  p.speed = 0.5 + Math.random() * 1.1;
-  p.size = 1 + Math.random() * 1.8;
-  p.color = roleList.length ? roleList[Math.floor(Math.random() * roleList.length)] : [200, 200, 200];
+  p.life = 280 + Math.random() * 360;
+  p.speed = 0.45 + Math.random() * 1.05;
+  p.size = 1 + Math.random() * 1.7;
+  p.color = roleList.length
+    ? roleList[Math.floor(Math.random() * roleList.length)]
+    : [180, 200, 220];
 }
 
 function initParticles() {
@@ -208,18 +182,17 @@ function initParticles() {
   }
 }
 
-let start = performance.now();
-
 function frame(now) {
   const t = ((now - start) / 1000) * speedMul;
 
-  ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
-  ctx.globalCompositeOperation = 'source-over';
-  const surf = theme.surface || [12, 20, 27];
-  ctx.fillStyle = rgba(surf, 0.055);
+  ctx.setTransform(DPR, 0, 0, DPR, 0, 0);
+  ctx.globalCompositeOperation = "source-over";
+  ctx.fillStyle = rgba(theme.surface, 0.05);
   ctx.fillRect(0, 0, W, H);
 
-  ctx.globalCompositeOperation = 'lighter';
+  ctx.globalCompositeOperation = "lighter";
+  ctx.lineCap = "round";
+
   for (const p of particles) {
     const angle = flowAngle(p.x, p.y, t);
     const px = p.x, py = p.y;
@@ -228,45 +201,80 @@ function frame(now) {
     p.age++;
 
     const lifeRatio = p.age / p.life;
-    const fade = lifeRatio < 0.15 ? lifeRatio / 0.15 : (lifeRatio > 0.8 ? (1 - lifeRatio) / 0.2 : 1);
-    const alpha = Math.max(0, Math.min(1, fade)) * 0.55;
+    const fade =
+      lifeRatio < 0.12 ? lifeRatio / 0.12 :
+      lifeRatio > 0.78 ? (1 - lifeRatio) / 0.22 : 1;
+    const alpha = Math.max(0, Math.min(1, fade)) * 0.5;
 
     ctx.strokeStyle = rgba(p.color, alpha);
     ctx.lineWidth = p.size;
-    ctx.lineCap = 'round';
     ctx.beginPath();
     ctx.moveTo(px, py);
     ctx.lineTo(p.x, p.y);
     ctx.stroke();
 
-    if (p.age > p.life || p.x < -20 || p.x > W + 20 || p.y < -20 || p.y > H + 20) {
+    if (
+      p.age > p.life ||
+      p.x < -30 || p.x > W + 30 ||
+      p.y < -30 || p.y > H + 30
+    ) {
       spawnParticle(p);
     }
   }
-  ctx.globalCompositeOperation = 'source-over';
 
+  ctx.globalCompositeOperation = "source-over";
   requestAnimationFrame(frame);
 }
 
-let clockVisible = true;
-window.addEventListener('keydown', (e) => {
-  if (e.key.toLowerCase() === 'c') {
-    clockVisible = !clockVisible;
-    clockEl.classList.toggle('hidden', !clockVisible);
-    dateEl.classList.toggle('hidden', !clockVisible);
+addEventListener("pointermove", () => {
+  document.body.classList.add("show-cursor");
+  clearTimeout(cursorTimer);
+  cursorTimer = setTimeout(() => document.body.classList.remove("show-cursor"), 2500);
+}, { passive: true });
+
+addEventListener("keydown", e => {
+  if (e.key.toLowerCase() === "c") {
+    clockEl.classList.toggle("hidden");
+    dateEl.classList.toggle("hidden");
   }
 });
 
-hintEl.classList.add('show');
-setTimeout(() => hintEl.classList.remove('show'), 4000);
-
-window.addEventListener('load', async () => {
-  resize();
-  await loadMatugenColors();
-  initParticles();
-  if (typeof startClock === 'function') {
-    startClock(clockEl, dateEl);
+function fallbackClock() {
+  function update() {
+    const n = new Date();
+    let h = n.getHours();
+    const ap = h >= 12 ? "PM" : "AM";
+    h = h % 12 || 12;
+    clockEl.innerHTML =
+      `${String(h).padStart(2,"0")}:${String(n.getMinutes()).padStart(2,"0")}` +
+      `<span class="ampm">${ap}</span>`;
+    dateEl.textContent = n.toLocaleDateString("en-US", {
+      weekday: "short", month: "short", day: "numeric"
+    }).toUpperCase();
   }
+  update();
+  setInterval(update, 1000);
+}
+
+addEventListener("load", () => {
+  loadTheme();
+  resize();
+  initParticles();
+
+  const s = document.createElement("script");
+  s.src = "clock-shared.js";
+  s.onload = () => {
+    try {
+      if (typeof startClock === "function") startClock(clockEl, dateEl);
+      else fallbackClock();
+    } catch { fallbackClock(); }
+  };
+  s.onerror = fallbackClock;
+  document.head.appendChild(s);
+
+  hintEl.classList.add("show");
+  setTimeout(() => hintEl.classList.remove("show"), 4000);
+
   requestAnimationFrame(frame);
 });
 </script>

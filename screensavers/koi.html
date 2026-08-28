@@ -5,255 +5,255 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Material Screensaver — Koi Pond</title>
 <style>
-  :root {
-    --primary_rgb: 138 206 255;
-    --secondary_rgb: 180 199 233;
-    --tertiary_rgb: 186 196 250;
-    --primary_container_rgb: 0 75 111;
-    --secondary_container_rgb: 53 72 99;
-    --tertiary_container_rgb: 58 68 114;
-    --surface_rgb: 12 20 27;
-    --outline_rgb: 137 146 154;
-  }
-  html, body {
-    margin: 0; padding: 0; width: 100%; height: 100%;
-    overflow: hidden; background: rgb(var(--surface_rgb));
-    font-family: "Google Sans", "Segoe UI", Roboto, system-ui, sans-serif;
-    user-select: none;
-  }
+:root {
+  --primary_rgb: 138 206 255;
+  --secondary_rgb: 180 199 233;
+  --tertiary_rgb: 186 196 250;
+  --primary_container_rgb: 0 75 111;
+  --secondary_container_rgb: 53 72 99;
+  --tertiary_container_rgb: 58 68 114;
+  --surface_rgb: 12 20 27;
+  --outline_rgb: 137 146 154;
+}
+* { margin: 0; padding: 0; box-sizing: border-box; }
+html, body {
+  width: 100%; height: 100%; overflow: hidden;
+  background: rgb(var(--surface_rgb));
+  cursor: none;
+  font-family: "Google Sans", "Segoe UI", system-ui, sans-serif;
+}
+body.show-cursor { cursor: default; }
+canvas { display: block; width: 100vw; height: 100vh; }
 
-  body { cursor: none; }
-  body.show-cursor { cursor: default; }
+#clock-wrap {
+  position: fixed;
+  left: clamp(20px, 2.5vw, 40px);
+  bottom: clamp(16px, 2vw, 28px);
+  padding: 18px 26px 14px;
+  border-radius: 20px;
+  background: radial-gradient(
+    ellipse at 30% 70%,
+    rgb(var(--surface_rgb) / .85) 0%,
+    rgb(var(--surface_rgb) / .5) 55%,
+    transparent 100%
+  );
+  pointer-events: none;
+  transition: opacity .7s ease;
+  z-index: 10;
+}
+#clock-wrap.hidden { opacity: 0; }
 
-  canvas { display: block; width: 100vw; height: 100vh; }
+#clock {
+  font-weight: 200;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: -2px;
+  font-size: clamp(40px, 5.5vw, 78px);
+  color: rgb(var(--primary_rgb));
+  text-shadow:
+    0 0 2px rgb(var(--surface_rgb)),
+    0 0 14px rgb(var(--surface_rgb) / .95),
+    0 0 36px rgb(var(--primary_rgb) / .5),
+    0 2px 14px rgba(0,0,0,.85);
+  line-height: 1;
+}
+#clock .ampm {
+  font-size: .26em;
+  margin-left: 10px;
+  opacity: .78;
+  vertical-align: 22%;
+  letter-spacing: 2px;
+  font-weight: 400;
+}
+#date {
+  margin-top: 8px;
+  font-size: clamp(11px, 1.05vw, 14px);
+  letter-spacing: 4px;
+  text-transform: uppercase;
+  color: rgb(var(--secondary_rgb));
+  text-shadow:
+    0 0 8px rgb(var(--surface_rgb) / .9),
+    0 1px 8px rgba(0,0,0,.7);
+  opacity: .95;
+}
 
-  #ui-container {
-    position: fixed; inset: 0; pointer-events: none; z-index: 10;
-    display: flex; flex-direction: column; justify-content: flex-end;
-    padding: 48px; box-sizing: border-box;
-    transition: opacity 0.6s cubic-bezier(0.16, 1, 0.3, 1), transform 0.6s cubic-bezier(0.16, 1, 0.3, 1);
-  }
-  #ui-container.hidden { opacity: 0; transform: translateY(12px); }
-
-  .vignette-card {
-    background: radial-gradient(circle at bottom left, rgb(var(--surface_rgb) / 0.75) 0%, rgb(var(--surface_rgb) / 0.2) 70%);
-    backdrop-filter: blur(16px);
-    -webkit-backdrop-filter: blur(16px);
-    padding: 28px 36px;
-    width: fit-content;
-    border-radius: 24px;
-    border: 1px solid rgb(var(--outline_rgb) / 0.15);
-    box-shadow: 0 16px 40px rgba(0, 0, 0, 0.5), inset 0 1px 0 rgba(255, 255, 255, 0.05);
-  }
-
-  #clock {
-    font-size: clamp(52px, 7vw, 84px);
-    font-weight: 200;
-    font-variant-numeric: tabular-nums;
-    letter-spacing: -2px;
-    line-height: 0.95;
-    text-shadow: 0 2px 12px rgba(0, 0, 0, 0.4);
-  }
-  #clock .ampm {
-    font-size: 0.28em;
-    margin-left: 8px;
-    opacity: 0.75;
-    font-weight: 500;
-    text-transform: uppercase;
-    vertical-align: super;
-    letter-spacing: 1.5px;
-  }
-  #date {
-    font-size: clamp(12px, 1.3vw, 15px);
-    letter-spacing: 3.5px;
-    text-transform: uppercase;
-    margin-top: 10px;
-    opacity: 0.9;
-    font-weight: 500;
-  }
-  #hint {
-    position: fixed; right: 36px; bottom: 36px;
-    font-size: 11px; letter-spacing: 2px; text-transform: uppercase;
-    opacity: 0; transition: opacity 0.8s ease;
-    padding: 10px 18px;
-    background: rgb(var(--surface_rgb) / 0.6);
-    backdrop-filter: blur(8px);
-    border: 1px solid rgb(var(--outline_rgb) / 0.1);
-    border-radius: 12px;
-    pointer-events: none;
-  }
-  #hint.show { opacity: 0.7; }
+#hint {
+  position: fixed; right: 28px; bottom: 24px; z-index: 10;
+  font-size: 11px; letter-spacing: 1.5px;
+  color: rgb(var(--outline_rgb) / .55);
+  opacity: 0; transition: opacity 1s ease;
+  text-transform: uppercase;
+  pointer-events: none;
+  text-shadow: 0 1px 8px rgb(var(--surface_rgb));
+}
+#hint.show { opacity: .7; }
 </style>
 <link rel="stylesheet" href="file:///home/sakib/.config/matugen/matugen-colors.css">
 </head>
 <body>
 <canvas id="c"></canvas>
-
-<div id="ui-container">
-  <div class="vignette-card">
-    <div id="clock">00:00</div>
-    <div id="date">Mon, Jan 1</div>
-  </div>
+<div id="clock-wrap">
+  <div id="clock">00:00<span class="ampm">AM</span></div>
+  <div id="date">MON, JAN 1</div>
 </div>
-<div id="hint">Press <b>C</b> to toggle UI</div>
+<div id="hint">C · toggle clock</div>
 
-<script src="clock-shared.js"></script>
 <script>
-const canvas = document.getElementById('c');
-const ctx = canvas.getContext('2d');
-const clockEl = document.getElementById('clock');
-const dateEl = document.getElementById('date');
-const hintEl = document.getElementById('hint');
-const uiContainer = document.getElementById('ui-container');
+"use strict";
 
-let cursorTimeout;
-function triggerCursor() {
-  document.body.classList.add('show-cursor');
-  clearTimeout(cursorTimeout);
-  cursorTimeout = setTimeout(() => {
-    document.body.classList.remove('show-cursor');
-  }, 2500);
-}
-window.addEventListener('pointermove', triggerCursor);
+const canvas = document.getElementById("c");
+const ctx = canvas.getContext("2d", { alpha: false, desynchronized: true });
+const clockEl = document.getElementById("clock");
+const dateEl  = document.getElementById("date");
+const hintEl  = document.getElementById("hint");
+const clockWrap = document.getElementById("clock-wrap");
 
-let dpr = Math.min(window.devicePixelRatio || 1, 2);
-let W, H;
-function resize() {
-  W = window.innerWidth; H = window.innerHeight;
-  canvas.width = W * dpr; canvas.height = H * dpr;
-  ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
-}
-window.addEventListener('resize', resize);
-resize();
-
-const reduceMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
-const speedMul = reduceMotion ? 0.25 : 1;
-
-function readRGB(name, fallback) {
-  const raw = getComputedStyle(document.documentElement).getPropertyValue(name).trim();
-  const parts = raw.split(/\s+/).map(Number);
-  if (parts.length === 3 && parts.every(n => !isNaN(n))) return parts;
-  return fallback;
-}
-function rgba(rgb, a) {
-  const c = rgb || [200, 200, 200];
-  return `rgba(${c[0]}, ${c[1]}, ${c[2]}, ${a})`;
-}
-
+let W = 0, H = 0, DPR = 1;
 let theme = {};
 let roleList = [];
-
-async function loadMatugenColors() {
-  try {
-    const res = await fetch('file:///home/sakib/.config/matugen/matugen-colors.css');
-    if (res.ok) {
-      const cssText = await res.text();
-      const styleTag = document.createElement('style');
-      styleTag.textContent = cssText;
-      document.head.appendChild(styleTag);
-    }
-  } catch (e) {}
-  applyTheme();
-}
-
-function applyTheme() {
-  theme = {
-    surface: readRGB('--surface_rgb', [12, 20, 27]),
-    primary: readRGB('--primary_rgb', [138, 206, 255]),
-    secondary: readRGB('--secondary_rgb', [180, 199, 233]),
-    tertiary: readRGB('--tertiary_rgb', [186, 196, 250]),
-    primaryContainer: readRGB('--primary_container_rgb', [0, 75, 111]),
-    secondaryContainer: readRGB('--secondary_container_rgb', [53, 72, 99]),
-    tertiaryContainer: readRGB('--tertiary_container_rgb', [58, 68, 114]),
-    outline: readRGB('--outline_rgb', [137, 146, 154]),
-  };
-  roleList = [theme.primary, theme.secondary, theme.tertiary, theme.primaryContainer, theme.secondaryContainer, theme.tertiaryContainer];
-
-  clockEl.style.color = rgba(theme.primary, 1);
-  dateEl.style.color = rgba(theme.secondary, 0.9);
-  hintEl.style.color = rgba(theme.outline, 1);
-  document.body.style.backgroundColor = `rgb(${theme.surface.join(',')})`;
-
-  fish.forEach((f, i) => { f.color = roleList[i % roleList.length]; });
-}
-
 let fish = [];
 let ripples = [];
+let start = performance.now();
+let lastT = 0;
+let cursorTimer;
+
+const reduceMotion = matchMedia("(prefers-reduced-motion: reduce)").matches;
+const speedMul = reduceMotion ? 0.28 : 0.85;
+
+function readRGB(name, fb = [160, 160, 160]) {
+  const r = getComputedStyle(document.documentElement).getPropertyValue(name).trim();
+  const p = r.split(/\s+/).map(Number);
+  return (p.length === 3 && p.every(n => !isNaN(n))) ? p : fb;
+}
+function rgba(c, a = 1) {
+  return `rgba(${c[0]},${c[1]},${c[2]},${a})`;
+}
+
+function loadTheme() {
+  theme = {
+    surface:            readRGB("--surface_rgb", [12, 20, 27]),
+    primary:            readRGB("--primary_rgb", [138, 206, 255]),
+    secondary:          readRGB("--secondary_rgb", [180, 199, 233]),
+    tertiary:           readRGB("--tertiary_rgb", [186, 196, 250]),
+    primaryContainer:   readRGB("--primary_container_rgb", [0, 75, 111]),
+    secondaryContainer: readRGB("--secondary_container_rgb", [53, 72, 99]),
+    tertiaryContainer:  readRGB("--tertiary_container_rgb", [58, 68, 114]),
+    outline:            readRGB("--outline_rgb", [137, 146, 154])
+  };
+
+  roleList = [
+    theme.primary,
+    theme.secondary,
+    theme.tertiary,
+    theme.primaryContainer,
+    theme.secondaryContainer,
+    theme.tertiaryContainer
+  ];
+
+  fish.forEach((f, i) => {
+    f.color = roleList[i % roleList.length];
+  });
+
+  document.body.style.background = rgba(theme.surface);
+  clockEl.style.color = rgba(theme.primary, 1);
+  dateEl.style.color  = rgba(theme.secondary, 0.95);
+  hintEl.style.color  = rgba(theme.outline, 0.6);
+}
+
+function resize() {
+  W = innerWidth; H = innerHeight;
+  DPR = Math.min(devicePixelRatio || 1, 2);
+  canvas.width  = Math.floor(W * DPR);
+  canvas.height = Math.floor(H * DPR);
+  ctx.setTransform(DPR, 0, 0, DPR, 0, 0);
+}
+addEventListener("resize", resize, { passive: true });
 
 function makeFish() {
   fish = [];
-  for (let i = 0; i < 6; i++) {
+  for (let i = 0; i < 7; i++) {
     fish.push({
-      x: Math.random() * W, y: Math.random() * H,
+      x: Math.random() * W,
+      y: Math.random() * H,
       angle: Math.random() * Math.PI * 2,
       turnPhase: Math.random() * Math.PI * 2,
-      turnSpeed: 0.15 + Math.random() * 0.2,
-      speed: 22 + Math.random() * 18,
-      len: 20 + Math.random() * 14,
-      color: [200, 200, 200],
-      nextRipple: Math.random() * 2,
+      turnSpeed: 0.12 + Math.random() * 0.22,
+      speed: 18 + Math.random() * 20,
+      len: 18 + Math.random() * 16,
+      color: roleList[i % Math.max(1, roleList.length)] || [180, 200, 220],
+      nextRipple: Math.random() * 2
     });
   }
 }
 
 function drawFish(f, t) {
-  const wag = Math.sin(t * 4 + f.turnPhase) * 0.3;
+  const wag = Math.sin(t * 3.8 + f.turnPhase) * 0.28;
   ctx.save();
   ctx.translate(f.x, f.y);
   ctx.rotate(f.angle);
+
+  // Body
   ctx.beginPath();
   ctx.moveTo(f.len * 0.55, 0);
   ctx.quadraticCurveTo(f.len * 0.2, f.len * 0.22, -f.len * 0.35, f.len * 0.12);
   ctx.quadraticCurveTo(-f.len * 0.55, 0, -f.len * 0.35, -f.len * 0.12);
   ctx.quadraticCurveTo(f.len * 0.2, -f.len * 0.22, f.len * 0.55, 0);
   ctx.closePath();
-  ctx.fillStyle = rgba(f.color, 0.75);
+  ctx.fillStyle = rgba(f.color, 0.78);
   ctx.fill();
 
+  // Tail
   ctx.save();
-  ctx.translate(-f.len * 0.5, 0);
+  ctx.translate(-f.len * 0.48, 0);
   ctx.rotate(wag);
   ctx.beginPath();
   ctx.moveTo(0, 0);
-  ctx.lineTo(-f.len * 0.35, f.len * 0.2);
-  ctx.lineTo(-f.len * 0.35, -f.len * 0.2);
+  ctx.lineTo(-f.len * 0.34, f.len * 0.2);
+  ctx.lineTo(-f.len * 0.34, -f.len * 0.2);
   ctx.closePath();
   ctx.fillStyle = rgba(f.color, 0.55);
   ctx.fill();
   ctx.restore();
 
+  // Soft eye
+  ctx.beginPath();
+  ctx.arc(f.len * 0.28, -f.len * 0.06, 1.4, 0, Math.PI * 2);
+  ctx.fillStyle = rgba(theme.surface || [12, 20, 27], 0.7);
+  ctx.fill();
+
   ctx.restore();
 }
 
-let start = performance.now();
-let lastT = 0;
-
 function frame(now) {
   const t = ((now - start) / 1000) * speedMul;
-  const dt = Math.min(0.05, t - lastT);
+  const dt = Math.min(0.05, t - lastT || 0.016);
   lastT = t;
 
-  ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+  ctx.setTransform(DPR, 0, 0, DPR, 0, 0);
+
+  // Pond water
   const surf = theme.surface || [12, 20, 27];
-  const pContainer = theme.primaryContainer || [0, 75, 111];
-  const water = ctx.createRadialGradient(W / 2, H / 2, 0, W / 2, H / 2, Math.max(W, H) * 0.7);
-  water.addColorStop(0, `rgb(${pContainer.map((v, i) => Math.round(v * 0.5 + surf[i] * 0.5)).join(',')})`);
-  water.addColorStop(1, `rgb(${surf.join(',')})`);
+  const pc = theme.primaryContainer || [0, 75, 111];
+  const mid = pc.map((v, i) => Math.round(v * 0.45 + surf[i] * 0.55));
+  const water = ctx.createRadialGradient(W * 0.5, H * 0.5, 0, W * 0.5, H * 0.5, Math.max(W, H) * 0.72);
+  water.addColorStop(0, rgba(mid, 1));
+  water.addColorStop(1, rgba(surf, 1));
   ctx.fillStyle = water;
   ctx.fillRect(0, 0, W, H);
 
+  // Ripples
   ripples = ripples.filter(r => (t - r.start) < r.duration);
   for (const r of ripples) {
     const p = (t - r.start) / r.duration;
     ctx.beginPath();
     ctx.arc(r.x, r.y, r.maxR * p, 0, Math.PI * 2);
-    ctx.strokeStyle = rgba(theme.outline, (1 - p) * 0.3);
-    ctx.lineWidth = 1;
+    ctx.strokeStyle = rgba(theme.outline || theme.secondary, (1 - p) * 0.28);
+    ctx.lineWidth = 1.2;
     ctx.stroke();
   }
 
+  // Fish
   for (const f of fish) {
-    f.angle += Math.sin(t * f.turnSpeed + f.turnPhase) * dt * 0.6;
+    f.angle += Math.sin(t * f.turnSpeed + f.turnPhase) * dt * 0.55;
     f.x += Math.cos(f.angle) * f.speed * dt;
     f.y += Math.sin(f.angle) * f.speed * dt;
 
@@ -263,8 +263,14 @@ function frame(now) {
     if (f.y > H) { f.y = H; f.angle = -f.angle; }
 
     if (t >= f.nextRipple) {
-      ripples.push({ x: f.x, y: f.y, start: t, duration: 3.5, maxR: 30 + Math.random() * 20 });
-      f.nextRipple = t + 1.2 + Math.random() * 1.5;
+      ripples.push({
+        x: f.x,
+        y: f.y,
+        start: t,
+        duration: 3.2 + Math.random(),
+        maxR: 28 + Math.random() * 22
+      });
+      f.nextRipple = t + 1.1 + Math.random() * 1.6;
     }
 
     drawFish(f, t);
@@ -273,38 +279,54 @@ function frame(now) {
   requestAnimationFrame(frame);
 }
 
-let uiVisible = true;
-window.addEventListener('keydown', (e) => {
-  if (e.key.toLowerCase() === 'c') {
-    uiVisible = !uiVisible;
-    uiContainer.classList.toggle('hidden', !uiVisible);
+addEventListener("pointermove", () => {
+  document.body.classList.add("show-cursor");
+  clearTimeout(cursorTimer);
+  cursorTimer = setTimeout(() => document.body.classList.remove("show-cursor"), 2500);
+}, { passive: true });
+
+addEventListener("keydown", e => {
+  if (e.key.toLowerCase() === "c") {
+    clockWrap.classList.toggle("hidden");
   }
 });
 
-hintEl.classList.add('show');
-setTimeout(() => hintEl.classList.remove('show'), 4000);
+function fallbackClock() {
+  function update() {
+    const n = new Date();
+    let h = n.getHours();
+    const ap = h >= 12 ? "PM" : "AM";
+    h = h % 12 || 12;
+    clockEl.innerHTML =
+      `${String(h).padStart(2,"0")}:${String(n.getMinutes()).padStart(2,"0")}` +
+      `<span class="ampm">${ap}</span>`;
+    dateEl.textContent = n.toLocaleDateString("en-US", {
+      weekday: "short", month: "short", day: "numeric"
+    }).toUpperCase();
+  }
+  update();
+  setInterval(update, 1000);
+}
 
-window.addEventListener('load', async () => {
+addEventListener("load", () => {
+  loadTheme();
+  resize();
   makeFish();
-  await loadMatugenColors();
+  loadTheme();
 
-  try {
-    if (typeof startClock === 'function') {
-      startClock(clockEl, dateEl);
-    } else {
-      const update = () => {
-        const now = new Date();
-        let hours = now.getHours();
-        const minutes = String(now.getMinutes()).padStart(2, '0');
-        const ampm = hours >= 12 ? 'PM' : 'AM';
-        hours = hours % 12 || 12;
-        clockEl.innerHTML = `${String(hours).padStart(2, '0')}:${minutes}<span class="ampm">${ampm}</span>`;
-        dateEl.textContent = now.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' });
-      };
-      update();
-      setInterval(update, 1000);
-    }
-  } catch (err) {}
+  const s = document.createElement("script");
+  s.src = "clock-shared.js";
+  s.onload = () => {
+    try {
+      if (typeof startClock === "function") startClock(clockEl, dateEl);
+      else fallbackClock();
+    } catch { fallbackClock(); }
+  };
+  s.onerror = fallbackClock;
+  document.head.appendChild(s);
+
+  hintEl.classList.add("show");
+  setTimeout(() => hintEl.classList.remove("show"), 4000);
 
   requestAnimationFrame(frame);
 });

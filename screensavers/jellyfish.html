@@ -5,187 +5,169 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Material Screensaver — Jellyfish</title>
 <style>
-  :root {
-    --primary_rgb: 138 206 255;
-    --primary_container_rgb: 0 75 111;
-    --secondary_rgb: 180 199 233;
-    --secondary_container_rgb: 53 72 99;
-    --tertiary_rgb: 186 196 250;
-    --tertiary_container_rgb: 58 68 114;
-    --surface_rgb: 6 12 20;
-    --outline_rgb: 137 146 154;
-  }
-  html, body {
-    margin: 0; padding: 0; width: 100%; height: 100%;
-    overflow: hidden; background: rgb(var(--surface_rgb, 6 12 20));
-    font-family: "Google Sans", "Segoe UI", Roboto, system-ui, sans-serif;
-    user-select: none;
-  }
+:root {
+  --primary_rgb: 138 206 255;
+  --secondary_rgb: 180 199 233;
+  --tertiary_rgb: 186 196 250;
+  --primary_container_rgb: 0 75 111;
+  --secondary_container_rgb: 53 72 99;
+  --tertiary_container_rgb: 58 68 114;
+  --surface_rgb: 6 12 20;
+  --outline_rgb: 137 146 154;
+}
+* { margin: 0; padding: 0; box-sizing: border-box; }
+html, body {
+  width: 100%; height: 100%; overflow: hidden;
+  background: rgb(var(--surface_rgb));
+  cursor: none;
+  font-family: "Google Sans", "Segoe UI", system-ui, sans-serif;
+}
+body.show-cursor { cursor: default; }
+canvas { display: block; width: 100vw; height: 100vh; }
 
-  body { cursor: none; }
-  body.show-cursor { cursor: default; }
+#clock-wrap {
+  position: fixed;
+  left: clamp(20px, 2.5vw, 40px);
+  bottom: clamp(16px, 2vw, 28px);
+  padding: 18px 26px 14px;
+  border-radius: 20px;
+  background: radial-gradient(
+    ellipse at 30% 70%,
+    rgb(var(--surface_rgb) / .85) 0%,
+    rgb(var(--surface_rgb) / .5) 55%,
+    transparent 100%
+  );
+  pointer-events: none;
+  transition: opacity .7s ease;
+  z-index: 10;
+}
+#clock-wrap.hidden { opacity: 0; }
 
-  canvas { display: block; width: 100vw; height: 100vh; }
+#clock {
+  font-weight: 200;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: -2px;
+  font-size: clamp(40px, 5.5vw, 78px);
+  color: rgb(var(--primary_rgb));
+  text-shadow:
+    0 0 2px rgb(var(--surface_rgb)),
+    0 0 14px rgb(var(--surface_rgb) / .95),
+    0 0 36px rgb(var(--primary_rgb) / .5),
+    0 2px 14px rgba(0,0,0,.85);
+  line-height: 1;
+}
+#clock .ampm {
+  font-size: .26em;
+  margin-left: 10px;
+  opacity: .78;
+  vertical-align: 22%;
+  letter-spacing: 2px;
+  font-weight: 400;
+}
+#date {
+  margin-top: 8px;
+  font-size: clamp(11px, 1.05vw, 14px);
+  letter-spacing: 4px;
+  text-transform: uppercase;
+  color: rgb(var(--secondary_rgb));
+  text-shadow:
+    0 0 8px rgb(var(--surface_rgb) / .9),
+    0 1px 8px rgba(0,0,0,.7);
+  opacity: .95;
+}
 
-  #ui-container {
-    position: fixed; inset: 0; pointer-events: none; z-index: 10;
-    display: flex; flex-direction: column; justify-content: flex-end;
-    padding: 48px; box-sizing: border-box;
-    transition: opacity 0.6s cubic-bezier(0.16, 1, 0.3, 1), transform 0.6s cubic-bezier(0.16, 1, 0.3, 1);
-  }
-  #ui-container.hidden { opacity: 0; transform: translateY(12px); }
-
-  .vignette-card {
-    background: radial-gradient(circle at bottom left, rgb(var(--surface_rgb) / 0.75) 0%, rgb(var(--surface_rgb) / 0.2) 70%);
-    backdrop-filter: blur(16px);
-    -webkit-backdrop-filter: blur(16px);
-    padding: 28px 36px;
-    width: fit-content;
-    border-radius: 24px;
-    border: 1px solid rgb(var(--outline_rgb) / 0.15);
-    box-shadow: 0 16px 40px rgba(0, 0, 0, 0.5), inset 0 1px 0 rgba(255, 255, 255, 0.05);
-  }
-
-  #clock {
-    font-size: clamp(52px, 7vw, 84px);
-    font-weight: 200;
-    font-variant-numeric: tabular-nums;
-    letter-spacing: -2px;
-    line-height: 0.95;
-    text-shadow: 0 2px 12px rgba(0, 0, 0, 0.4);
-  }
-  #clock .ampm {
-    font-size: 0.28em;
-    margin-left: 8px;
-    opacity: 0.75;
-    font-weight: 500;
-    text-transform: uppercase;
-    vertical-align: super;
-    letter-spacing: 1.5px;
-  }
-  #date {
-    font-size: clamp(12px, 1.3vw, 15px);
-    letter-spacing: 3.5px;
-    text-transform: uppercase;
-    margin-top: 10px;
-    opacity: 0.9;
-    font-weight: 500;
-  }
-  #hint {
-    position: fixed; right: 36px; bottom: 36px;
-    font-size: 11px; letter-spacing: 2px; text-transform: uppercase;
-    opacity: 0; transition: opacity 0.8s ease;
-    padding: 10px 18px;
-    background: rgb(var(--surface_rgb) / 0.6);
-    backdrop-filter: blur(8px);
-    border: 1px solid rgb(var(--outline_rgb) / 0.1);
-    border-radius: 12px;
-    pointer-events: none;
-  }
-  #hint.show { opacity: 0.7; }
+#hint {
+  position: fixed; right: 28px; bottom: 24px; z-index: 10;
+  font-size: 11px; letter-spacing: 1.5px;
+  color: rgb(var(--outline_rgb) / .55);
+  opacity: 0; transition: opacity 1s ease;
+  text-transform: uppercase;
+  pointer-events: none;
+  text-shadow: 0 1px 8px rgb(var(--surface_rgb));
+}
+#hint.show { opacity: .7; }
 </style>
 <link rel="stylesheet" href="file:///home/sakib/.config/matugen/matugen-colors.css">
 </head>
 <body>
 <canvas id="c"></canvas>
-
-<div id="ui-container">
-  <div class="vignette-card">
-    <div id="clock">00:00</div>
-    <div id="date">Mon, Jan 1</div>
-  </div>
+<div id="clock-wrap">
+  <div id="clock">00:00<span class="ampm">AM</span></div>
+  <div id="date">MON, JAN 1</div>
 </div>
-<div id="hint">Press <b>C</b> to toggle UI</div>
+<div id="hint">C · toggle clock</div>
 
-<script src="clock-shared.js"></script>
 <script>
-const canvas = document.getElementById('c');
-const ctx = canvas.getContext('2d');
-const clockEl = document.getElementById('clock');
-const dateEl = document.getElementById('date');
-const hintEl = document.getElementById('hint');
-const uiContainer = document.getElementById('ui-container');
+"use strict";
 
-let mouse = { x: -1000, y: -1000, vx: 0, vy: 0, lastX: -1000, lastY: -1000 };
-let cursorTimeout;
+const canvas = document.getElementById("c");
+const ctx = canvas.getContext("2d", { alpha: false, desynchronized: true });
+const clockEl = document.getElementById("clock");
+const dateEl  = document.getElementById("date");
+const hintEl  = document.getElementById("hint");
+const clockWrap = document.getElementById("clock-wrap");
 
-window.addEventListener('pointermove', (e) => {
-  document.body.classList.add('show-cursor');
-  clearTimeout(cursorTimeout);
-  cursorTimeout = setTimeout(() => {
-    document.body.classList.remove('show-cursor');
-  }, 2500);
-
-  mouse.vx = e.clientX - mouse.lastX;
-  mouse.vy = e.clientY - mouse.lastY;
-  mouse.x = e.clientX;
-  mouse.y = e.clientY;
-  mouse.lastX = e.clientX;
-  mouse.lastY = e.clientY;
-});
-
-let dpr = Math.min(window.devicePixelRatio || 1, 2);
-let W, H;
-function resize() {
-  W = window.innerWidth; H = window.innerHeight;
-  canvas.width = W * dpr; canvas.height = H * dpr;
-  ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
-}
-window.addEventListener('resize', resize);
-resize();
-
-const reduceMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
-const speedMul = reduceMotion ? 0.2 : 1;
-
-function readRGB(name, fallback) {
-  const raw = getComputedStyle(document.documentElement).getPropertyValue(name).trim();
-  const parts = raw.split(/\s+/).map(Number);
-  if (parts.length === 3 && parts.every(n => !isNaN(n))) return parts;
-  return fallback;
-}
-function rgba(rgb, a) {
-  const c = rgb || [200, 200, 200];
-  return `rgba(${c[0]}, ${c[1]}, ${c[2]}, ${a})`;
-}
-
+let W = 0, H = 0, DPR = 1;
 let theme = {};
 let roleList = [];
-
-async function loadMatugenColors() {
-  try {
-    const res = await fetch('file:///home/sakib/.config/matugen/matugen-colors.css');
-    if (res.ok) {
-      const cssText = await res.text();
-      const styleTag = document.createElement('style');
-      styleTag.textContent = cssText;
-      document.head.appendChild(styleTag);
-    }
-  } catch (e) {}
-  applyTheme();
-}
-
-function applyTheme() {
-  theme = {
-    surface: readRGB('--surface_rgb', [6, 12, 20]),
-    primary: readRGB('--primary_rgb', [138, 206, 255]),
-    secondary: readRGB('--secondary_rgb', [180, 199, 233]),
-    tertiary: readRGB('--tertiary_rgb', [186, 196, 250]),
-    primaryContainer: readRGB('--primary_container_rgb', [0, 75, 111]),
-    secondaryContainer: readRGB('--secondary_container_rgb', [53, 72, 99]),
-    tertiaryContainer: readRGB('--tertiary_container_rgb', [58, 68, 114]),
-    outline: readRGB('--outline_rgb', [137, 146, 154]),
-  };
-  roleList = [theme.primary, theme.secondary, theme.tertiary, theme.primaryContainer, theme.secondaryContainer, theme.tertiaryContainer];
-  
-  clockEl.style.color = rgba(theme.primary, 1);
-  dateEl.style.color = rgba(theme.secondary, 0.9);
-  hintEl.style.color = rgba(theme.outline, 1);
-  
-  document.body.style.backgroundColor = `rgb(${theme.surface.join(',')})`;
-  jellies.forEach((j, i) => { j.color = roleList[i % roleList.length]; });
-}
-
 let jellies = [];
+let particles = [];
+let mouse = { x: -2000, y: -2000, vx: 0, vy: 0 };
+let start = performance.now();
+let cursorTimer;
+
+const reduceMotion = matchMedia("(prefers-reduced-motion: reduce)").matches;
+const speedMul = reduceMotion ? 0.25 : 0.85;
+
+function readRGB(name, fb = [160, 160, 160]) {
+  const r = getComputedStyle(document.documentElement).getPropertyValue(name).trim();
+  const p = r.split(/\s+/).map(Number);
+  return (p.length === 3 && p.every(n => !isNaN(n))) ? p : fb;
+}
+function rgba(c, a = 1) {
+  return `rgba(${c[0]},${c[1]},${c[2]},${a})`;
+}
+
+function loadTheme() {
+  theme = {
+    surface:            readRGB("--surface_rgb", [6, 12, 20]),
+    primary:            readRGB("--primary_rgb", [138, 206, 255]),
+    secondary:          readRGB("--secondary_rgb", [180, 199, 233]),
+    tertiary:           readRGB("--tertiary_rgb", [186, 196, 250]),
+    primaryContainer:   readRGB("--primary_container_rgb", [0, 75, 111]),
+    secondaryContainer: readRGB("--secondary_container_rgb", [53, 72, 99]),
+    tertiaryContainer:  readRGB("--tertiary_container_rgb", [58, 68, 114]),
+    outline:            readRGB("--outline_rgb", [137, 146, 154])
+  };
+
+  roleList = [
+    theme.primary,
+    theme.secondary,
+    theme.tertiary,
+    theme.primaryContainer,
+    theme.secondaryContainer,
+    theme.tertiaryContainer
+  ];
+
+  jellies.forEach((j, i) => {
+    j.color = roleList[i % roleList.length];
+  });
+
+  document.body.style.background = rgba(theme.surface);
+  clockEl.style.color = rgba(theme.primary, 1);
+  dateEl.style.color  = rgba(theme.secondary, 0.95);
+  hintEl.style.color  = rgba(theme.outline, 0.6);
+}
+
+function resize() {
+  W = innerWidth; H = innerHeight;
+  DPR = Math.min(devicePixelRatio || 1, 2);
+  canvas.width  = Math.floor(W * DPR);
+  canvas.height = Math.floor(H * DPR);
+  ctx.setTransform(DPR, 0, 0, DPR, 0, 0);
+}
+addEventListener("resize", resize, { passive: true });
+
 function makeJellies() {
   jellies = [];
   for (let i = 0; i < 9; i++) {
@@ -194,123 +176,128 @@ function makeJellies() {
       x: Math.random() * W,
       y: H + Math.random() * H * 0.5,
       depth,
-      bellW: (28 + Math.random() * 22) * (0.5 + depth * 0.7),
+      bellW: (26 + Math.random() * 24) * (0.55 + depth * 0.65),
       pulsePhase: Math.random() * Math.PI * 2,
-      pulseFreq: 0.35 + Math.random() * 0.25,
-      driftAmp: 25 + Math.random() * 35,
-      driftFreq: 0.08 + Math.random() * 0.12,
+      pulseFreq: 0.32 + Math.random() * 0.28,
+      driftAmp: 22 + Math.random() * 38,
+      driftFreq: 0.07 + Math.random() * 0.12,
       driftPhase: Math.random() * Math.PI * 2,
       tentacleCount: 5 + Math.floor(Math.random() * 3),
-      color: [200, 200, 200],
+      color: roleList[i % Math.max(1, roleList.length)] || [180, 200, 230]
+    });
+  }
+}
+
+function makeParticles() {
+  particles = [];
+  for (let i = 0; i < 50; i++) {
+    particles.push({
+      x: Math.random() * W,
+      y: Math.random() * H,
+      r: 0.35 + Math.random() * 1.3,
+      speed: 1.8 + Math.random() * 5.5,
+      alpha: 0.08 + Math.random() * 0.22
     });
   }
 }
 
 function drawJelly(j, t) {
-  const pulse = (Math.sin(t * j.pulseFreq + j.pulsePhase) + 1) / 2;
-  const bellSquash = 1 - pulse * 0.28;
+  const pulse = (Math.sin(t * j.pulseFreq + j.pulsePhase) + 1) * 0.5;
+  const bellSquash = 1 - pulse * 0.26;
   const x = j.x + Math.sin(t * j.driftFreq + j.driftPhase) * j.driftAmp;
-  const alpha = 0.35 + j.depth * 0.5;
+  const alpha = 0.32 + j.depth * 0.52;
 
+  // Soft mouse avoidance
   const dx = x - mouse.x;
   const dy = j.y - mouse.y;
-  const dist = Math.sqrt(dx * dx + dy * dy);
-  if (dist < 220) {
-    const force = (1 - dist / 220) * 40;
-    j.x += (dx / dist) * force * 0.04;
+  const dist = Math.hypot(dx, dy);
+  if (dist < 200 && dist > 1) {
+    const force = (1 - dist / 200) * 36;
+    j.x += (dx / dist) * force * 0.035;
   }
 
-  const glowR = j.bellW * (2.4 + pulse * 0.6);
+  // Glow
+  const glowR = j.bellW * (2.2 + pulse * 0.55);
   const grad = ctx.createRadialGradient(x, j.y, 0, x, j.y, glowR);
-  grad.addColorStop(0, rgba(j.color, (alpha * 0.55) + (pulse * 0.25)));
-  grad.addColorStop(1, rgba(j.color, 0));
+  grad.addColorStop(0, rgba(j.color, alpha * 0.5 + pulse * 0.2));
+  grad.addColorStop(1, "transparent");
   ctx.fillStyle = grad;
   ctx.beginPath();
   ctx.arc(x, j.y, glowR, 0, Math.PI * 2);
   ctx.fill();
 
-  // Bell dome
+  // Bell
   ctx.beginPath();
-  ctx.ellipse(x, j.y, j.bellW, j.bellW * 0.65 * bellSquash, 0, Math.PI, 0, false);
-  ctx.quadraticCurveTo(x + j.bellW, j.y + j.bellW * 0.15, x, j.y + j.bellW * 0.1);
-  ctx.quadraticCurveTo(x - j.bellW, j.y + j.bellW * 0.15, x - j.bellW, j.y);
+  ctx.ellipse(x, j.y, j.bellW, j.bellW * 0.62 * bellSquash, 0, Math.PI, 0, false);
+  ctx.quadraticCurveTo(x + j.bellW, j.y + j.bellW * 0.14, x, j.y + j.bellW * 0.1);
+  ctx.quadraticCurveTo(x - j.bellW, j.y + j.bellW * 0.14, x - j.bellW, j.y);
   ctx.closePath();
-  ctx.fillStyle = rgba(j.color, alpha + pulse * 0.15);
+  ctx.fillStyle = rgba(j.color, alpha + pulse * 0.12);
   ctx.fill();
 
   // Tentacles
-  ctx.strokeStyle = rgba(j.color, alpha * 0.65);
-  ctx.lineWidth = 1.3 * (0.5 + j.depth);
+  ctx.strokeStyle = rgba(j.color, alpha * 0.6);
+  ctx.lineWidth = 1.2 * (0.55 + j.depth);
+  ctx.lineCap = "round";
   for (let k = 0; k < j.tentacleCount; k++) {
-    const tx = x - j.bellW * 0.7 + (k / (j.tentacleCount - 1)) * j.bellW * 1.4;
-    const len = j.bellW * (1.4 + Math.sin(k * 1.7) * 0.3);
+    const tx = x - j.bellW * 0.65 + (k / Math.max(1, j.tentacleCount - 1)) * j.bellW * 1.3;
+    const len = j.bellW * (1.35 + Math.sin(k * 1.6) * 0.28);
+    const wob1 = Math.sin(t * 1.3 + k + j.pulsePhase) * j.bellW * 0.22;
+    const wob2 = Math.sin(t * 0.95 + k * 1.4 + j.pulsePhase) * j.bellW * 0.32;
     ctx.beginPath();
-    ctx.moveTo(tx, j.y + j.bellW * 0.15);
-    const wob1 = Math.sin(t * 1.4 + k + j.pulsePhase) * (j.bellW * 0.25 + mouse.vx * 0.2);
-    const wob2 = Math.sin(t * 1.0 + k * 1.5 + j.pulsePhase) * (j.bellW * 0.35 + mouse.vy * 0.2);
+    ctx.moveTo(tx, j.y + j.bellW * 0.12);
     ctx.quadraticCurveTo(tx + wob1, j.y + len * 0.5, tx + wob2, j.y + len);
     ctx.stroke();
   }
 }
 
-let particles = [];
-function makeParticles() {
-  particles = [];
-  for (let i = 0; i < 55; i++) {
-    particles.push({ 
-      x: Math.random() * W, 
-      y: Math.random() * H, 
-      r: 0.4 + Math.random() * 1.4, 
-      speed: 2 + Math.random() * 6,
-      alpha: 0.1 + Math.random() * 0.25
-    });
-  }
-}
-
-let start = performance.now();
-
 function frame(now) {
   const t = ((now - start) / 1000) * speedMul;
 
-  ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+  ctx.setTransform(DPR, 0, 0, DPR, 0, 0);
+
+  // Water column
   const surf = theme.surface || [6, 12, 20];
   const water = ctx.createLinearGradient(0, 0, 0, H);
-  water.addColorStop(0, `rgb(${surf.map(v => Math.min(255, v + 12)).join(',')})`);
-  water.addColorStop(1, `rgb(${surf.map(v => Math.max(0, v - 8)).join(',')})`);
+  water.addColorStop(0, rgba(surf.map(v => Math.min(255, v + 14)), 1));
+  water.addColorStop(1, rgba(surf.map(v => Math.max(0, v - 6)), 1));
   ctx.fillStyle = water;
   ctx.fillRect(0, 0, W, H);
 
   // Light rays
-  ctx.globalAlpha = 0.045;
+  ctx.globalAlpha = 0.04;
   for (let i = 0; i < 4; i++) {
-    const rx = W * (0.15 + i * 0.25) + Math.sin(t * 0.2 + i) * 35;
+    const rx = W * (0.15 + i * 0.24) + Math.sin(t * 0.18 + i) * 30;
     ctx.beginPath();
-    ctx.moveTo(rx - 50, 0);
-    ctx.lineTo(rx + 50, 0);
-    ctx.lineTo(rx + 120, H);
-    ctx.lineTo(rx - 120, H);
+    ctx.moveTo(rx - 45, 0);
+    ctx.lineTo(rx + 45, 0);
+    ctx.lineTo(rx + 110, H);
+    ctx.lineTo(rx - 110, H);
     ctx.closePath();
-    ctx.fillStyle = rgba(theme.primary, 1);
+    ctx.fillStyle = rgba(theme.primary || [140, 200, 255], 1);
     ctx.fill();
   }
   ctx.globalAlpha = 1;
 
-  // Floating plankton
+  // Plankton
   for (const p of particles) {
     p.y -= p.speed * 0.016 * speedMul;
-    p.x += Math.sin(t + p.y * 0.01) * 0.2;
-    if (p.y < 0) { p.y = H; p.x = Math.random() * W; }
+    p.x += Math.sin(t + p.y * 0.01) * 0.18;
+    if (p.y < -4) {
+      p.y = H + 4;
+      p.x = Math.random() * W;
+    }
     ctx.beginPath();
     ctx.arc(p.x, p.y, p.r, 0, Math.PI * 2);
-    ctx.fillStyle = `rgba(255, 255, 255, ${p.alpha})`;
+    ctx.fillStyle = `rgba(255,255,255,${p.alpha})`;
     ctx.fill();
   }
 
-  // Jellies
+  // Jellies back → front
   jellies.sort((a, b) => a.depth - b.depth);
   for (const j of jellies) {
-    const pulse = (Math.sin(t * j.pulseFreq + j.pulsePhase) + 1) / 2;
-    j.y -= (0.45 + pulse * 1.9) * (0.5 + j.depth * 0.7) * speedMul;
+    const pulse = (Math.sin(t * j.pulseFreq + j.pulsePhase) + 1) * 0.5;
+    j.y -= (0.4 + pulse * 1.7) * (0.5 + j.depth * 0.7) * speedMul;
     if (j.y < -j.bellW * 3) {
       j.y = H + j.bellW * 2;
       j.x = Math.random() * W;
@@ -318,45 +305,65 @@ function frame(now) {
     drawJelly(j, t);
   }
 
-  mouse.vx *= 0.92;
-  mouse.vy *= 0.92;
+  mouse.vx *= 0.9;
+  mouse.vy *= 0.9;
 
   requestAnimationFrame(frame);
 }
 
-let uiVisible = true;
-window.addEventListener('keydown', (e) => {
-  if (e.key.toLowerCase() === 'c') {
-    uiVisible = !uiVisible;
-    uiContainer.classList.toggle('hidden', !uiVisible);
+addEventListener("pointermove", e => {
+  mouse.vx = e.clientX - (mouse.x === -2000 ? e.clientX : mouse.x);
+  mouse.vy = e.clientY - (mouse.y === -2000 ? e.clientY : mouse.y);
+  mouse.x = e.clientX;
+  mouse.y = e.clientY;
+  document.body.classList.add("show-cursor");
+  clearTimeout(cursorTimer);
+  cursorTimer = setTimeout(() => document.body.classList.remove("show-cursor"), 2500);
+}, { passive: true });
+
+addEventListener("keydown", e => {
+  if (e.key.toLowerCase() === "c") {
+    clockWrap.classList.toggle("hidden");
   }
 });
 
-hintEl.classList.add('show');
-setTimeout(() => hintEl.classList.remove('show'), 4000);
+function fallbackClock() {
+  function update() {
+    const n = new Date();
+    let h = n.getHours();
+    const ap = h >= 12 ? "PM" : "AM";
+    h = h % 12 || 12;
+    clockEl.innerHTML =
+      `${String(h).padStart(2,"0")}:${String(n.getMinutes()).padStart(2,"0")}` +
+      `<span class="ampm">${ap}</span>`;
+    dateEl.textContent = n.toLocaleDateString("en-US", {
+      weekday: "short", month: "short", day: "numeric"
+    }).toUpperCase();
+  }
+  update();
+  setInterval(update, 1000);
+}
 
-window.addEventListener('load', async () => {
+addEventListener("load", () => {
+  loadTheme();
+  resize();
   makeJellies();
   makeParticles();
-  await loadMatugenColors();
-  
-  try {
-    if (typeof startClock === 'function') {
-      startClock(clockEl, dateEl);
-    } else {
-      const update = () => {
-        const now = new Date();
-        let hours = now.getHours();
-        const minutes = String(now.getMinutes()).padStart(2, '0');
-        const ampm = hours >= 12 ? 'PM' : 'AM';
-        hours = hours % 12 || 12;
-        clockEl.innerHTML = `${String(hours).padStart(2, '0')}:${minutes}<span class="ampm">${ampm}</span>`;
-        dateEl.textContent = now.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' });
-      };
-      update();
-      setInterval(update, 1000);
-    }
-  } catch (err) {}
+  loadTheme(); // re-apply colors to jellies
+
+  const s = document.createElement("script");
+  s.src = "clock-shared.js";
+  s.onload = () => {
+    try {
+      if (typeof startClock === "function") startClock(clockEl, dateEl);
+      else fallbackClock();
+    } catch { fallbackClock(); }
+  };
+  s.onerror = fallbackClock;
+  document.head.appendChild(s);
+
+  hintEl.classList.add("show");
+  setTimeout(() => hintEl.classList.remove("show"), 4000);
 
   requestAnimationFrame(frame);
 });

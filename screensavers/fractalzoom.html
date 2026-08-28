@@ -2,282 +2,290 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<title>Material Screensaver — Fractal Zoom</title>
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Material Screensaver — Prism Dive</title>
 <style>
-  :root {
-    --primary_rgb: 138 206 255; --primary_container_rgb: 0 75 111;
-    --secondary_rgb: 180 199 233; --secondary_container_rgb: 53 72 99;
-    --tertiary_rgb: 186 196 250; --tertiary_container_rgb: 58 68 114;
-    --surface_rgb: 8 13 18; --outline_rgb: 137 146 154;
-  }
-  html, body {
-    margin: 0; padding: 0; width: 100%; height: 100%;
-    overflow: hidden; background: rgb(var(--surface_rgb));
-    cursor: none; font-family: "Google Sans", "Segoe UI", Roboto, system-ui, sans-serif;
-  }
-  body.show-cursor { cursor: default; }
-  canvas { display: block; width: 100vw; height: 100vh; }
+:root {
+  --primary_rgb: 138 206 255;
+  --secondary_rgb: 180 199 233;
+  --tertiary_rgb: 186 196 250;
+  --surface_rgb: 8 12 18;
+  --outline_rgb: 137 146 154;
+}
+* { margin: 0; padding: 0; box-sizing: border-box; }
+html, body {
+  width: 100%; height: 100%; overflow: hidden;
+  background: #080c12;
+  cursor: none;
+  font-family: "Google Sans", "Segoe UI", system-ui, sans-serif;
+}
+body.show-cursor { cursor: default; }
+canvas { display: block; width: 100vw; height: 100vh; }
 
-  /* Redesigned Glassmorphic HUD Container */
-  #hud-container {
-    position: fixed; left: 48px; bottom: 48px;
-    pointer-events: none; transition: opacity 0.6s cubic-bezier(0.16, 1, 0.3, 1), transform 0.6s cubic-bezier(0.16, 1, 0.3, 1);
-    display: flex; flex-direction: column; gap: 6px;
-    padding: 24px 32px;
-    background: rgb(var(--surface_rgb) / 0.45);
-    backdrop-filter: blur(16px);
-    -webkit-backdrop-filter: blur(16px);
-    border: 1px solid rgb(var(--outline_rgb) / 0.15);
-    border-radius: 24px;
-    box-shadow: 0 16px 40px rgba(0, 0, 0, 0.5), inset 0 1px 0 rgba(255, 255, 255, 0.05);
-  }
-  #clock {
-    font-weight: 200; font-variant-numeric: tabular-nums;
-    letter-spacing: -2px; font-size: clamp(52px, 7vw, 84px);
-    line-height: 0.95;
-    text-shadow: 0 2px 12px rgba(0, 0, 0, 0.4);
-  }
-  #clock .ampm {
-    font-size: 0.28em; margin-left: 8px; opacity: 0.75;
-    vertical-align: super; font-weight: 500; letter-spacing: 1.5px;
-  }
-  #date {
-    font-size: clamp(12px, 1.3vw, 15px); letter-spacing: 3.5px;
-    font-weight: 500;
-    text-transform: uppercase;
-    opacity: 0.9;
-  }
-  #hint {
-    position: fixed; right: 36px; bottom: 36px;
-    font-size: 11px; letter-spacing: 2px; text-transform: uppercase;
-    opacity: 0; transition: opacity 0.8s ease;
-    padding: 10px 18px;
-    background: rgb(var(--surface_rgb) / 0.6);
-    backdrop-filter: blur(8px);
-    border: 1px solid rgb(var(--outline_rgb) / 0.1);
-    border-radius: 12px;
-    pointer-events: none;
-  }
-  #hint.show { opacity: 0.7; }
-  #hud-container.hidden { opacity: 0; transform: translateY(12px); }
+#clock {
+  position: fixed;
+  left: clamp(28px, 3vw, 48px);
+  bottom: clamp(40px, 4.5vw, 56px);
+  font-weight: 200;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: -2px;
+  font-size: clamp(40px, 5.5vw, 78px);
+  color: rgb(var(--primary_rgb));
+  text-shadow:
+    0 0 40px rgb(var(--primary_rgb) / .4),
+    0 2px 18px rgba(0,0,0,.7);
+  pointer-events: none;
+  transition: opacity .7s ease;
+  z-index: 2;
+}
+#clock .ampm {
+  font-size: .26em;
+  margin-left: 10px;
+  opacity: .72;
+  vertical-align: 22%;
+  letter-spacing: 2px;
+  font-weight: 400;
+}
+#date {
+  position: fixed;
+  left: clamp(30px, 3.1vw, 50px);
+  bottom: clamp(18px, 2.2vw, 28px);
+  font-size: clamp(11px, 1.05vw, 14px);
+  letter-spacing: 4px;
+  text-transform: uppercase;
+  color: rgb(var(--secondary_rgb) / .9);
+  text-shadow: 0 1px 12px rgba(0,0,0,.65);
+  pointer-events: none;
+  transition: opacity .7s ease;
+  z-index: 2;
+}
+#clock.hidden, #date.hidden { opacity: 0; }
 
-  #fallback {
-    display: none; position: fixed; inset: 0;
-    align-items: center; justify-content: center;
-    color: rgb(var(--outline_rgb)); font-size: 14px; text-align: center; padding: 40px;
-  }
+#hint {
+  position: fixed; right: 28px; bottom: 24px;
+  font-size: 11px; letter-spacing: 1.5px;
+  color: rgb(var(--outline_rgb) / .5);
+  opacity: 0; transition: opacity 1s ease;
+  text-transform: uppercase;
+  pointer-events: none; z-index: 2;
+}
+#hint.show { opacity: .65; }
+
+#fallback {
+  display: none; position: fixed; inset: 0;
+  align-items: center; justify-content: center;
+  color: #889; font-size: 14px;
+}
 </style>
 <link rel="stylesheet" href="file:///home/sakib/.config/matugen/matugen-colors.css">
 </head>
 <body>
 <canvas id="c"></canvas>
-<div id="fallback">Fractal Zoom needs WebGL, which isn't available in this browser.</div>
+<div id="fallback">WebGL required</div>
+<div id="clock">00:00<span class="ampm">AM</span></div>
+<div id="date">MON, JAN 1</div>
+<div id="hint">C · toggle clock</div>
 
-<div id="hud-container">
-  <div id="clock">00:00</div>
-  <div id="date">Mon, Jan 1</div>
-</div>
-<div id="hint">Press C to toggle clock</div>
-
-<script src="clock-shared.js"></script>
 <script>
-const canvas = document.getElementById('c');
-const gl = canvas.getContext('webgl', { preserveDrawingBuffer: false, antialias: false });
-const hudContainer = document.getElementById('hud-container');
-const clockEl = document.getElementById('clock');
-const dateEl = document.getElementById('date');
-const hintEl = document.getElementById('hint');
-const fallbackEl = document.getElementById('fallback');
+"use strict";
 
-let cursorTimeout;
-window.addEventListener('pointermove', () => {
-  document.body.classList.add('show-cursor');
-  clearTimeout(cursorTimeout);
-  cursorTimeout = setTimeout(() => {
-    document.body.classList.remove('show-cursor');
-  }, 2500);
+const canvas = document.getElementById("c");
+const clockEl = document.getElementById("clock");
+const dateEl  = document.getElementById("date");
+const hintEl  = document.getElementById("hint");
+const fallbackEl = document.getElementById("fallback");
+
+const gl = canvas.getContext("webgl", {
+  alpha: false,
+  antialias: false,
+  preserveDrawingBuffer: false,
+  powerPreference: "high-performance"
 });
 
-function rgba(rgb, a) { return `rgba(${rgb[0]}, ${rgb[1]}, ${rgb[2]}, ${a})`; }
+let cursorTimer;
 
-function readRGB(name, fallback) {
-  const raw = getComputedStyle(document.documentElement).getPropertyValue(name).trim();
-  const parts = raw.split(/\s+/).map(Number);
-  return (parts.length === 3 && parts.every(n => !isNaN(n))) ? parts : fallback;
+function readRGB(name, fb) {
+  const r = getComputedStyle(document.documentElement).getPropertyValue(name).trim();
+  const p = r.split(/\s+/).map(Number);
+  return (p.length === 3 && p.every(n => !isNaN(n))) ? p : fb;
+}
+function rgba(c, a = 1) {
+  return `rgba(${c[0]},${c[1]},${c[2]},${a})`;
 }
 
-let theme = {};
-function applyTheme() {
-  const primary = readRGB('--primary_rgb', [138, 206, 255]);
-  const secondary = readRGB('--secondary_rgb', [180, 199, 233]);
-  const tertiary = readRGB('--tertiary_rgb', [186, 196, 250]);
-  const outline = readRGB('--outline_rgb', [137, 146, 154]);
-  const surface = readRGB('--surface_rgb', [8, 13, 18]);
+function loadTheme() {
+  const primary   = readRGB("--primary_rgb", [138, 206, 255]);
+  const secondary = readRGB("--secondary_rgb", [180, 199, 233]);
+  const tertiary  = readRGB("--tertiary_rgb", [186, 196, 250]);
+  const surface   = readRGB("--surface_rgb", [8, 12, 18]);
+  const outline   = readRGB("--outline_rgb", [137, 146, 154]);
 
-  theme = {
-    surface: surface.map(v => v / 255),
-    primary: primary.map(v => v / 255),
+  clockEl.style.color = rgba(primary, 0.98);
+  dateEl.style.color  = rgba(secondary, 0.9);
+  hintEl.style.color  = rgba(outline, 0.55);
+  document.body.style.background = rgba(surface, 1);
+
+  return {
+    surface:   surface.map(v => v / 255),
+    primary:   primary.map(v => v / 255),
     secondary: secondary.map(v => v / 255),
-    tertiary: tertiary.map(v => v / 255),
+    tertiary:  tertiary.map(v => v / 255)
   };
-
-  clockEl.style.color = rgba(primary, 1);
-  dateEl.style.color = rgba(secondary, 0.9);
-  hintEl.style.color = rgba(outline, 1);
-  document.body.style.backgroundColor = `rgb(${surface.join(',')})`;
 }
 
-async function loadMatugenColors() {
-  try {
-    const res = await fetch('file:///home/sakib/.config/matugen/matugen-colors.css');
-    if (res.ok) {
-      const cssText = await res.text();
-      const styleTag = document.createElement('style');
-      styleTag.textContent = cssText;
-      document.head.appendChild(styleTag);
-    }
-  } catch (e) {}
-  applyTheme();
+addEventListener("pointermove", () => {
+  document.body.classList.add("show-cursor");
+  clearTimeout(cursorTimer);
+  cursorTimer = setTimeout(() => document.body.classList.remove("show-cursor"), 2500);
+}, { passive: true });
+
+addEventListener("keydown", e => {
+  if (e.key.toLowerCase() === "c") {
+    clockEl.classList.toggle("hidden");
+    dateEl.classList.toggle("hidden");
+  }
+});
+
+function fallbackClock() {
+  function update() {
+    const n = new Date();
+    let h = n.getHours();
+    const ap = h >= 12 ? "PM" : "AM";
+    h = h % 12 || 12;
+    clockEl.innerHTML =
+      `${String(h).padStart(2,"0")}:${String(n.getMinutes()).padStart(2,"0")}` +
+      `<span class="ampm">${ap}</span>`;
+    dateEl.textContent = n.toLocaleDateString("en-US", {
+      weekday: "short", month: "short", day: "numeric"
+    }).toUpperCase();
+  }
+  update();
+  setInterval(update, 1000);
 }
 
 if (!gl) {
-  canvas.style.display = 'none';
-  fallbackEl.style.display = 'flex';
+  canvas.style.display = "none";
+  fallbackEl.style.display = "flex";
 } else {
-  let dpr = Math.min(window.devicePixelRatio || 1, 2);
+  let theme = loadTheme();
+  let dpr = Math.min(devicePixelRatio || 1, 2);
+
   function resize() {
-    canvas.width = window.innerWidth * dpr;
-    canvas.height = window.innerHeight * dpr;
+    dpr = Math.min(devicePixelRatio || 1, 2);
+    canvas.width  = Math.floor(innerWidth * dpr);
+    canvas.height = Math.floor(innerHeight * dpr);
     gl.viewport(0, 0, canvas.width, canvas.height);
   }
-  window.addEventListener('resize', resize);
+  addEventListener("resize", resize, { passive: true });
   resize();
 
-  const vsSource = `
-    attribute vec2 a_position;
-    void main() {
-      gl_Position = vec4(a_position, 0.0, 1.0);
-    }
+  const vs = `
+    attribute vec2 a;
+    void main(){ gl_Position = vec4(a, 0.0, 1.0); }
   `;
 
-  /* Enhanced Fragment Shader with Richer Lighting & Vignette */
-  const fsSource = `
+  /*
+    Prism Dive — iterative polar fold + rotate
+    Looks like stained glass / crystal lattice, not Mandelbrot bulbs
+  */
+  const fs = `
     precision highp float;
-    uniform vec2 u_resolution;
-    uniform float u_zoom;
-    uniform float u_time;
-    uniform vec2 u_target;
-    uniform vec3 u_col1;
-    uniform vec3 u_col2;
-    uniform vec3 u_col3;
-    uniform vec3 u_surface;
+    uniform vec2  uRes;
+    uniform float uTime;
+    uniform vec3  uP, uS, uT, uSurf;
+
+    // 2D rotation
+    mat2 rot(float a) {
+      float c = cos(a), s = sin(a);
+      return mat2(c, -s, s, c);
+    }
 
     void main() {
-      vec2 st = (gl_FragCoord.xy - u_resolution * 0.5) / min(u_resolution.x, u_resolution.y);
-      
-      // Subtle organic warping for fluid motion
-      st += vec2(sin(st.y * 4.0 + u_time * 0.2), cos(st.x * 4.0 + u_time * 0.2)) * 0.015;
+      vec2 uv = (gl_FragCoord.xy - 0.5 * uRes) / min(uRes.x, uRes.y);
 
-      vec2 c = st * (3.0 / u_zoom) + u_target;
+      // slow continuous zoom + drift
+      float zoom = exp(mod(uTime * 0.12, 6.0));
+      uv *= 1.8 / zoom;
+      uv += vec2(sin(uTime * 0.07), cos(uTime * 0.05)) * 0.15;
 
-      vec2 z = vec2(0.0);
-      float n = 0.0;
-      float maxIter = 140.0 + min(log(u_zoom) * 30.0, 320.0);
+      float acc = 0.0;
+      vec3 col = uSurf * 0.4;
 
-      for (float i = 0.0; i < 460.0; i++) {
-        if (i > maxIter) break;
-        if (dot(z, z) > 4.0) {
-          n = i;
-          break;
-        }
-        z = vec2(z.x * z.x - z.y * z.y, 2.0 * z.x * z.y) + c;
+      // iterative kaleidoscopic fold
+      for (float i = 0.0; i < 8.0; i++) {
+        uv = abs(uv);
+        uv -= 0.35 + 0.08 * sin(uTime * 0.2 + i);
+        uv *= rot(0.6 + uTime * 0.03 + i * 0.4);
+        uv *= 1.15;
+
+        float d = length(uv) - 0.25;
+        float band = exp(-abs(d) * 14.0);
+        acc += band * (1.0 / (i + 1.0));
+
+        // color layers by depth
+        float t = fract(i * 0.17 + uTime * 0.04 + length(uv) * 0.3);
+        vec3 layer = mix(uP, uS, sin(t * 6.28318) * 0.5 + 0.5);
+        layer = mix(layer, uT, cos(t * 4.0) * 0.5 + 0.5);
+        col += layer * band * (0.35 / (i + 1.0));
       }
 
-      vec3 col = u_surface;
-      if (n > 0.0 && dot(z, z) > 4.0) {
-        float log_zn = log(dot(z, z)) / 2.0;
-        float nu = log(log_zn / 0.693147) / 0.693147;
-        float iter = n + 1.0 - nu;
+      // soft core glow
+      col += uP * acc * 0.12;
 
-        float t = fract(iter * 0.025 + u_zoom * 0.00008 + u_time * 0.03);
-        col = mix(u_col1, u_col2, sin(t * 3.1415) * 0.5 + 0.5);
-        col = mix(col, u_col3, cos(t * 6.2831) * 0.5 + 0.5);
-        
-        // Interior neon glow highlights
-        float glow = smoothstep(0.0, 1.0, fract(iter * 0.08));
-        col += u_col1 * glow * 0.4;
-        col *= glow * 0.8 + 0.3;
-      }
+      // vignette
+      vec2 q = gl_FragCoord.xy / uRes;
+      float vig = q.x * q.y * (1.0 - q.x) * (1.0 - q.y);
+      vig = pow(16.0 * vig, 0.35);
+      col *= mix(0.7, 1.0, clamp(vig, 0.0, 1.0));
 
-      // Atmospheric Vignette
-      vec2 uv = gl_FragCoord.xy / u_resolution;
-      float vignette = uv.x * uv.y * (1.0 - uv.x) * (1.0 - uv.y);
-      vignette = clamp(pow(16.0 * vignette, 0.25), 0.0, 1.0);
-      col *= mix(0.65, 1.0, vignette);
+      // slight film grain for texture
+      float grain = fract(sin(dot(gl_FragCoord.xy, vec2(12.9898, 78.233)) + uTime) * 43758.5453);
+      col += (grain - 0.5) * 0.02;
 
       gl_FragColor = vec4(col, 1.0);
     }
   `;
 
-  function createShader(gl, type, source) {
-    const shader = gl.createShader(type);
-    gl.shaderSource(shader, source);
-    gl.compileShader(shader);
-    return shader;
+  function compile(type, src) {
+    const s = gl.createShader(type);
+    gl.shaderSource(s, src);
+    gl.compileShader(s);
+    return s;
   }
 
-  const vs = createShader(gl, gl.VERTEX_SHADER, vsSource);
-  const fs = createShader(gl, gl.FRAGMENT_SHADER, fsSource);
-  const program = gl.createProgram();
-  gl.attachShader(program, vs);
-  gl.attachShader(program, fs);
-  gl.linkProgram(program);
-  gl.useProgram(program);
+  const prog = gl.createProgram();
+  gl.attachShader(prog, compile(gl.VERTEX_SHADER, vs));
+  gl.attachShader(prog, compile(gl.FRAGMENT_SHADER, fs));
+  gl.linkProgram(prog);
+  gl.useProgram(prog);
 
-  const positionBuffer = gl.createBuffer();
-  gl.bindBuffer(gl.ARRAY_BUFFER, positionBuffer);
-  gl.bufferData(gl.ARRAY_BUFFER, new Float32Array([-1, -1, 1, -1, -1, 1, -1, 1, 1, -1, 1, 1]), gl.STATIC_DRAW);
+  const buf = gl.createBuffer();
+  gl.bindBuffer(gl.ARRAY_BUFFER, buf);
+  gl.bufferData(gl.ARRAY_BUFFER, new Float32Array([
+    -1,-1, 1,-1, -1,1, -1,1, 1,-1, 1,1
+  ]), gl.STATIC_DRAW);
+  const a = gl.getAttribLocation(prog, "a");
+  gl.enableVertexAttribArray(a);
+  gl.vertexAttribPointer(a, 2, gl.FLOAT, false, 0, 0);
 
-  const posAttr = gl.getAttribLocation(program, 'a_position');
-  gl.enableVertexAttribArray(posAttr);
-  gl.vertexAttribPointer(posAttr, 2, gl.FLOAT, false, 0, 0);
+  const uRes  = gl.getUniformLocation(prog, "uRes");
+  const uTime = gl.getUniformLocation(prog, "uTime");
+  const uP = gl.getUniformLocation(prog, "uP");
+  const uS = gl.getUniformLocation(prog, "uS");
+  const uT = gl.getUniformLocation(prog, "uT");
+  const uSurf = gl.getUniformLocation(prog, "uSurf");
 
-  const uResLoc = gl.getUniformLocation(program, 'u_resolution');
-  const uZoomLoc = gl.getUniformLocation(program, 'u_zoom');
-  const uTimeLoc = gl.getUniformLocation(program, 'u_time');
-  const uTargetLoc = gl.getUniformLocation(program, 'u_target');
-  const uCol1Loc = gl.getUniformLocation(program, 'u_col1');
-  const uCol2Loc = gl.getUniformLocation(program, 'u_col2');
-  const uCol3Loc = gl.getUniformLocation(program, 'u_col3');
-  const uSurfaceLoc = gl.getUniformLocation(program, 'u_surface');
-
-  const TARGETS = [
-    [-0.7436438870371587, 0.1318259042053119],
-    [-0.16, 1.0405],
-    [0.2869322288108422, 0.014286697309044],
-    [-1.25066, 0.02012],
-  ];
-
-  let targetIdx = 0;
-  let startTime = performance.now();
+  let t0 = performance.now();
 
   function frame(now) {
-    const elapsed = (now - startTime) / 1000;
-    const zoom = Math.exp((elapsed % 30) * 0.3) + 1.0;
+    const t = (now - t0) / 1000;
 
-    if ((elapsed % 30) < 0.05) {
-      targetIdx = (targetIdx + 1) % TARGETS.length;
-    }
-
-    gl.uniform2f(uResLoc, canvas.width, canvas.height);
-    gl.uniform1f(uZoomLoc, zoom);
-    gl.uniform1f(uTimeLoc, elapsed);
-    gl.uniform2f(uTargetLoc, TARGETS[targetIdx][0], TARGETS[targetIdx][1]);
-
-    gl.uniform3fv(uCol1Loc, theme.primary || [0.5, 0.8, 1]);
-    gl.uniform3fv(uCol2Loc, theme.secondary || [0.7, 0.8, 0.9]);
-    gl.uniform3fv(uCol3Loc, theme.tertiary || [0.7, 0.8, 1]);
-    gl.uniform3fv(uSurfaceLoc, theme.surface || [0.03, 0.05, 0.07]);
+    gl.uniform2f(uRes, canvas.width, canvas.height);
+    gl.uniform1f(uTime, t);
+    gl.uniform3fv(uP, theme.primary);
+    gl.uniform3fv(uS, theme.secondary);
+    gl.uniform3fv(uT, theme.tertiary);
+    gl.uniform3fv(uSurf, theme.surface);
 
     gl.drawArrays(gl.TRIANGLES, 0, 6);
     requestAnimationFrame(frame);
@@ -286,22 +294,22 @@ if (!gl) {
   requestAnimationFrame(frame);
 }
 
-let clockVisible = true;
-window.addEventListener('keydown', (e) => {
-  if (e.key.toLowerCase() === 'c') {
-    clockVisible = !clockVisible;
-    hudContainer.classList.toggle('hidden', !clockVisible);
-  }
-});
+hintEl.classList.add("show");
+setTimeout(() => hintEl.classList.remove("show"), 4000);
 
-hintEl.classList.add('show');
-setTimeout(() => hintEl.classList.remove('show'), 4000);
+addEventListener("load", () => {
+  if (gl) loadTheme();
 
-window.addEventListener('load', async () => {
-  await loadMatugenColors();
-  if (typeof startClock === 'function') {
-    startClock(clockEl, dateEl);
-  }
+  const s = document.createElement("script");
+  s.src = "clock-shared.js";
+  s.onload = () => {
+    try {
+      if (typeof startClock === "function") startClock(clockEl, dateEl);
+      else fallbackClock();
+    } catch { fallbackClock(); }
+  };
+  s.onerror = fallbackClock;
+  document.head.appendChild(s);
 });
 </script>
 </body>

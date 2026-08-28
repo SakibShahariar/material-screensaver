@@ -5,324 +5,311 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Material Screensaver — Quantum Interference</title>
 <style>
-  :root {
-    --primary_rgb: 138 206 255;
-    --primary_container_rgb: 0 75 111;
-    --secondary_rgb: 180 199 233;
-    --tertiary_rgb: 186 196 250;
-    --surface_rgb: 12 20 27;
-    --surface_bright_rgb: 50 58 65;
-    --on_surface_variant_rgb: 191 199 209;
-    --outline_rgb: 137 146 154;
-  }
-  html, body {
-    margin: 0; padding: 0; width: 100%; height: 100%;
-    overflow: hidden; background: rgb(var(--surface_rgb));
-    font-family: "Google Sans", "Segoe UI", Roboto, system-ui, sans-serif;
-    user-select: none;
-  }
+:root {
+  --primary_rgb: 138 206 255;
+  --secondary_rgb: 180 199 233;
+  --tertiary_rgb: 186 196 250;
+  --surface_rgb: 12 20 27;
+  --outline_rgb: 137 146 154;
+}
+* { margin: 0; padding: 0; box-sizing: border-box; }
+html, body {
+  width: 100%; height: 100%; overflow: hidden;
+  background: rgb(var(--surface_rgb));
+  cursor: none;
+  font-family: "Google Sans", "Segoe UI", system-ui, sans-serif;
+}
+body.show-cursor { cursor: default; }
+canvas { display: block; width: 100vw; height: 100vh; }
 
-  body { cursor: none; }
-  body.show-cursor { cursor: default; }
+#clock-wrap {
+  position: fixed;
+  left: clamp(20px, 2.5vw, 40px);
+  bottom: clamp(16px, 2vw, 28px);
+  padding: 18px 26px 14px;
+  border-radius: 20px;
+  background: radial-gradient(
+    ellipse at 30% 70%,
+    rgb(var(--surface_rgb) / .88) 0%,
+    rgb(var(--surface_rgb) / .55) 55%,
+    transparent 100%
+  );
+  pointer-events: none;
+  transition: opacity .7s ease;
+  z-index: 10;
+}
+#clock-wrap.hidden { opacity: 0; }
 
-  canvas { display: block; width: 100vw; height: 100vh; }
+#clock {
+  font-weight: 200;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: -2px;
+  font-size: clamp(40px, 5.5vw, 78px);
+  color: rgb(var(--primary_rgb));
+  text-shadow:
+    0 0 2px rgb(var(--surface_rgb)),
+    0 0 14px rgb(var(--surface_rgb) / .95),
+    0 0 36px rgb(var(--primary_rgb) / .5),
+    0 2px 14px rgba(0,0,0,.85);
+  line-height: 1;
+}
+#clock .ampm {
+  font-size: .26em;
+  margin-left: 10px;
+  opacity: .78;
+  vertical-align: 22%;
+  letter-spacing: 2px;
+  font-weight: 400;
+}
+#date {
+  margin-top: 8px;
+  font-size: clamp(11px, 1.05vw, 14px);
+  letter-spacing: 4px;
+  text-transform: uppercase;
+  color: rgb(var(--secondary_rgb));
+  text-shadow:
+    0 0 8px rgb(var(--surface_rgb) / .9),
+    0 1px 8px rgba(0,0,0,.7);
+  opacity: .95;
+}
 
-  /* Ambient depth vignette */
-  body::after {
-    content: '';
-    position: fixed; inset: 0; pointer-events: none; z-index: 5;
-    background: radial-gradient(circle at center, transparent 40%, rgb(var(--surface_rgb) / 0.65) 100%);
-  }
+#hint {
+  position: fixed; right: 28px; bottom: 24px; z-index: 10;
+  font-size: 11px; letter-spacing: 1.5px;
+  color: rgb(var(--outline_rgb) / .55);
+  opacity: 0; transition: opacity 1s ease;
+  text-transform: uppercase;
+  pointer-events: none;
+  text-shadow: 0 1px 8px rgb(var(--surface_rgb));
+}
+#hint.show { opacity: .7; }
 
-  #ui-container {
-    position: fixed; inset: 0; pointer-events: none; z-index: 10;
-    display: flex; flex-direction: column; justify-content: flex-end;
-    padding: 56px; box-sizing: border-box;
-    transition: opacity 0.5s cubic-bezier(0.16, 1, 0.3, 1), transform 0.5s cubic-bezier(0.16, 1, 0.3, 1);
-  }
-  #ui-container.hidden { opacity: 0; transform: translateY(16px); }
-
-  .vignette-card {
-    background: linear-gradient(135deg, rgb(var(--surface_rgb) / 0.75) 0%, rgb(var(--surface_rgb) / 0.4) 100%);
-    backdrop-filter: blur(20px);
-    -webkit-backdrop-filter: blur(20px);
-    padding: 32px 40px;
-    width: fit-content;
-    border-radius: 28px;
-    border: 1px solid rgb(var(--outline_rgb) / 0.12);
-    box-shadow: 0 24px 60px rgba(0, 0, 0, 0.5), inset 0 1px 0 rgba(255, 255, 255, 0.06);
-  }
-
-  #clock {
-    font-size: clamp(56px, 8vw, 92px);
-    font-weight: 200;
-    font-variant-numeric: tabular-nums;
-    letter-spacing: -3px;
-    line-height: 0.9;
-    text-shadow: 0 4px 24px rgba(0, 0, 0, 0.45);
-  }
-  #clock .ampm {
-    font-size: 0.26em;
-    margin-left: 10px;
-    opacity: 0.7;
-    font-weight: 500;
-    text-transform: uppercase;
-    vertical-align: super;
-    letter-spacing: 2px;
-  }
-  #date {
-    font-size: clamp(13px, 1.4vw, 16px);
-    letter-spacing: 4px;
-    text-transform: uppercase;
-    margin-top: 12px;
-    opacity: 0.85;
-    font-weight: 500;
-  }
-  #hint {
-    position: fixed; right: 40px; bottom: 40px;
-    font-size: 11px; letter-spacing: 2.5px; text-transform: uppercase;
-    opacity: 0; transition: opacity 0.6s ease;
-    padding: 10px 20px;
-    background: rgb(var(--surface_rgb) / 0.5);
-    backdrop-filter: blur(12px);
-    border: 1px solid rgb(var(--outline_rgb) / 0.1);
-    border-radius: 14px;
-    pointer-events: none;
-    z-index: 10;
-  }
-  #hint.show { opacity: 0.65; }
+#fallback {
+  display: none;
+  position: fixed; inset: 0;
+  align-items: center; justify-content: center;
+  color: rgb(var(--outline_rgb));
+  font-size: 14px;
+}
 </style>
 <link rel="stylesheet" href="file:///home/sakib/.config/matugen/matugen-colors.css">
 </head>
 <body>
 <canvas id="c"></canvas>
-
-<div id="ui-container">
-  <div class="vignette-card">
-    <div id="clock">00:00</div>
-    <div id="date">Mon, Jan 1</div>
-  </div>
+<div id="fallback">WebGL2 required</div>
+<div id="clock-wrap">
+  <div id="clock">00:00<span class="ampm">AM</span></div>
+  <div id="date">MON, JAN 1</div>
 </div>
-<div id="hint">Press <b>C</b> to toggle UI</div>
+<div id="hint">C · toggle clock</div>
 
-<script src="clock-shared.js"></script>
 <script>
-const canvas = document.getElementById('c');
-const clockEl = document.getElementById('clock');
-const dateEl = document.getElementById('date');
-const hintEl = document.getElementById('hint');
-const uiContainer = document.getElementById('ui-container');
+"use strict";
 
-let cursorTimeout;
-function triggerCursor() {
-  document.body.classList.add('show-cursor');
-  clearTimeout(cursorTimeout);
-  cursorTimeout = setTimeout(() => {
-    document.body.classList.remove('show-cursor');
-  }, 2500);
+const canvas = document.getElementById("c");
+const clockEl = document.getElementById("clock");
+const dateEl  = document.getElementById("date");
+const hintEl  = document.getElementById("hint");
+const clockWrap = document.getElementById("clock-wrap");
+const fallbackEl = document.getElementById("fallback");
+
+const gl = canvas.getContext("webgl2", {
+  alpha: false,
+  antialias: false,
+  powerPreference: "high-performance"
+});
+
+let cursorTimer;
+
+function readRGB(name, fb) {
+  const r = getComputedStyle(document.documentElement).getPropertyValue(name).trim();
+  const p = r.split(/\s+/).map(Number);
+  return (p.length === 3 && p.every(n => !isNaN(n))) ? p : fb;
 }
-window.addEventListener('pointermove', triggerCursor);
-window.addEventListener('pointerdown', triggerCursor);
-
-const reduceMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
-const speedMul = reduceMotion ? 0.25 : 1;
-
-function readRGB(name, fallback) {
-  const raw = getComputedStyle(document.documentElement).getPropertyValue(name).trim();
-  const parts = raw.split(/\s+/).map(Number);
-  return (parts.length === 3 && parts.every(n => !isNaN(n))) ? parts : fallback;
-}
-
-let theme = {};
-function loadThemeColors() {
-  return {
-    surface: readRGB('--surface_rgb', [12, 20, 27]),
-    primary: readRGB('--primary_rgb', [138, 206, 255]),
-    secondary: readRGB('--secondary_rgb', [180, 199, 233]),
-    tertiary: readRGB('--tertiary_rgb', [186, 196, 250]),
-    outline: readRGB('--outline_rgb', [137, 146, 154]),
-  };
+function rgba(c, a = 1) {
+  return `rgba(${c[0]},${c[1]},${c[2]},${a})`;
 }
 
-function applyThemeDOM() {
-  theme = loadThemeColors();
-  document.body.style.backgroundColor = `rgb(${theme.surface.join(',')})`;
-  clockEl.style.color = `rgba(${theme.primary.join(',')}, 0.98)`;
-  dateEl.style.color = `rgba(${theme.secondary.join(',')}, 0.9)`;
-  hintEl.style.color = `rgba(${theme.outline.join(',')}, 0.95)`;
+function loadTheme() {
+  const surface   = readRGB("--surface_rgb", [12, 20, 27]);
+  const primary   = readRGB("--primary_rgb", [138, 206, 255]);
+  const secondary = readRGB("--secondary_rgb", [180, 199, 233]);
+  const tertiary  = readRGB("--tertiary_rgb", [186, 196, 250]);
+  const outline   = readRGB("--outline_rgb", [137, 146, 154]);
+
+  document.body.style.background = rgba(surface, 1);
+  clockEl.style.color = rgba(primary, 1);
+  dateEl.style.color  = rgba(secondary, 0.95);
+  hintEl.style.color  = rgba(outline, 0.6);
+
+  return { surface, primary, secondary, tertiary };
 }
 
-// WebGL2 Setup for GPU-accelerated Quantum Interference Field
-const gl = canvas.getContext('webgl2', { alpha: false, antialias: false, powerPreference: 'high-performance' });
+addEventListener("pointermove", () => {
+  document.body.classList.add("show-cursor");
+  clearTimeout(cursorTimer);
+  cursorTimer = setTimeout(() => document.body.classList.remove("show-cursor"), 2500);
+}, { passive: true });
+
+addEventListener("keydown", e => {
+  if (e.key.toLowerCase() === "c") {
+    clockWrap.classList.toggle("hidden");
+  }
+});
+
+function fallbackClock() {
+  function update() {
+    const n = new Date();
+    let h = n.getHours();
+    const ap = h >= 12 ? "PM" : "AM";
+    h = h % 12 || 12;
+    clockEl.innerHTML =
+      `${String(h).padStart(2,"0")}:${String(n.getMinutes()).padStart(2,"0")}` +
+      `<span class="ampm">${ap}</span>`;
+    dateEl.textContent = n.toLocaleDateString("en-US", {
+      weekday: "short", month: "short", day: "numeric"
+    }).toUpperCase();
+  }
+  update();
+  setInterval(update, 1000);
+}
+
 if (!gl) {
-  alert('WebGL2 not supported in this environment.');
-}
+  canvas.style.display = "none";
+  fallbackEl.style.display = "flex";
+} else {
+  let theme = loadTheme();
+  const reduceMotion = matchMedia("(prefers-reduced-motion: reduce)").matches;
+  const speedMul = reduceMotion ? 0.25 : 0.75;
 
-const vsSource = `#version 300 es
-in vec2 a_position;
-void main() {
-  gl_Position = vec4(a_position, 0.0, 1.0);
-}`;
+  function resize() {
+    const dpr = Math.min(devicePixelRatio || 1, 2);
+    canvas.width  = Math.floor(innerWidth * dpr);
+    canvas.height = Math.floor(innerHeight * dpr);
+    gl.viewport(0, 0, canvas.width, canvas.height);
+  }
+  addEventListener("resize", resize, { passive: true });
+  resize();
 
-const fsSource = `#version 300 es
+  const vs = `#version 300 es
+in vec2 a;
+void main(){ gl_Position = vec4(a, 0.0, 1.0); }`;
+
+  const fs = `#version 300 es
 precision highp float;
 out vec4 fragColor;
-uniform vec2 u_resolution;
-uniform float u_time;
-uniform vec3 u_surface;
-uniform vec3 u_primary;
-uniform vec3 u_secondary;
-uniform vec3 u_tertiary;
+uniform vec2 uRes;
+uniform float uTime;
+uniform vec3 uSurf, uP, uS, uT;
 
 void main() {
-  vec2 st = gl_FragCoord.xy / u_resolution;
   vec2 p = gl_FragCoord.xy;
-  float t = u_time * 0.6;
+  float t = uTime * 0.55;
 
-  // Lissajous emitters
-  vec2 s1 = vec2(u_resolution.x * 0.5 + sin(t * 0.7) * u_resolution.x * 0.3, u_resolution.y * 0.5 + cos(t * 0.5) * u_resolution.y * 0.25);
-  vec2 s2 = vec2(u_resolution.x * 0.5 + cos(t * 0.4) * u_resolution.x * 0.35, u_resolution.y * 0.5 + sin(t * 0.6) * u_resolution.y * 0.25);
-  vec2 s3 = vec2(u_resolution.x * 0.5 + sin(t * 0.9) * u_resolution.x * 0.2, u_resolution.y * 0.5 + cos(t * 0.8) * u_resolution.y * 0.3);
+  vec2 s1 = vec2(uRes.x * 0.5 + sin(t * 0.7) * uRes.x * 0.28,
+                 uRes.y * 0.5 + cos(t * 0.5) * uRes.y * 0.22);
+  vec2 s2 = vec2(uRes.x * 0.5 + cos(t * 0.4) * uRes.x * 0.32,
+                 uRes.y * 0.5 + sin(t * 0.6) * uRes.y * 0.22);
+  vec2 s3 = vec2(uRes.x * 0.5 + sin(t * 0.9) * uRes.x * 0.18,
+                 uRes.y * 0.5 + cos(t * 0.8) * uRes.y * 0.28);
 
   float d1 = distance(p, s1);
   float d2 = distance(p, s2);
   float d3 = distance(p, s3);
 
-  float waveVal = sin(d1 * 0.035 - t * 4.0) +
-                  sin(d2 * 0.028 + t * 3.0) +
-                  cos(d3 * 0.045 - t * 2.0);
+  float wave = sin(d1 * 0.032 - t * 3.6)
+             + sin(d2 * 0.026 + t * 2.8)
+             + cos(d3 * 0.04  - t * 1.9);
 
-  float intensity = (waveVal + 3.0) / 6.0;
-  float alpha = pow(intensity, 2.2) * 0.88;
+  float intensity = (wave + 3.0) / 6.0;
+  float alpha = pow(intensity, 2.0) * 0.85;
 
-  vec3 col = u_surface + (u_primary * intensity + u_secondary * (1.0 - intensity)) * alpha;
-  
-  // Add subtle tertiary chromatic shimmer
-  col += u_tertiary * (sin(d1 * 0.01 + t) * 0.08);
+  vec3 col = uSurf / 255.0;
+  col += mix(uP, uS, intensity) / 255.0 * alpha;
+  col += uT / 255.0 * (sin(d1 * 0.01 + t) * 0.07);
 
-  fragColor = vec4(col / 255.0, 1.0);
+  fragColor = vec4(col, 1.0);
 }`;
 
-function createShader(gl, type, source) {
-  const shader = gl.createShader(type);
-  gl.shaderSource(shader, source);
-  gl.compileShader(shader);
-  if (!gl.getShaderParameter(shader, gl.COMPILE_STATUS)) {
-    console.error(gl.getShaderInfoLog(shader));
-    gl.deleteShader(shader);
-    return null;
-  }
-  return shader;
-}
-
-const vertShader = createShader(gl, gl.VERTEX_SHADER, vsSource);
-const fragShader = createShader(gl, gl.FRAGMENT_SHADER, fsSource);
-const program = gl.createProgram();
-gl.attachShader(program, vertShader);
-gl.attachShader(program, fragShader);
-gl.linkProgram(program);
-
-if (!gl.getProgramParameter(program, gl.LINK_STATUS)) {
-  console.error(gl.getProgramInfoLog(program));
-}
-
-const positionAttributeLocation = gl.getAttribLocation(program, "a_position");
-const positionBuffer = gl.createBuffer();
-gl.bindBuffer(gl.ARRAY_BUFFER, positionBuffer);
-const positions = new Float32Array([
-  -1, -1,
-   1, -1,
-  -1,  1,
-  -1,  1,
-   1, -1,
-   1,  1,
-]);
-gl.bufferData(gl.ARRAY_BUFFER, positions, gl.STATIC_DRAW);
-
-const vao = gl.createVertexArray();
-gl.bindVertexArray(vao);
-gl.enableVertexAttribArray(positionAttributeLocation);
-gl.vertexAttribPointer(positionAttributeLocation, 2, gl.FLOAT, false, 0, 0);
-
-const resolutionUniformLocation = gl.getUniformLocation(program, "u_resolution");
-const timeUniformLocation = gl.getUniformLocation(program, "u_time");
-const surfaceUniformLocation = gl.getUniformLocation(program, "u_surface");
-const primaryUniformLocation = gl.getUniformLocation(program, "u_primary");
-const secondaryUniformLocation = gl.getUniformLocation(program, "u_secondary");
-const tertiaryUniformLocation = gl.getUniformLocation(program, "u_tertiary");
-
-function resize() {
-  const dpr = Math.min(window.devicePixelRatio || 1, 2);
-  const W = window.innerWidth;
-  const H = window.innerHeight;
-  canvas.width = W * dpr;
-  canvas.height = H * dpr;
-  gl.viewport(0, 0, canvas.width, canvas.height);
-}
-window.addEventListener('resize', resize);
-resize();
-
-let start = performance.now();
-
-function frame(now) {
-  const t = ((now - start) / 1000) * speedMul;
-
-  gl.useProgram(program);
-  gl.bindVertexArray(vao);
-
-  gl.uniform2f(resolutionUniformLocation, canvas.width, canvas.height);
-  gl.uniform1f(timeUniformLocation, t);
-  
-  const th = loadThemeColors();
-  gl.uniform3fv(surfaceUniformLocation, th.surface);
-  gl.uniform3fv(primaryUniformLocation, th.primary);
-  gl.uniform3fv(secondaryUniformLocation, th.secondary);
-  gl.uniform3fv(tertiaryUniformLocation, th.tertiary);
-
-  gl.drawArrays(gl.TRIANGLES, 0, 6);
-
-  requestAnimationFrame(frame);
-}
-
-function fallbackClock() {
-  const update = () => {
-    const now = new Date();
-    let hours = now.getHours();
-    const minutes = String(now.getMinutes()).padStart(2, '0');
-    const ampm = hours >= 12 ? 'PM' : 'AM';
-    hours = hours % 12 || 12;
-    clockEl.innerHTML = `${String(hours).padStart(2, '0')}:${minutes}<span class="ampm">${ampm}</span>`;
-    dateEl.textContent = now.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' });
-  };
-  update();
-  setInterval(update, 1000);
-}
-
-let uiVisible = true;
-window.addEventListener('keydown', (e) => {
-  if (e.key.toLowerCase() === 'c') {
-    uiVisible = !uiVisible;
-    uiContainer.classList.toggle('hidden', !uiVisible);
-  }
-});
-
-hintEl.classList.add('show');
-setTimeout(() => hintEl.classList.remove('show'), 4000);
-
-window.addEventListener('load', () => {
-  applyThemeDOM();
-
-  try {
-    if (typeof startClock === 'function') {
-      startClock(clockEl, dateEl);
-    } else {
-      fallbackClock();
+  function compile(type, src) {
+    const s = gl.createShader(type);
+    gl.shaderSource(s, src);
+    gl.compileShader(s);
+    if (!gl.getShaderParameter(s, gl.COMPILE_STATUS)) {
+      console.error(gl.getShaderInfoLog(s));
+      return null;
     }
-  } catch (err) {
-    fallbackClock();
+    return s;
   }
 
-  requestAnimationFrame(frame);
+  const prog = gl.createProgram();
+  const vsh = compile(gl.VERTEX_SHADER, vs);
+  const fsh = compile(gl.FRAGMENT_SHADER, fs);
+  if (!vsh || !fsh) {
+    canvas.style.display = "none";
+    fallbackEl.style.display = "flex";
+  } else {
+    gl.attachShader(prog, vsh);
+    gl.attachShader(prog, fsh);
+    gl.linkProgram(prog);
+    gl.useProgram(prog);
+
+    const buf = gl.createBuffer();
+    gl.bindBuffer(gl.ARRAY_BUFFER, buf);
+    gl.bufferData(gl.ARRAY_BUFFER, new Float32Array([
+      -1,-1, 1,-1, -1,1, -1,1, 1,-1, 1,1
+    ]), gl.STATIC_DRAW);
+
+    const vao = gl.createVertexArray();
+    gl.bindVertexArray(vao);
+    const a = gl.getAttribLocation(prog, "a");
+    gl.enableVertexAttribArray(a);
+    gl.vertexAttribPointer(a, 2, gl.FLOAT, false, 0, 0);
+
+    const uRes  = gl.getUniformLocation(prog, "uRes");
+    const uTime = gl.getUniformLocation(prog, "uTime");
+    const uSurf = gl.getUniformLocation(prog, "uSurf");
+    const uP = gl.getUniformLocation(prog, "uP");
+    const uS = gl.getUniformLocation(prog, "uS");
+    const uT = gl.getUniformLocation(prog, "uT");
+
+    let t0 = performance.now();
+
+    function frame(now) {
+      const t = ((now - t0) / 1000) * speedMul;
+      theme = loadTheme();
+
+      gl.uniform2f(uRes, canvas.width, canvas.height);
+      gl.uniform1f(uTime, t);
+      gl.uniform3fv(uSurf, theme.surface);
+      gl.uniform3fv(uP, theme.primary);
+      gl.uniform3fv(uS, theme.secondary);
+      gl.uniform3fv(uT, theme.tertiary);
+
+      gl.drawArrays(gl.TRIANGLES, 0, 6);
+      requestAnimationFrame(frame);
+    }
+
+    requestAnimationFrame(frame);
+  }
+}
+
+hintEl.classList.add("show");
+setTimeout(() => hintEl.classList.remove("show"), 4000);
+
+addEventListener("load", () => {
+  loadTheme();
+
+  const s = document.createElement("script");
+  s.src = "clock-shared.js";
+  s.onload = () => {
+    try {
+      if (typeof startClock === "function") startClock(clockEl, dateEl);
+      else fallbackClock();
+    } catch { fallbackClock(); }
+  };
+  s.onerror = fallbackClock;
+  document.head.appendChild(s);
 });
 </script>
 </body>
