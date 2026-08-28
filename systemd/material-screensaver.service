@@ -7,6 +7,9 @@ PartOf=graphical-session.target
 Type=simple
 ExecStart=%h/.local/bin/material-screensaver-ctl.py daemon
 Restart=on-failure
+RestartSec=3
+TimeoutStopSec=5
+KillMode=mixed
 
 [Install]
 WantedBy=graphical-session.target

@@ -24,6 +24,8 @@ import json
 import glob
 import random
 import subprocess
+import atexit
+import signal
 
 SCREENSAVER_DIR = os.path.expanduser("~/.local/share/material-screensaver/screensavers")
 CONFIG_PATH = os.path.expanduser("~/.config/material-screensaver/config.json")
@@ -43,6 +45,9 @@ _idle_proxy = None  # Gio.DBusProxy for org.gnome.Mutter.IdleMonitor (daemon onl
 _idle_watch_ids = {"idle": None, "active": None}
 _lock_timeout_id = None  # GLib source id for lock after screensaver
 _saved_overlay_key = None  # saved org.gnome.mutter overlay-key while Super+Q is exclusive
+_is_showing = False  # guard double-Show TOCTOU
+_pending_sources = []  # GLib source ids for fullscreen retry / gc to cancel on Hide
+_ephemeral_ctx = None  # single ephemeral WebContext reused across Shows (fixes per-Show leak)
 
 
 def load_config():
@@ -65,7 +70,8 @@ def list_screensavers():
 def get_active_html_path(cfg):
     screensavers = list_screensavers()
     if not screensavers:
-        sys.exit(f"No screensaver .html files found in {SCREENSAVER_DIR}")
+        print(f"No screensaver .html files found in {SCREENSAVER_DIR}", file=sys.stderr)
+        return None
     if cfg.get("random", False):
         return random.choice(list(screensavers.values()))
     active = cfg.get("active")
@@ -180,20 +186,14 @@ def _create_viewer_windows(html_path, clock_format="24h"):
     from gi.repository import Gtk, Gdk, WebKit, GLib
 
     # Always clean orphans before create — second Show often ghosts if previous Hide left bwrap
-    # is_viewer_active is false when ghost is invisible, so we need explicit orphan check
     try:
-        # If any WebKit child still alive while we think hidden, kill it before new Show
-        import subprocess, os
+        import subprocess
         out = subprocess.run(["ps", "--ppid", str(os.getpid()), "-o", "args="],
                              capture_output=True, text=True, timeout=2)
         if "WebKit" in out.stdout or "bwrap" in out.stdout:
             _kill_orphan_webkit()
-            import time
-            time.sleep(0.15)
         if is_viewer_active():
             hide_viewer()
-            import time
-            time.sleep(0.05)
     except Exception:
         pass
 
@@ -224,16 +224,17 @@ def _create_viewer_windows(html_path, clock_format="24h"):
 
     uri = f"file://{html_path}?format={clock_format}"
     windows = []
-    # Ephemeral per Show — allows full cleanup after Hide and avoids reusing killed shared NetworkProcess (second-show ghost)
-    try:
-        ctx = WebKit.WebContext.new_ephemeral()
+    global _ephemeral_ctx
+    if _ephemeral_ctx is None:
         try:
-            ctx.set_cache_model(WebKit.CacheModel.DOCUMENT_VIEWER)
+            _ephemeral_ctx = WebKit.WebContext.new_ephemeral()
+            try:
+                _ephemeral_ctx.set_cache_model(WebKit.CacheModel.DOCUMENT_VIEWER)
+            except Exception:
+                pass
         except Exception:
-            pass
-    except Exception:
-        ctx = _get_shared_context()
-    _ephemeral_ctx = ctx
+            _ephemeral_ctx = _get_shared_context()
+    ctx = _ephemeral_ctx
     for mon in monitors:
         try:
             if _daemon_app is not None:
@@ -363,20 +364,30 @@ def _create_viewer_windows(html_path, clock_format="24h"):
                 pass
         # Defer fullscreen to next idle so Wayland compositor has surface
         try:
-            GLib.idle_add(_do_fullscreen, priority=GLib.PRIORITY_HIGH_IDLE)
-            # Retry after 200ms — second Show sometimes ghosts if first hide SIGTERM left compositor state stale
+            sid = GLib.idle_add(_do_fullscreen, priority=GLib.PRIORITY_HIGH_IDLE)
+            try:
+                _pending_sources.append(sid)
+            except Exception:
+                pass
             def _retry_fs(w=win):
                 try:
-                    if w.get_visible() and not w.is_visible() or True:
+                    if w.get_visible():
                         w.fullscreen()
                         w.present()
                 except Exception:
                     pass
                 return False
-            GLib.timeout_add(200, _retry_fs)
-            GLib.timeout_add(600, _retry_fs)
+            sid2 = GLib.timeout_add(200, _retry_fs)
+            sid3 = GLib.timeout_add(600, _retry_fs)
+            try:
+                _pending_sources.extend([sid2, sid3])
+            except Exception:
+                pass
         except Exception:
-            _do_fullscreen()
+            try:
+                _do_fullscreen()
+            except Exception:
+                pass
         # Also ensure fullscreen on map (covers case where idle fired before map)
         try:
             def _on_map(w, _pspec=None):
@@ -462,8 +473,8 @@ def _schedule_lock():
         secs=int(cfg.get("lock_after_seconds", 300) or 0)
         if secs <=0:
             return
-        if not is_viewer_active():
-            return
+        # Don't gate on is_viewer_active here — windows are only present()'d and fullscreen deferred to idle,
+        # so get_visible may still be false and lock would never schedule on first Show
         from gi.repository import GLib
         def _do_lock():
             global _lock_timeout_id
@@ -491,11 +502,15 @@ def _cancel_lock():
 def _inhibit_overview():
     global _saved_overlay_key
     try:
+        if _saved_overlay_key is not None:
+            # already inhibited — don't overwrite saved value with "''"
+            return
         out = subprocess.run(["gsettings", "get", "org.gnome.mutter", "overlay-key"],
                              capture_output=True, text=True, timeout=2)
         if out.returncode==0:
-            _saved_overlay_key = out.stdout.strip()
-            if _saved_overlay_key != "''":
+            cur = out.stdout.strip()
+            _saved_overlay_key = cur
+            if cur != "''":
                 subprocess.run(["gsettings", "set", "org.gnome.mutter", "overlay-key", "''"],
                                capture_output=True, timeout=2)
     except Exception:
@@ -505,16 +520,35 @@ def _restore_overview():
     global _saved_overlay_key
     try:
         if _saved_overlay_key is not None:
-            # restore only if we changed it
             if _saved_overlay_key != "''":
                 subprocess.run(["gsettings", "set", "org.gnome.mutter", "overlay-key", _saved_overlay_key],
                                capture_output=True, timeout=2)
+            else:
+                # saved was already "''" — ensure we don't leave blank if current is blank
+                cur = subprocess.run(["gsettings", "get", "org.gnome.mutter", "overlay-key"],
+                                     capture_output=True, text=True, timeout=2)
+                if cur.returncode==0 and cur.stdout.strip() == "''":
+                    # restore default Super if we never saved a real value
+                    subprocess.run(["gsettings", "set", "org.gnome.mutter", "overlay-key", "'Super'"],
+                                   capture_output=True, timeout=2)
             _saved_overlay_key=None
         else:
-            # ensure default Super_L if unset
-            pass
+            # no saved value but overlay is blank — fix orphaned blank from crash
+            try:
+                cur = subprocess.run(["gsettings", "get", "org.gnome.mutter", "overlay-key"],
+                                     capture_output=True, text=True, timeout=2)
+                if cur.returncode==0 and cur.stdout.strip() == "''":
+                    subprocess.run(["gsettings", "set", "org.gnome.mutter", "overlay-key", "'Super'"],
+                                   capture_output=True, timeout=2)
+            except Exception:
+                pass
     except Exception:
         pass
+# Ensure overlay restored even on crash / SIGTERM
+try:
+    atexit.register(_restore_overview)
+except Exception:
+    pass
 
 def _daemon_switch_to_active_watch():
     """If daemon IdleMonitor is active, switch idle→active so mouse movement hides even manual Show (if close_on_mouse)."""
@@ -569,11 +603,17 @@ def _daemon_switch_to_idle_watch():
 
 def show_viewer():
     """Show screensaver viewer in this process (non-blocking, creates windows)."""
-    global _viewer_windows
+    global _viewer_windows, _is_showing
+    if _is_showing:
+        return True
     if is_viewer_active():
         return True
+    _is_showing = True
     cfg = load_config()
     html_path = get_active_html_path(cfg)
+    if html_path is None:
+        _is_showing = False
+        return False
     clock_format = cfg.get("clock_format", "24h")
     try:
         # Defensive: clear stale refs before creating new (ghost prevention)
@@ -589,11 +629,30 @@ def show_viewer():
         import traceback
         traceback.print_exc()
         return False
+    finally:
+        _is_showing = False
 
 
 def hide_viewer():
     """Hide/destroy viewer windows in this process. Thorough cleanup to prevent ghost dash/bwrap leak."""
-    global _viewer_windows
+    global _viewer_windows, _is_showing, _pending_sources
+    # Cancel any pending fullscreen/gc sources from previous Show (leaked GLib sources)
+    try:
+        from gi.repository import GLib
+        ctx = GLib.MainContext.default()
+        for sid in list(_pending_sources):
+            try:
+                if ctx.find_source_by_id(sid) is not None:
+                    GLib.source_remove(sid)
+            except Exception:
+                pass
+        _pending_sources.clear()
+    except Exception:
+        try:
+            _pending_sources.clear()
+        except Exception:
+            pass
+    _is_showing = False
     to_close = list(_viewer_windows)
     try:
         import gi
@@ -836,6 +895,8 @@ def start():
     # Fallback: standalone viewer (blocking)
     cfg = load_config()
     html_path = get_active_html_path(cfg)
+    if html_path is None:
+        sys.exit(1)
     clock_format = cfg.get("clock_format", "24h")
     # For standalone, we need to run a Gtk loop blocking
     try:
@@ -885,20 +946,41 @@ def stop():
     # If we were in standalone loop, the loop will quit via check_closed
     # But if called as separate `ctl stop` process while standalone viewer is in another process,
     # we can't affect that process's windows (different process). Need to find and kill that viewer process.
-    # Try pkill fallback for standalone viewer
+    # Try pkill fallback for standalone viewer — scoped to user and exact argv to avoid killing daemon/gui
     try:
-        # Find standalone viewer processes (material-screensaver-ctl.py start) and SIGTERM them
-        # Use pkill pattern; best effort
-        subprocess.run(["pkill", "-f", "material-screensaver-ctl.py start"], capture_output=True)
+        import getpass
+        user = getpass.getuser()
+        subprocess.run(["pkill", "-u", user, "-f", r"material-screensaver-ctl\.py start(\b| )"],
+                       capture_output=True, timeout=2)
     except Exception:
-        pass
+        try:
+            subprocess.run(["pkill", "-f", "material-screensaver-ctl.py start"], capture_output=True, timeout=2)
+        except Exception:
+            pass
 
 
 def toggle():
-    if is_running():
-        stop()
+    # Use daemon atomic Toggle if available (avoids IsActive→Show race)
+    ok, _ = _call_daemon("Toggle")
+    if ok:
+        return
+    if is_viewer_active():
+        hide_viewer()
     else:
-        start()
+        # fallback local toggle
+        cfg = load_config()
+        html_path = get_active_html_path(cfg)
+        if html_path is None:
+            return
+        clock_format = cfg.get("clock_format", "24h")
+        try:
+            global _viewer_windows
+            _viewer_windows = _create_viewer_windows(html_path, clock_format)
+            _inhibit()
+            _inhibit_overview()
+            _schedule_lock()
+        except Exception:
+            pass
 
 
 def run_daemon():
@@ -916,6 +998,36 @@ def run_daemon():
     # Hold to keep app running without windows
     try:
         app.hold()
+    except Exception:
+        pass
+
+    # Ensure overlay/hold cleaned on SIGTERM/SIGINT (systemd stop)
+    try:
+        def _sig_handler(*_a):
+            try:
+                _restore_overview()
+            except Exception:
+                pass
+            try:
+                _uninhibit()
+            except Exception:
+                pass
+            try:
+                _cancel_lock()
+            except Exception:
+                pass
+            try:
+                app.release()
+            except Exception:
+                pass
+            try:
+                GLib.MainLoop().quit
+            except Exception:
+                pass
+            return False
+        GLib.unix_signal_add(GLib.PRIORITY_DEFAULT, signal.SIGTERM, _sig_handler)
+        GLib.unix_signal_add(GLib.PRIORITY_DEFAULT, signal.SIGINT, _sig_handler)
+        GLib.unix_signal_add(GLib.PRIORITY_DEFAULT, signal.SIGHUP, _sig_handler)
     except Exception:
         pass
 

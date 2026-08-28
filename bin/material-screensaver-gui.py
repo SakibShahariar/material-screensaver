@@ -47,8 +47,24 @@ def save_config(**updates):
     cfg = load_config()
     cfg.update(updates)
     os.makedirs(os.path.dirname(CONFIG_PATH), exist_ok=True)
-    with open(CONFIG_PATH, "w") as f:
-        json.dump(cfg, f, indent=2)
+    tmp = CONFIG_PATH + ".tmp"
+    try:
+        with open(tmp, "w") as f:
+            json.dump(cfg, f, indent=2)
+            f.flush()
+            os.fsync(f.fileno())
+        os.rename(tmp, CONFIG_PATH)
+    except Exception:
+        try:
+            with open(CONFIG_PATH, "w") as f:
+                json.dump(cfg, f, indent=2)
+        except Exception:
+            pass
+        try:
+            if os.path.exists(tmp):
+                os.remove(tmp)
+        except Exception:
+            pass
 
 
 def display_name(filename):
