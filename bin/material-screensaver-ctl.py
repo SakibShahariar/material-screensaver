@@ -288,23 +288,27 @@ def _create_viewer_windows(html_path, clock_format="24h"):
         win.set_child(web)
 
         def on_key(ctrl, keyval, keycode, state, _win=win):
-            # Only Super+Q closes — requested
+            # Only Super+Q closes, Super alone is consumed (no overview, no close)
             try:
                 from gi.repository import Gdk
                 is_q = keyval in (Gdk.KEY_q, Gdk.KEY_Q)
                 has_super = bool(state & Gdk.ModifierType.SUPER_MASK)
+                is_super = keyval in (Gdk.KEY_Super_L, Gdk.KEY_Super_R, Gdk.KEY_Meta_L, Gdk.KEY_Meta_R, 65515, 65516)
                 if is_q and has_super:
                     hide_viewer()
                     return True
+                if is_super:
+                    return True
                 return False
             except Exception:
-                # fallback: check Super+Q via accelerator
                 try:
                     from gi.repository import Gtk
                     if Gtk.accelerator_valid(keyval, state):
                         name = Gtk.accelerator_name(keyval, state)
                         if name == "<Super>q":
                             hide_viewer()
+                            return True
+                        if name in ("Super_L", "Super_R", "<Super>Super_L", "<Super>Super_R"):
                             return True
                 except Exception:
                     pass
