@@ -37,7 +37,7 @@ BROWSER_LABELS = ["Auto-detect", "Firefox", "Helium", "Helium (AUR build)", "Chr
 
 
 def load_config():
-    cfg = {"active": None, "idle_seconds": 300, "browser": "auto"}
+    cfg = {"active": None, "idle_seconds": 300, "browser": "auto", "clock_format": "24h", "random": False}
     if os.path.exists(CONFIG_PATH):
         try:
             with open(CONFIG_PATH) as f:
