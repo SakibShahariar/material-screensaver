@@ -214,10 +214,28 @@ def _create_viewer_windows(html_path, clock_format="24h"):
         except Exception:
             pass
 
-        # Present and fullscreen
+        # Ensure window covers monitor geometry before fullscreen
+        try:
+            if mon is not None:
+                geom = mon.get_geometry()
+                win.set_default_size(geom.width, geom.height)
+        except Exception:
+            pass
+        # Hide from taskbar/dash where possible (best effort)
+        try:
+            win.set_hide_on_close(False)
+        except Exception:
+            pass
+
+        # Present and fullscreen (order matters on Wayland: present first, then fullscreen)
         win.present()
         try:
             win.fullscreen()
+        except Exception:
+            pass
+        # Ensure visible and on top
+        try:
+            win.set_visible(True)
         except Exception:
             pass
 
@@ -287,15 +305,62 @@ def hide_viewer():
                 from gi.repository import Gdk
                 display = Gdk.Display.get_default()
                 if display:
-                    display.get_default_seat().ungrab()
+                    try:
+                        display.get_default_seat().ungrab()
+                    except Exception:
+                        pass
             except Exception:
                 pass
-            w.close()
-            w.destroy() if hasattr(w, "destroy") else None
+            # Stop WebView loading before close
+            try:
+                child = w.get_child()
+                if child is not None:
+                    try:
+                        child.stop_loading()
+                    except Exception:
+                        pass
+                    try:
+                        child.load_uri("about:blank")
+                    except Exception:
+                        pass
+                    # Force terminate web process to free bwrap/CPU
+                    try:
+                        child.terminate_web_process()
+                    except Exception:
+                        pass
+            except Exception:
+                pass
+            try:
+                w.close()
+            except Exception:
+                pass
+            try:
+                w.set_visible(False)
+            except Exception:
+                pass
+            # Also try to destroy child explicitly
+            try:
+                child = w.get_child()
+                if child is not None:
+                    try:
+                        w.set_child(None)
+                    except Exception:
+                        pass
+                    try:
+                        child.unparent()
+                    except Exception:
+                        pass
+            except Exception:
+                pass
         except Exception:
             pass
     _viewer_windows = []
     _uninhibit()
+    try:
+        import gc
+        gc.collect()
+    except Exception:
+        pass
     return True
 
 
