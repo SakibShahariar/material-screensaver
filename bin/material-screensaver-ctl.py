@@ -305,11 +305,56 @@ def _create_viewer_windows(html_path, clock_format="24h"):
                     pass
                 return False
         def on_click(ctrl, n_press, x, y, _win=win):
-            # Disabled — only Super+Q closes
+            # Disabled — only Super+Q closes, but show cursor briefly on click
+            try:
+                _show_cursor_temporarily(_win)
+            except Exception:
+                pass
             return
         def on_motion(ctrl, x, y, _win=win):
-            # Disabled — only Super+Q closes (ignore close_on_mouse)
+            # Only Super+Q closes — motion just shows cursor briefly
+            try:
+                _show_cursor_temporarily(_win)
+            except Exception:
+                pass
             return
+        # cursor helpers — hidden by default, show 1.2s on movement
+        def _hide_cursor(w):
+            try:
+                c = Gdk.Cursor.new_from_name("none", None)
+                if c is None:
+                    c = Gdk.Cursor.new_from_name("default", None)
+                    # fallback blank via CSS already
+                    return
+                w.set_cursor(c)
+            except Exception:
+                try:
+                    w.set_cursor(None)
+                except Exception:
+                    pass
+        def _show_cursor_temporarily(w):
+            try:
+                # show default cursor
+                try:
+                    w.set_cursor(Gdk.Cursor.new_from_name("default", None))
+                except Exception:
+                    w.set_cursor(None)
+                # hide again after 1200ms
+                from gi.repository import GLib as _GLib2
+                def _rehide():
+                    try:
+                        _hide_cursor(w)
+                    except Exception:
+                        pass
+                    return False
+                _GLib2.timeout_add(1200, _rehide)
+            except Exception:
+                pass
+        # initially hide cursor even after launch
+        try:
+            _hide_cursor(win)
+        except Exception:
+            pass
         try:
             key_ctrl = Gtk.EventControllerKey()
             key_ctrl.connect("key-pressed", on_key)
@@ -350,6 +395,11 @@ def _create_viewer_windows(html_path, clock_format="24h"):
                 surf = w.get_surface()
                 if seat and surf:
                     seat.grab(surf, Gdk.SeatCapabilities.ALL, True, None, None, None, None)
+            except Exception:
+                pass
+            # ensure cursor hidden after launch (even if compositor reset it)
+            try:
+                _hide_cursor(w)
             except Exception:
                 pass
             return False
