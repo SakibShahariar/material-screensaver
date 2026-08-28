@@ -662,68 +662,13 @@ def run_daemon():
     app.connect("startup", on_startup)
     app.connect("activate", on_activate)
 
-    # Register app without running its own loop, then use GLib loop (keeps idle low)
+    # Use app.run (not register+GLib) — required for Wayland ApplicationWindow to map fullscreen correctly
     try:
-        app.register(None)
-    except Exception:
-        pass
-    # Also run startup manually if not yet called (register triggers startup)
-    # Fallback: ensure watches are setup even if startup not fired yet
-    try:
-        if bus is None:
-            setup_idle_watches()
-            # Own D-Bus name if not yet owned via startup
-            try:
-                def _acquire(conn, name):
-                    try:
-                        node_xml = f"""
-                        <node>
-                          <interface name="{INTERFACE_NAME}">
-                            <method name="Show"/>
-                            <method name="Hide"/>
-                            <method name="Toggle"/>
-                            <method name="IsActive">
-                              <arg type="b" name="active" direction="out"/>
-                            </method>
-                          </interface>
-                        </node>
-                        """
-                        from gi.repository import Gio as Gio3
-                        node_info = Gio3.DBusNodeInfo.new_for_xml(node_xml)
-                        iface_info = node_info.interfaces[0]
-                        def _on_method(conn, sender, path, iface, method, params, invocation):
-                            try:
-                                if method == "Show":
-                                    show_viewer()
-                                    invocation.return_value(None)
-                                elif method == "Hide":
-                                    hide_viewer()
-                                    invocation.return_value(None)
-                                elif method == "Toggle":
-                                    hide_viewer() if is_viewer_active() else show_viewer()
-                                    invocation.return_value(None)
-                                elif method == "IsActive":
-                                    invocation.return_value(GLib.Variant("(b)", (is_viewer_active(),)))
-                                else:
-                                    invocation.return_error_literal(Gio.DBusError, Gio.DBusError.UNKNOWN_METHOD, "Unknown method")
-                            except Exception as e:
-                                invocation.return_error_literal(Gio.DBusError, Gio.DBusError.FAILED, str(e))
-                        conn.register_object(OBJECT_PATH, iface_info, _on_method, None, None)
-                    except Exception as e:
-                        print(f"Failed to export D-Bus object (fallback): {e}", file=sys.stderr)
-                Gio.bus_own_name(Gio.BusType.SESSION, SERVICE_NAME, Gio.BusNameOwnerFlags.NONE, _acquire, lambda *_: None, lambda *_: None)
-            except Exception:
-                pass
-    except Exception:
-        pass
-
-    # Run GLib main loop (instead of app.run to keep idle CPU low)
-    try:
-        GLib.MainLoop().run()
+        app.run(None)
     except Exception as e:
-        print(f"MainLoop failed: {e}", file=sys.stderr)
+        print(f"app.run failed: {e}", file=sys.stderr)
         try:
-            app.run(None)
+            GLib.MainLoop().run()
         except Exception:
             pass
 
