@@ -161,7 +161,20 @@ def run_daemon():
         # re-read config each time so GUI changes apply without restarting the service
         return int(load_config().get("idle_seconds", 300))
 
+    def remove_watch(kind):
+        wid = watch_ids.get(kind)
+        if wid is not None:
+            try:
+                proxy.call_sync(
+                    "RemoveWatch", GLib.Variant("(u)", (wid,)),
+                    Gio.DBusCallFlags.NONE, -1, None,
+                )
+            except Exception:
+                pass
+            watch_ids[kind] = None
+
     def add_idle_watch():
+        remove_watch("idle")
         result = proxy.call_sync(
             "AddIdleWatch", GLib.Variant("(t)", (current_idle_seconds() * 1000,)),
             Gio.DBusCallFlags.NONE, -1, None,
@@ -169,6 +182,7 @@ def run_daemon():
         watch_ids["idle"] = result.unpack()[0]
 
     def add_active_watch():
+        remove_watch("active")
         result = proxy.call_sync(
             "AddUserActiveWatch", None, Gio.DBusCallFlags.NONE, -1, None,
         )
