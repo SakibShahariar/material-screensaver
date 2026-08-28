@@ -27,7 +27,7 @@ import subprocess
 
 SCREENSAVER_DIR = os.path.expanduser("~/.local/share/material-screensaver/screensavers")
 CONFIG_PATH = os.path.expanduser("~/.config/material-screensaver/config.json")
-DEFAULT_CONFIG = {"active": None, "idle_seconds": 300, "clock_format": "24h", "random": False, "browser": "auto"}
+DEFAULT_CONFIG = {"active": None, "idle_seconds": 300, "clock_format": "24h", "random": False, "browser": "auto", "lock_after_seconds": 300}
 
 # D-Bus service for daemon delegation (PID file gone)
 SERVICE_NAME = "io.github.sakib.MaterialScreensaver"
@@ -41,6 +41,7 @@ _viewer_inhibit_proxy = None
 _daemon_app = None  # Gtk.Application for daemon (Wayland fullscreen needs ApplicationWindow)
 _idle_proxy = None  # Gio.DBusProxy for org.gnome.Mutter.IdleMonitor (daemon only)
 _idle_watch_ids = {"idle": None, "active": None}
+_lock_timeout_id = None  # GLib source id for lock after screensaver
 
 
 def load_config():
@@ -412,6 +413,66 @@ def is_viewer_active():
     return False
 
 
+def _lock_screen():
+    """Lock GNOME session — used after screensaver has been visible for lock_after_seconds."""
+    try:
+        # Try GNOME ScreenSaver first
+        subprocess.run(["gdbus", "call", "--session", "--dest", "org.gnome.ScreenSaver",
+                        "--object-path", "/org/gnome/ScreenSaver",
+                        "--method", "org.gnome.ScreenSaver.Lock"],
+                       capture_output=True, timeout=3)
+        return
+    except Exception:
+        pass
+    try:
+        subprocess.run(["loginctl", "lock-session"], capture_output=True, timeout=3)
+    except Exception:
+        pass
+    try:
+        subprocess.run(["xdg-screensaver", "lock"], capture_output=True, timeout=3)
+    except Exception:
+        pass
+
+def _schedule_lock():
+    global _lock_timeout_id
+    try:
+        if _lock_timeout_id is not None:
+            try:
+                from gi.repository import GLib
+                GLib.source_remove(_lock_timeout_id)
+            except Exception:
+                pass
+            _lock_timeout_id=None
+        cfg=load_config()
+        secs=int(cfg.get("lock_after_seconds", 300) or 0)
+        if secs <=0:
+            return
+        if not is_viewer_active():
+            return
+        from gi.repository import GLib
+        def _do_lock():
+            global _lock_timeout_id
+            _lock_timeout_id=None
+            if is_viewer_active():
+                _lock_screen()
+            return False
+        _lock_timeout_id = GLib.timeout_add_seconds(secs, _do_lock)
+    except Exception:
+        pass
+
+def _cancel_lock():
+    global _lock_timeout_id
+    try:
+        if _lock_timeout_id is not None:
+            from gi.repository import GLib
+            try:
+                GLib.source_remove(_lock_timeout_id)
+            except Exception:
+                pass
+            _lock_timeout_id=None
+    except Exception:
+        pass
+
 def _daemon_switch_to_active_watch():
     """If daemon IdleMonitor is active, switch idle→active so mouse movement hides even manual Show."""
     try:
@@ -472,6 +533,7 @@ def show_viewer():
         _viewer_windows = _create_viewer_windows(html_path, clock_format)
         _inhibit()
         _daemon_switch_to_active_watch()
+        _schedule_lock()
         return True
     except Exception as e:
         print(f"Failed to show screensaver: {e}", file=sys.stderr)
@@ -499,6 +561,8 @@ def hide_viewer():
     if not to_close:
         _viewer_windows = []
         _uninhibit()
+        _cancel_lock()
+        _daemon_switch_to_idle_watch()
         # Ghost bwrap may remain even when no visible window — still kill (second-show ghost)
         try:
             _kill_orphan_webkit()
@@ -595,6 +659,7 @@ def hide_viewer():
             pass
     _viewer_windows = []
     _uninhibit()
+    _cancel_lock()
     _daemon_switch_to_idle_watch()
     # Clear WebKit caches to prevent memory creep
     try:

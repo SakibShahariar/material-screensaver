@@ -33,7 +33,7 @@ def get_keybinding_settings():
     return child
 
 def load_config():
-    cfg = {"active": None, "idle_seconds": 300, "browser": "auto", "clock_format": "24h", "random": False}
+    cfg = {"active": None, "idle_seconds": 300, "browser": "auto", "clock_format": "24h", "random": False, "lock_after_seconds": 300}
     if os.path.exists(CONFIG_PATH):
         try:
             with open(CONFIG_PATH) as f:
@@ -108,6 +108,10 @@ class ScreensaverWindow(Adw.ApplicationWindow):
         self.idle_row.set_title("Idle timeout")
         self.idle_row.set_subtitle("Minutes before auto-launch")
         timing_group.add(self.idle_row)
+        self.lock_row = Adw.SpinRow.new_with_range(0, 60, 1)
+        self.lock_row.set_title("Lock after")
+        self.lock_row.set_subtitle("Minutes on screensaver before lock (0 = never)")
+        timing_group.add(self.lock_row)
 
         # --- Clock format ---
         clock_group = Adw.PreferencesGroup(title="Clock")
@@ -163,6 +167,7 @@ class ScreensaverWindow(Adw.ApplicationWindow):
         self.random_switch.connect("notify::active", self.on_random_toggled)
         self.combo_row.connect("notify::selected", self.on_screensaver_changed)
         self.idle_row.connect("notify::value", self.on_idle_changed)
+        self.lock_row.connect("notify::value", self.on_lock_changed)
         self.ampm_switch.connect("notify::active", self.on_ampm_toggled)
         self.autostart_switch.connect("notify::active", self.on_autostart_toggled)
 
@@ -179,6 +184,7 @@ class ScreensaverWindow(Adw.ApplicationWindow):
             self.combo_row.set_selected(idx)
 
         self.idle_row.set_value(cfg.get("idle_seconds", 300) / 60)
+        self.lock_row.set_value(cfg.get("lock_after_seconds", 300) / 60)
 
         self.ampm_switch.set_active(cfg.get("clock_format", "24h") == "12h")
 
@@ -249,6 +255,9 @@ class ScreensaverWindow(Adw.ApplicationWindow):
 
     def on_idle_changed(self, row, _pspec):
         save_config(idle_seconds=int(row.get_value() * 60))
+
+    def on_lock_changed(self, row, _pspec):
+        save_config(lock_after_seconds=int(row.get_value() * 60))
 
     def on_ampm_toggled(self, switch, _pspec):
         save_config(clock_format="12h" if switch.get_active() else "24h")
