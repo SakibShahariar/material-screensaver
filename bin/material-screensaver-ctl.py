@@ -42,6 +42,7 @@ _daemon_app = None  # Gtk.Application for daemon (Wayland fullscreen needs Appli
 _idle_proxy = None  # Gio.DBusProxy for org.gnome.Mutter.IdleMonitor (daemon only)
 _idle_watch_ids = {"idle": None, "active": None}
 _lock_timeout_id = None  # GLib source id for lock after screensaver
+_saved_overlay_key = None  # saved org.gnome.mutter overlay-key while Super+Q is exclusive
 
 
 def load_config():
@@ -487,6 +488,34 @@ def _cancel_lock():
     except Exception:
         pass
 
+def _inhibit_overview():
+    global _saved_overlay_key
+    try:
+        out = subprocess.run(["gsettings", "get", "org.gnome.mutter", "overlay-key"],
+                             capture_output=True, text=True, timeout=2)
+        if out.returncode==0:
+            _saved_overlay_key = out.stdout.strip()
+            if _saved_overlay_key != "''":
+                subprocess.run(["gsettings", "set", "org.gnome.mutter", "overlay-key", "''"],
+                               capture_output=True, timeout=2)
+    except Exception:
+        pass
+
+def _restore_overview():
+    global _saved_overlay_key
+    try:
+        if _saved_overlay_key is not None:
+            # restore only if we changed it
+            if _saved_overlay_key != "''":
+                subprocess.run(["gsettings", "set", "org.gnome.mutter", "overlay-key", _saved_overlay_key],
+                               capture_output=True, timeout=2)
+            _saved_overlay_key=None
+        else:
+            # ensure default Super_L if unset
+            pass
+    except Exception:
+        pass
+
 def _daemon_switch_to_active_watch():
     """If daemon IdleMonitor is active, switch idle→active so mouse movement hides even manual Show (if close_on_mouse)."""
     try:
@@ -551,6 +580,7 @@ def show_viewer():
         _viewer_windows = []
         _viewer_windows = _create_viewer_windows(html_path, clock_format)
         _inhibit()
+        _inhibit_overview()
         _daemon_switch_to_active_watch()
         _schedule_lock()
         return True
@@ -580,6 +610,7 @@ def hide_viewer():
     if not to_close:
         _viewer_windows = []
         _uninhibit()
+        _restore_overview()
         _cancel_lock()
         _daemon_switch_to_idle_watch()
         # Ghost bwrap may remain even when no visible window — still kill (second-show ghost)
@@ -678,6 +709,7 @@ def hide_viewer():
             pass
     _viewer_windows = []
     _uninhibit()
+    _restore_overview()
     _cancel_lock()
     _daemon_switch_to_idle_watch()
     # Clear WebKit caches to prevent memory creep
