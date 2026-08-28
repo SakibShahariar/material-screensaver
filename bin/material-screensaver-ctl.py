@@ -262,14 +262,26 @@ def _create_viewer_windows(html_path, clock_format="24h"):
 def is_viewer_active():
     """Local check (no D-Bus). True if we have visible viewer windows in this process."""
     global _viewer_windows
-    if not _viewer_windows:
-        return False
-    for w in _viewer_windows:
+    # Check tracked windows first
+    for w in list(_viewer_windows):
         try:
             if w.get_visible():
                 return True
         except Exception:
             continue
+    # Fallback: check any toplevel ghost windows
+    try:
+        import gi
+        gi.require_version("Gtk", "4.0")
+        from gi.repository import Gtk
+        for tl in Gtk.Window.list_toplevels():
+            try:
+                if tl.get_title() == "Material Screensaver" and tl.get_visible():
+                    return True
+            except Exception:
+                continue
+    except Exception:
+        pass
     return False
 
 
@@ -293,10 +305,25 @@ def show_viewer():
 def hide_viewer():
     """Hide/destroy viewer windows in this process."""
     global _viewer_windows
-    if not _viewer_windows:
+    # Also collect any orphaned toplevels (ghost windows not in _viewer_windows)
+    to_close = list(_viewer_windows)
+    try:
+        import gi
+        gi.require_version("Gtk", "4.0")
+        from gi.repository import Gtk
+        for tl in Gtk.Window.list_toplevels():
+            try:
+                if tl.get_title() == "Material Screensaver" and tl not in to_close:
+                    to_close.append(tl)
+            except Exception:
+                pass
+    except Exception:
+        pass
+    if not to_close:
+        _viewer_windows = []
         _uninhibit()
         return False
-    for w in list(_viewer_windows):
+    for w in list(to_close):
         try:
             # ungrab seat
             try:
@@ -323,7 +350,6 @@ def hide_viewer():
                         child.load_uri("about:blank")
                     except Exception:
                         pass
-                    # Force terminate web process to free bwrap/CPU
                     try:
                         child.terminate_web_process()
                     except Exception:
@@ -338,7 +364,6 @@ def hide_viewer():
                 w.set_visible(False)
             except Exception:
                 pass
-            # Also try to destroy child explicitly
             try:
                 child = w.get_child()
                 if child is not None:
