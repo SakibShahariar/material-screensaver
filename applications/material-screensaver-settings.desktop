@@ -2,8 +2,8 @@
 Type=Application
 Name=Material Screensaver Settings
 Comment=Choose and configure your Material screensaver
-Exec=/home/sakib/.local/bin/material-screensaver-gui.py
-Icon=/home/sakib/.local/share/icons/material-screensaver.png
+Exec=material-screensaver-gui.py
+Icon=material-screensaver
 Terminal=false
 Categories=Settings;GTK;
 StartupNotify=true
