@@ -77,8 +77,8 @@ class ScreensaverWindow(Adw.ApplicationWindow):
 
         self.random_switch = Gtk.Switch(valign=Gtk.Align.CENTER)
         random_row = Adw.ActionRow(
-            title="Pick a random screensaver each time",
-            subtitle="Overrides the active screensaver below — a fresh random pick on every launch",
+            title="Random each time",
+            subtitle="Pick randomly on every launch",
         )
         random_row.add_suffix(self.random_switch)
         random_row.set_activatable_widget(self.random_switch)
@@ -96,7 +96,7 @@ class ScreensaverWindow(Adw.ApplicationWindow):
 
         note = Adw.ActionRow(
             title="Add more later",
-            subtitle=f"Drop a new .html file into {SCREENSAVER_DIR} and it shows up here automatically.",
+            subtitle=f"Drop .html files into {SCREENSAVER_DIR}",
         )
         note.add_css_class("dim-label")
         sv_group.add(note)
@@ -105,8 +105,8 @@ class ScreensaverWindow(Adw.ApplicationWindow):
         timing_group = Adw.PreferencesGroup(title="Timing")
         page.add(timing_group)
         self.idle_row = Adw.SpinRow.new_with_range(1, 120, 1)
-        self.idle_row.set_title("Idle timeout (minutes)")
-        self.idle_row.set_subtitle("How long to wait before launching automatically")
+        self.idle_row.set_title("Idle timeout")
+        self.idle_row.set_subtitle("Minutes before auto-launch")
         timing_group.add(self.idle_row)
 
         # --- Clock format ---
@@ -123,8 +123,8 @@ class ScreensaverWindow(Adw.ApplicationWindow):
         page.add(auto_group)
         self.autostart_switch = Gtk.Switch(valign=Gtk.Align.CENTER)
         autostart_row = Adw.ActionRow(
-            title="Run automatically when idle",
-            subtitle="Uses a systemd user service to watch for idle/activity",
+            title="Run automatically",
+            subtitle="Launch when idle (systemd service)",
         )
         autostart_row.add_suffix(self.autostart_switch)
         autostart_row.set_activatable_widget(self.autostart_switch)
