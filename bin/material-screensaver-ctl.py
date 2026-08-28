@@ -45,6 +45,7 @@ _idle_proxy = None  # Gio.DBusProxy for org.gnome.Mutter.IdleMonitor (daemon onl
 _idle_watch_ids = {"idle": None, "active": None}
 _lock_timeout_id = None  # GLib source id for lock after screensaver
 _saved_overlay_key = None  # saved org.gnome.mutter overlay-key while Super+Q is exclusive
+_saved_shell_toggle = None  # saved shell toggle-overview
 _is_showing = False  # guard double-Show TOCTOU
 _pending_sources = []  # GLib source ids for fullscreen retry / gc to cancel on Hide
 _ephemeral_ctx = None  # single ephemeral WebContext reused across Shows (fixes per-Show leak)
@@ -585,10 +586,11 @@ def _cancel_lock():
         pass
 
 def _inhibit_overview():
-    global _saved_overlay_key
+    global _saved_overlay_key, _saved_shell_toggle
     try:
         if _saved_overlay_key is not None:
             return
+        # mutter overlay-key — main Super→overview
         out = subprocess.run(["gsettings", "get", "org.gnome.mutter", "overlay-key"],
                              capture_output=True, text=True, timeout=2)
         if out.returncode==0:
@@ -597,29 +599,31 @@ def _inhibit_overview():
             if cur != "''":
                 subprocess.run(["gsettings", "set", "org.gnome.mutter", "overlay-key", "''"],
                                capture_output=True, timeout=2)
-                # verify and retry with dconf if needed
-                try:
-                    chk = subprocess.run(["gsettings", "get", "org.gnome.mutter", "overlay-key"],
-                                         capture_output=True, text=True, timeout=2)
-                    if chk.returncode==0 and chk.stdout.strip() != "''":
-                        subprocess.run(["dconf", "write", "/org/gnome/mutter/overlay-key", "''"],
-                                       capture_output=True, timeout=2)
-                except Exception:
-                    pass
-            # also blank shell toggle-overview if it contains Super
+                subprocess.run(["dconf", "write", "/org/gnome/mutter/overlay-key", "''"],
+                               capture_output=True, timeout=2)
+            # verify
             try:
-                out2 = subprocess.run(["gsettings", "get", "org.gnome.shell.keybindings", "toggle-overview"],
-                                      capture_output=True, text=True, timeout=2)
-                if out2.returncode==0 and "'<Super>" in out2.stdout:
-                    subprocess.run(["gsettings", "set", "org.gnome.shell.keybindings", "toggle-overview", "@as []"],
+                chk = subprocess.run(["gsettings", "get", "org.gnome.mutter", "overlay-key"],
+                                     capture_output=True, text=True, timeout=2)
+                if chk.returncode==0 and chk.stdout.strip() != "''":
+                    subprocess.run(["dconf", "write", "/org/gnome/mutter/overlay-key", "''"],
                                    capture_output=True, timeout=2)
             except Exception:
                 pass
-            # log for debug
-            try:
-                print(f"[overview] inhibited {cur} -> ''", file=sys.stderr)
-            except Exception:
-                pass
+        # shell toggle-overview if it was bound to Super
+        try:
+            out2 = subprocess.run(["gsettings", "get", "org.gnome.shell.keybindings", "toggle-overview"],
+                                  capture_output=True, text=True, timeout=2)
+            if out2.returncode==0 and "'<Super" in out2.stdout:
+                _saved_shell_toggle = out2.stdout.strip()
+                subprocess.run(["gsettings", "set", "org.gnome.shell.keybindings", "toggle-overview", "@as []"],
+                               capture_output=True, timeout=2)
+        except Exception:
+            pass
+        try:
+            print(f"[overview] inhibited overlay={_saved_overlay_key} shell={_saved_shell_toggle}", file=sys.stderr)
+        except Exception:
+            pass
     except Exception as e:
         try:
             print(f"[overview] inhibit failed {e}", file=sys.stderr)
@@ -627,11 +631,13 @@ def _inhibit_overview():
             pass
 
 def _restore_overview():
-    global _saved_overlay_key
+    global _saved_overlay_key, _saved_shell_toggle
     try:
         if _saved_overlay_key is not None:
             if _saved_overlay_key not in ("''", ""):
                 subprocess.run(["gsettings", "set", "org.gnome.mutter", "overlay-key", _saved_overlay_key],
+                               capture_output=True, timeout=2)
+                subprocess.run(["dconf", "write", "/org/gnome/mutter/overlay-key", _saved_overlay_key],
                                capture_output=True, timeout=2)
             else:
                 cur = subprocess.run(["gsettings", "get", "org.gnome.mutter", "overlay-key"],
@@ -639,13 +645,9 @@ def _restore_overview():
                 if cur.returncode==0 and cur.stdout.strip() == "''":
                     subprocess.run(["gsettings", "set", "org.gnome.mutter", "overlay-key", "'Super'"],
                                    capture_output=True, timeout=2)
+                    subprocess.run(["dconf", "write", "/org/gnome/mutter/overlay-key", "'Super'"],
+                                   capture_output=True, timeout=2)
             _saved_overlay_key=None
-            # restore shell toggle-overview if we blanked it
-            try:
-                subprocess.run(["gsettings", "reset", "org.gnome.shell.keybindings", "toggle-overview"],
-                               capture_output=True, timeout=2)
-            except Exception:
-                pass
         else:
             try:
                 cur = subprocess.run(["gsettings", "get", "org.gnome.mutter", "overlay-key"],
@@ -653,8 +655,21 @@ def _restore_overview():
                 if cur.returncode==0 and cur.stdout.strip() == "''":
                     subprocess.run(["gsettings", "set", "org.gnome.mutter", "overlay-key", "'Super'"],
                                    capture_output=True, timeout=2)
+                    subprocess.run(["dconf", "write", "/org/gnome/mutter/overlay-key", "'Super'"],
+                                   capture_output=True, timeout=2)
             except Exception:
                 pass
+        if _saved_shell_toggle is not None:
+            try:
+                subprocess.run(["gsettings", "set", "org.gnome.shell.keybindings", "toggle-overview", _saved_shell_toggle],
+                               capture_output=True, timeout=2)
+            except Exception:
+                try:
+                    subprocess.run(["gsettings", "reset", "org.gnome.shell.keybindings", "toggle-overview"],
+                                   capture_output=True, timeout=2)
+                except Exception:
+                    pass
+            _saved_shell_toggle=None
     except Exception:
         pass
 # Ensure overlay restored even on crash / SIGTERM
