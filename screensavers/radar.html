@@ -31,7 +31,7 @@ canvas { display: block; width: 100vw; height: 100vh; }
   border-radius: 20px;
   background: radial-gradient(
     ellipse at 30% 70%,
-    rgb(var(--surface_rgb) / .88) 0%,
+    rgb(var(--surface_rgb) / .9) 0%,
     rgb(var(--surface_rgb) / .55) 55%,
     transparent 100%
   );
@@ -85,7 +85,7 @@ canvas { display: block; width: 100vw; height: 100vh; }
 }
 #hint.show { opacity: .7; }
 </style>
-<link rel="stylesheet" href="file:///home/sakib/.config/matugen/matugen-colors.css">
+<link rel="stylesheet" href="matugen-colors.css">
 </head>
 <body>
 <canvas id="c"></canvas>
@@ -108,12 +108,14 @@ const clockWrap = document.getElementById("clock-wrap");
 let W = 0, H = 0, DPR = 1, cx = 0, cy = 0, radarR = 1;
 let theme = {};
 let blips = [];
+let trails = [];
 let start = performance.now();
 let cursorTimer;
 
-const SWEEP_PERIOD = 5.5;
+const SWEEP_A = 5.2;
+const SWEEP_B = 7.8;
 const reduceMotion = matchMedia("(prefers-reduced-motion: reduce)").matches;
-const speedMul = reduceMotion ? 0.3 : 0.85;
+const speedMul = reduceMotion ? 0.3 : 0.8;
 
 function readRGB(name, fb = [160, 160, 160]) {
   const r = getComputedStyle(document.documentElement).getPropertyValue(name).trim();
@@ -142,15 +144,17 @@ function loadTheme() {
 
 function initBlips() {
   blips = [];
-  for (let i = 0; i < 12; i++) {
+  for (let i = 0; i < 14; i++) {
     blips.push({
       angle: Math.random() * Math.PI * 2,
-      dist: (0.22 + Math.random() * 0.72) * radarR,
+      dist: (0.2 + Math.random() * 0.72) * radarR,
       lit: 0,
       lastHit: -10,
-      size: 2.4 + Math.random() * 2.2
+      size: 2.2 + Math.random() * 2.4,
+      drift: (Math.random() - 0.5) * 0.04
     });
   }
+  trails = [];
 }
 
 function resize() {
@@ -165,27 +169,47 @@ function resize() {
 }
 addEventListener("resize", resize, { passive: true });
 
+function drawSweep(angle, color, strength) {
+  const segments = 48;
+  for (let k = 0; k < segments; k++) {
+    const a = angle - (k / segments) * 0.65;
+    const alpha = Math.max(0, strength * (1 - k / segments));
+    ctx.beginPath();
+    ctx.moveTo(cx, cy);
+    ctx.arc(cx, cy, radarR, a, a - 0.022, true);
+    ctx.closePath();
+    ctx.fillStyle = rgba(color, alpha);
+    ctx.fill();
+  }
+  // Leading edge
+  ctx.beginPath();
+  ctx.moveTo(cx, cy);
+  ctx.lineTo(cx + Math.cos(angle) * radarR, cy + Math.sin(angle) * radarR);
+  ctx.strokeStyle = rgba(color, strength * 1.6);
+  ctx.lineWidth = 1.8;
+  ctx.stroke();
+}
+
 function frame(now) {
   const t = ((now - start) / 1000) * speedMul;
-  const sweepAngle = ((t / SWEEP_PERIOD) % 1) * Math.PI * 2;
+  const sweepA = ((t / SWEEP_A) % 1) * Math.PI * 2;
+  const sweepB = Math.PI + ((t / SWEEP_B) % 1) * Math.PI * 2;
 
   ctx.setTransform(DPR, 0, 0, DPR, 0, 0);
-
-  // Full background — always dark surface
   ctx.fillStyle = rgba(theme.surface, 1);
   ctx.fillRect(0, 0, W, H);
 
-  // Outer bezel (subtle)
+  // Outer bezel
   ctx.beginPath();
   ctx.arc(cx, cy, radarR + 14, 0, Math.PI * 2);
-  ctx.strokeStyle = rgba(theme.primary, 0.25);
+  ctx.strokeStyle = rgba(theme.primary, 0.28);
   ctx.lineWidth = 2;
   ctx.stroke();
 
-  // Dark radar face (never fill with primary)
+  // Dark face (never fill with light primary)
   ctx.beginPath();
   ctx.arc(cx, cy, radarR, 0, Math.PI * 2);
-  ctx.fillStyle = "rgb(6, 10, 14)";
+  ctx.fillStyle = "rgb(5, 9, 13)";
   ctx.fill();
   ctx.strokeStyle = rgba(theme.primary, 0.45);
   ctx.lineWidth = 1.5;
@@ -196,16 +220,14 @@ function frame(now) {
   ctx.arc(cx, cy, radarR - 1, 0, Math.PI * 2);
   ctx.clip();
 
-  // Range rings
-  ctx.strokeStyle = rgba(theme.primary, 0.28);
+  // Range rings + crosshairs
+  ctx.strokeStyle = rgba(theme.primary, 0.22);
   ctx.lineWidth = 1;
   for (let i = 1; i <= 4; i++) {
     ctx.beginPath();
     ctx.arc(cx, cy, (radarR / 4) * i, 0, Math.PI * 2);
     ctx.stroke();
   }
-
-  // Crosshairs
   ctx.beginPath();
   ctx.moveTo(cx - radarR, cy);
   ctx.lineTo(cx + radarR, cy);
@@ -213,64 +235,64 @@ function frame(now) {
   ctx.lineTo(cx, cy + radarR);
   ctx.stroke();
 
-  // Sweep fan — primary on dark = visible
-  const segments = 56;
-  for (let k = 0; k < segments; k++) {
-    const a = sweepAngle - (k / segments) * 0.7;
-    const alpha = Math.max(0, 0.55 * (1 - k / segments));
+  // Dual sweeps
+  drawSweep(sweepA, theme.primary, 0.42);
+  drawSweep(sweepB, theme.secondary, 0.22);
+
+  // Soft echo trails (past sweep positions)
+  trails.push({ a: sweepA, life: 1 });
+  if (trails.length > 18) trails.shift();
+  for (let i = 0; i < trails.length; i++) {
+    const tr = trails[i];
+    tr.life *= 0.92;
+    if (tr.life < 0.04) continue;
     ctx.beginPath();
     ctx.moveTo(cx, cy);
-    ctx.arc(cx, cy, radarR, a, a - 0.025, true);
-    ctx.closePath();
-    ctx.fillStyle = rgba(theme.primary, alpha);
-    ctx.fill();
+    ctx.lineTo(cx + Math.cos(tr.a) * radarR * 0.98, cy + Math.sin(tr.a) * radarR * 0.98);
+    ctx.strokeStyle = rgba(theme.primary, tr.life * 0.12);
+    ctx.lineWidth = 1;
+    ctx.stroke();
   }
-
-  // Leading edge
-  ctx.beginPath();
-  ctx.moveTo(cx, cy);
-  ctx.lineTo(
-    cx + Math.cos(sweepAngle) * radarR,
-    cy + Math.sin(sweepAngle) * radarR
-  );
-  ctx.strokeStyle = rgba(theme.secondary, 0.95);
-  ctx.lineWidth = 2.2;
-  ctx.stroke();
 
   // Blips
   for (const b of blips) {
-    let diff = ((sweepAngle - b.angle) % (Math.PI * 2) + Math.PI * 2) % (Math.PI * 2);
-    if (diff > Math.PI) diff -= Math.PI * 2;
-    if (Math.abs(diff) < 0.05 && t - b.lastHit > SWEEP_PERIOD * 0.35) {
-      b.lit = 1;
-      b.lastHit = t;
+    b.angle += b.drift * 0.016;
+
+    // Hit by either sweep
+    for (const sa of [sweepA, sweepB]) {
+      let diff = ((sa - b.angle) % (Math.PI * 2) + Math.PI * 2) % (Math.PI * 2);
+      if (diff > Math.PI) diff -= Math.PI * 2;
+      if (Math.abs(diff) < 0.045 && t - b.lastHit > 1.2) {
+        b.lit = 1;
+        b.lastHit = t;
+      }
     }
-    b.lit *= 0.982;
+    b.lit *= 0.978;
 
     const bx = cx + Math.cos(b.angle) * b.dist;
     const by = cy + Math.sin(b.angle) * b.dist;
 
     if (b.lit > 0.06) {
-      const pingR = b.size + (1 - b.lit) * 22;
+      const pingR = b.size + (1 - b.lit) * 20;
       ctx.beginPath();
       ctx.arc(bx, by, pingR, 0, Math.PI * 2);
-      ctx.strokeStyle = rgba(theme.tertiary, b.lit * 0.7);
-      ctx.lineWidth = 1.5;
+      ctx.strokeStyle = rgba(theme.tertiary, b.lit * 0.65);
+      ctx.lineWidth = 1.4;
       ctx.stroke();
     }
 
     if (b.lit > 0.02) {
-      const glow = ctx.createRadialGradient(bx, by, 0, bx, by, b.size * 6);
+      const glow = ctx.createRadialGradient(bx, by, 0, bx, by, b.size * 5.5);
       glow.addColorStop(0, rgba(theme.tertiary, b.lit * 0.9));
       glow.addColorStop(1, "transparent");
       ctx.fillStyle = glow;
       ctx.beginPath();
-      ctx.arc(bx, by, b.size * 6, 0, Math.PI * 2);
+      ctx.arc(bx, by, b.size * 5.5, 0, Math.PI * 2);
       ctx.fill();
 
       ctx.beginPath();
       ctx.arc(bx, by, b.size, 0, Math.PI * 2);
-      ctx.fillStyle = rgba(theme.tertiary, Math.min(1, b.lit * 1.5));
+      ctx.fillStyle = rgba(theme.tertiary, Math.min(1, b.lit * 1.45));
       ctx.fill();
     }
   }

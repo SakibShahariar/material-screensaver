@@ -12,7 +12,6 @@
   --primary_container_rgb: 0 75 111;
   --secondary_container_rgb: 53 72 99;
   --tertiary_container_rgb: 58 68 114;
-  --inverse_primary_rgb: 0 100 145;
   --surface_rgb: 12 20 27;
   --outline_rgb: 137 146 154;
 }
@@ -25,7 +24,6 @@ html, body {
 }
 body.show-cursor { cursor: default; }
 canvas { display: block; width: 100vw; height: 100vh; }
-#blobs { display: none; }
 
 #clock-wrap {
   position: fixed;
@@ -35,8 +33,8 @@ canvas { display: block; width: 100vw; height: 100vh; }
   border-radius: 20px;
   background: radial-gradient(
     ellipse at 30% 70%,
-    rgb(var(--surface_rgb) / .85) 0%,
-    rgb(var(--surface_rgb) / .5) 55%,
+    rgb(var(--surface_rgb) / .88) 0%,
+    rgb(var(--surface_rgb) / .55) 55%,
     transparent 100%
   );
   pointer-events: none;
@@ -89,10 +87,9 @@ canvas { display: block; width: 100vw; height: 100vh; }
 }
 #hint.show { opacity: .7; }
 </style>
-<link rel="stylesheet" href="file:///home/sakib/.config/matugen/matugen-colors.css">
+<link rel="stylesheet" href="matugen-colors.css">
 </head>
 <body>
-<canvas id="blobs"></canvas>
 <canvas id="c"></canvas>
 <div id="clock-wrap">
   <div id="clock">00:00<span class="ampm">AM</span></div>
@@ -103,8 +100,6 @@ canvas { display: block; width: 100vw; height: 100vh; }
 <script>
 "use strict";
 
-const blobCanvas = document.getElementById("blobs");
-const bctx = blobCanvas.getContext("2d", { alpha: true, desynchronized: true });
 const canvas = document.getElementById("c");
 const ctx = canvas.getContext("2d", { alpha: false, desynchronized: true });
 const clockEl = document.getElementById("clock");
@@ -114,14 +109,14 @@ const clockWrap = document.getElementById("clock-wrap");
 
 let W = 0, H = 0, DPR = 1;
 let theme = {};
-let roleList = [];
 let blobs = [];
 let start = performance.now();
 let lastT = 0;
 let cursorTimer;
 
+const BLOB_COUNT = 8;
 const reduceMotion = matchMedia("(prefers-reduced-motion: reduce)").matches;
-const speedMul = reduceMotion ? 0.25 : 0.75;
+const speedMul = reduceMotion ? 0.2 : 0.7;
 
 function readRGB(name, fb = [160, 160, 160]) {
   const r = getComputedStyle(document.documentElement).getPropertyValue(name).trim();
@@ -141,23 +136,22 @@ function loadTheme() {
     primaryContainer:   readRGB("--primary_container_rgb", [0, 75, 111]),
     secondaryContainer: readRGB("--secondary_container_rgb", [53, 72, 99]),
     tertiaryContainer:  readRGB("--tertiary_container_rgb", [58, 68, 114]),
-    inversePrimary:     readRGB("--inverse_primary_rgb", [0, 100, 145]),
     outline:            readRGB("--outline_rgb", [137, 146, 154])
   };
 
-  // Prefer saturated “on” colors for blobs; containers as accents
-  roleList = [
+  // Prefer richer/darker roles so light themes stay visible
+  const palette = [
+    theme.primaryContainer,
+    theme.secondaryContainer,
+    theme.tertiaryContainer,
     theme.primary,
     theme.secondary,
-    theme.tertiary,
-    theme.primary,
-    theme.secondary,
-    theme.tertiary,
-    theme.inversePrimary
+    theme.tertiary
   ];
 
   blobs.forEach((b, i) => {
-    b.color = roleList[i % roleList.length];
+    b.color = palette[i % palette.length];
+    b.glow  = [theme.primary, theme.secondary, theme.tertiary][i % 3];
   });
 
   document.body.style.background = rgba(theme.surface);
@@ -166,82 +160,104 @@ function loadTheme() {
   hintEl.style.color  = rgba(theme.outline, 0.6);
 }
 
-function resize() {
-  W = innerWidth; H = innerHeight;
-  DPR = Math.min(devicePixelRatio || 1, 2);
-  for (const cv of [blobCanvas, canvas]) {
-    cv.width  = Math.floor(W * DPR);
-    cv.height = Math.floor(H * DPR);
-    cv.getContext("2d").setTransform(DPR, 0, 0, DPR, 0, 0);
-  }
-}
-addEventListener("resize", resize, { passive: true });
-
 function makeBlobs() {
   blobs = [];
-  for (let i = 0; i < 10; i++) {
+  const palette = [
+    theme.primaryContainer || [0, 75, 111],
+    theme.secondaryContainer || [53, 72, 99],
+    theme.tertiaryContainer || [58, 68, 114],
+    theme.primary || [138, 206, 255],
+    theme.secondary || [180, 199, 233],
+    theme.tertiary || [186, 196, 250]
+  ];
+  const glows = [theme.primary, theme.secondary, theme.tertiary];
+
+  for (let i = 0; i < BLOB_COUNT; i++) {
     blobs.push({
-      x: (0.2 + Math.random() * 0.6) * W,
-      y: (0.15 + Math.random() * 0.7) * H,
-      vy: (Math.random() < 0.5 ? -1 : 1) * (4 + Math.random() * 10),
+      x: (0.2 + Math.random() * 0.6) * (W || 800),
+      y: (0.15 + Math.random() * 0.7) * (H || 600),
+      vx: (Math.random() - 0.5) * 18,
+      vy: (Math.random() < 0.5 ? -1 : 1) * (8 + Math.random() * 14),
+      r: 55 + Math.random() * 70,
       wobPhase: Math.random() * Math.PI * 2,
-      wobFreq: 0.1 + Math.random() * 0.18,
-      wobAmp: 12 + Math.random() * 24,
-      r: 48 + Math.random() * 52,
-      color: roleList[i % Math.max(1, roleList.length)] || [140, 200, 255]
+      wobFreq: 0.08 + Math.random() * 0.18,
+      wobAmp: 14 + Math.random() * 22,
+      pulsePhase: Math.random() * Math.PI * 2,
+      pulseSpeed: 0.25 + Math.random() * 0.35,
+      color: palette[i % palette.length],
+      glow: glows[i % 3] || [140, 200, 255]
     });
   }
 }
+
+function resize() {
+  W = innerWidth; H = innerHeight;
+  DPR = Math.min(devicePixelRatio || 1, 2);
+  canvas.width  = Math.floor(W * DPR);
+  canvas.height = Math.floor(H * DPR);
+  ctx.setTransform(DPR, 0, 0, DPR, 0, 0);
+  if (blobs.length === 0) makeBlobs();
+}
+addEventListener("resize", resize, { passive: true });
 
 function frame(now) {
   const t = ((now - start) / 1000) * speedMul;
   const dt = Math.min(0.05, t - lastT || 0.016);
   lastT = t;
 
-  // Offscreen: soft radial blobs (hue stays intact)
-  bctx.setTransform(DPR, 0, 0, DPR, 0, 0);
-  bctx.clearRect(0, 0, W, H);
-  bctx.globalCompositeOperation = "lighter";
-
-  for (const b of blobs) {
-    b.y += b.vy * dt;
-    if (b.y < H * 0.12) { b.y = H * 0.12; b.vy = Math.abs(b.vy); }
-    if (b.y > H * 0.88) { b.y = H * 0.88; b.vy = -Math.abs(b.vy); }
-
-    const x = b.x + Math.sin(t * b.wobFreq + b.wobPhase) * b.wobAmp;
-    const r = b.r * (1 + Math.sin(t * 0.3 + b.wobPhase) * 0.12);
-
-    const grad = bctx.createRadialGradient(x, b.y, 0, x, b.y, r);
-    grad.addColorStop(0, rgba(b.color, 0.95));
-    grad.addColorStop(0.45, rgba(b.color, 0.55));
-    grad.addColorStop(1, rgba(b.color, 0));
-
-    bctx.beginPath();
-    bctx.arc(x, b.y, r, 0, Math.PI * 2);
-    bctx.fillStyle = grad;
-    bctx.fill();
-  }
-  bctx.globalCompositeOperation = "source-over";
-
-  // Main canvas: surface + mild blur only (no crushing contrast)
   ctx.setTransform(DPR, 0, 0, DPR, 0, 0);
   ctx.fillStyle = rgba(theme.surface, 1);
   ctx.fillRect(0, 0, W, H);
 
-  ctx.save();
-  ctx.filter = "blur(18px)";
-  ctx.globalAlpha = 0.95;
-  ctx.drawImage(blobCanvas, 0, 0, W, H);
-  ctx.restore();
-
-  // Second pass: sharper core so color stays readable
-  ctx.save();
-  ctx.filter = "blur(6px)";
-  ctx.globalAlpha = 0.55;
+  // Soft additive blending for organic merge
   ctx.globalCompositeOperation = "lighter";
-  ctx.drawImage(blobCanvas, 0, 0, W, H);
-  ctx.restore();
 
+  for (const b of blobs) {
+    // Buoyancy + gentle horizontal drift
+    b.vy += Math.sin(t * 0.15 + b.wobPhase) * 4 * dt;
+    b.vx += Math.sin(t * b.wobFreq + b.wobPhase) * 6 * dt;
+
+    // Soft damping
+    b.vx *= 0.995;
+    b.vy *= 0.997;
+
+    b.x += b.vx * dt;
+    b.y += b.vy * dt;
+
+    // Bounce inside vertical tube-like bounds
+    const margin = b.r * 0.6;
+    if (b.y < margin) { b.y = margin; b.vy = Math.abs(b.vy) * 0.85; }
+    if (b.y > H - margin) { b.y = H - margin; b.vy = -Math.abs(b.vy) * 0.85; }
+    if (b.x < margin) { b.x = margin; b.vx = Math.abs(b.vx); }
+    if (b.x > W - margin) { b.x = W - margin; b.vx = -Math.abs(b.vx); }
+
+    const pulse = 1 + Math.sin(t * b.pulseSpeed + b.pulsePhase) * 0.12;
+    const r = b.r * pulse;
+    const x = b.x + Math.sin(t * b.wobFreq * 1.3 + b.wobPhase) * b.wobAmp * 0.4;
+
+    // Outer soft glow (lighter Material accent)
+    const outer = ctx.createRadialGradient(x, b.y, 0, x, b.y, r * 1.55);
+    outer.addColorStop(0, rgba(b.glow, 0.22));
+    outer.addColorStop(0.45, rgba(b.glow, 0.08));
+    outer.addColorStop(1, "transparent");
+    ctx.fillStyle = outer;
+    ctx.beginPath();
+    ctx.arc(x, b.y, r * 1.55, 0, Math.PI * 2);
+    ctx.fill();
+
+    // Dense colored core (container / richer role)
+    const core = ctx.createRadialGradient(x, b.y, 0, x, b.y, r);
+    core.addColorStop(0, rgba(b.color, 0.9));
+    core.addColorStop(0.4, rgba(b.color, 0.55));
+    core.addColorStop(0.75, rgba(b.color, 0.18));
+    core.addColorStop(1, "transparent");
+    ctx.fillStyle = core;
+    ctx.beginPath();
+    ctx.arc(x, b.y, r, 0, Math.PI * 2);
+    ctx.fill();
+  }
+
+  ctx.globalCompositeOperation = "source-over";
   requestAnimationFrame(frame);
 }
 

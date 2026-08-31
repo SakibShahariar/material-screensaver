@@ -1,0 +1,414 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>marble-run</title>
+<style>
+:root {
+  --primary_rgb: 138 206 255;
+  --secondary_rgb: 180 199 233;
+  --tertiary_rgb: 186 196 250;
+  --surface_rgb: 8 12 18;
+  --outline_rgb: 137 146 154;
+}
+* { margin: 0; padding: 0; box-sizing: border-box; }
+html, body {
+  width: 100%; height: 100%; overflow: hidden;
+  background: rgb(var(--surface_rgb));
+  cursor: none;
+  font-family: "Google Sans", "Segoe UI", system-ui, sans-serif;
+}
+body.show-cursor { cursor: default; }
+canvas { display: block; width: 100vw; height: 100vh; }
+
+#clock-wrap {
+  position: fixed;
+  left: clamp(20px, 2.5vw, 40px);
+  bottom: clamp(16px, 2vw, 28px);
+  padding: 18px 26px 14px;
+  border-radius: 20px;
+  background: radial-gradient(
+    ellipse at 30% 70%,
+    rgb(var(--surface_rgb) / .9) 0%,
+    rgb(var(--surface_rgb) / .55) 55%,
+    transparent 100%
+  );
+  pointer-events: none;
+  transition: opacity .7s ease;
+  z-index: 10;
+}
+#clock-wrap.hidden { opacity: 0; }
+
+#clock {
+  font-weight: 200;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: -2px;
+  font-size: clamp(40px, 5.5vw, 78px);
+  color: rgb(var(--primary_rgb));
+  text-shadow:
+    0 0 2px rgb(var(--surface_rgb)),
+    0 0 14px rgb(var(--surface_rgb) / .95),
+    0 0 36px rgb(var(--primary_rgb) / .5),
+    0 2px 14px rgba(0,0,0,.85);
+  line-height: 1;
+}
+#clock .ampm {
+  font-size: .26em;
+  margin-left: 10px;
+  opacity: .78;
+  vertical-align: 22%;
+  letter-spacing: 2px;
+  font-weight: 400;
+}
+#date {
+  margin-top: 8px;
+  font-size: clamp(11px, 1.05vw, 14px);
+  letter-spacing: 4px;
+  text-transform: uppercase;
+  color: rgb(var(--secondary_rgb));
+  text-shadow:
+    0 0 8px rgb(var(--surface_rgb) / .9),
+    0 1px 8px rgba(0,0,0,.7);
+  opacity: .95;
+}
+
+#hint {
+  position: fixed; right: 28px; bottom: 24px; z-index: 10;
+  font-size: 11px; letter-spacing: 1.5px;
+  color: rgb(var(--outline_rgb) / .55);
+  opacity: 0; transition: opacity 1s ease;
+  text-transform: uppercase;
+  pointer-events: none;
+  text-shadow: 0 1px 8px rgb(var(--surface_rgb));
+}
+#hint.show { opacity: .7; }
+</style>
+<link rel="stylesheet" href="matugen-colors.css">
+</head>
+<body>
+<canvas id="c"></canvas>
+<div id="clock-wrap">
+  <div id="clock">00:00<span class="ampm">AM</span></div>
+  <div id="date">MON, JAN 1</div>
+</div>
+<div id="hint">C · toggle · R new track</div>
+
+<script>
+"use strict";
+
+const canvas = document.getElementById("c");
+const ctx = canvas.getContext("2d", { alpha: false, desynchronized: true });
+const clockEl = document.getElementById("clock");
+const dateEl  = document.getElementById("date");
+const hintEl  = document.getElementById("hint");
+const clockWrap = document.getElementById("clock-wrap");
+
+let W = 0, H = 0, DPR = 1;
+let theme = {};
+let segments = [];
+let marbles = [];
+let spawnT = 0;
+let start = performance.now();
+let cursorTimer;
+
+const G = 0.22;
+const REST = 0.68;
+const reduceMotion = matchMedia("(prefers-reduced-motion: reduce)").matches;
+const speedMul = reduceMotion ? 0.4 : 1;
+
+function readRGB(name, fb = [160, 160, 160]) {
+  const r = getComputedStyle(document.documentElement).getPropertyValue(name).trim();
+  const p = r.split(/\s+/).map(Number);
+  return (p.length === 3 && p.every(n => !isNaN(n))) ? p : fb;
+}
+function rgba(c, a = 1) {
+  return `rgba(${c[0]},${c[1]},${c[2]},${a})`;
+}
+
+function loadTheme() {
+  theme = {
+    surface:   readRGB("--surface_rgb", [8, 12, 18]),
+    primary:   readRGB("--primary_rgb", [138, 206, 255]),
+    secondary: readRGB("--secondary_rgb", [180, 199, 233]),
+    tertiary:  readRGB("--tertiary_rgb", [186, 196, 250]),
+    outline:   readRGB("--outline_rgb", [137, 146, 154])
+  };
+  document.body.style.background = rgba(theme.surface);
+  clockEl.style.color = rgba(theme.primary, 1);
+  dateEl.style.color  = rgba(theme.secondary, 0.95);
+  hintEl.style.color  = rgba(theme.outline, 0.6);
+}
+
+function buildTrack() {
+  segments = [];
+  marbles = [];
+  spawnT = 0;
+
+  const margin = W * 0.06;
+  const gap = W * 0.18; // always leave an exit gap on the low side
+  let y = H * 0.14;
+  let fromLeft = true;
+
+  while (y < H * 0.85) {
+    // Platform covers most of width but leaves gap on the downhill side
+    const len = W - margin * 2 - gap;
+    const drop = 14 + Math.random() * 16; // gentle, always passable
+
+    let x1, x2, y1, y2;
+    if (fromLeft) {
+      // High on left, low on right → marbles exit right into gap
+      x1 = margin;
+      x2 = margin + len;
+      y1 = y;
+      y2 = y + drop;
+    } else {
+      // High on right, low on left → marbles exit left into gap
+      x1 = W - margin - len;
+      x2 = W - margin;
+      y1 = y + drop;
+      y2 = y;
+    }
+
+    segments.push({ x1, y1, x2, y2 });
+
+    // Pegs only on upper half of plank so they don't block the exit lip
+    if (Math.random() > 0.45) {
+      const t = 0.15 + Math.random() * 0.45;
+      segments.push({
+        peg: true,
+        x: x1 + (x2 - x1) * t,
+        y: y1 + (y2 - y1) * t - 2,
+        r: 5 + Math.random() * 4
+      });
+    }
+
+    y += 52 + Math.random() * 28;
+    fromLeft = !fromLeft;
+  }
+
+  // Catch floor
+  segments.push({ x1: 0, y1: H - 14, x2: W, y2: H - 14, floor: true });
+}
+
+function spawnMarble() {
+  const colors = [theme.primary, theme.secondary, theme.tertiary];
+  // Drop above the first platform center-ish
+  marbles.push({
+    x: W * (0.35 + Math.random() * 0.3),
+    y: 16,
+    vx: (Math.random() - 0.5) * 0.8,
+    vy: 0,
+    r: 6 + Math.random() * 3.5,
+    color: colors[(Math.random() * 3) | 0],
+    trail: []
+  });
+}
+
+function projectPointToSeg(px, py, seg) {
+  const dx = seg.x2 - seg.x1;
+  const dy = seg.y2 - seg.y1;
+  const len2 = dx * dx + dy * dy || 1;
+  let t = ((px - seg.x1) * dx + (py - seg.y1) * dy) / len2;
+  t = Math.max(0, Math.min(1, t));
+  const invLen = 1 / Math.sqrt(len2);
+  return {
+    x: seg.x1 + t * dx,
+    y: seg.y1 + t * dy,
+    nx: -dy * invLen,
+    ny: dx * invLen
+  };
+}
+
+function stepMarbles() {
+  for (const m of marbles) {
+    m.vy += G * speedMul;
+    m.x += m.vx * speedMul;
+    m.y += m.vy * speedMul;
+
+    for (const seg of segments) {
+      if (seg.peg) {
+        const dx = m.x - seg.x;
+        const dy = m.y - seg.y;
+        const d = Math.sqrt(dx * dx + dy * dy) || 1;
+        const min = m.r + seg.r;
+        if (d < min) {
+          const nx = dx / d, ny = dy / d;
+          const overlap = min - d;
+          m.x += nx * overlap;
+          m.y += ny * overlap;
+          const vn = m.vx * nx + m.vy * ny;
+          if (vn < 0) {
+            m.vx -= (1 + REST) * vn * nx;
+            m.vy -= (1 + REST) * vn * ny;
+          }
+        }
+        continue;
+      }
+
+      const p = projectPointToSeg(m.x, m.y, seg);
+      const dx = m.x - p.x;
+      const dy = m.y - p.y;
+      const d = Math.sqrt(dx * dx + dy * dy) || 1;
+      if (d < m.r) {
+        let nx = p.nx, ny = p.ny;
+        if (ny > 0) { nx = -nx; ny = -ny; }
+        const overlap = m.r - d;
+        m.x += nx * overlap;
+        m.y += ny * overlap;
+        const vn = m.vx * nx + m.vy * ny;
+        if (vn < 0) {
+          m.vx -= (1 + REST) * vn * nx;
+          m.vy -= (1 + REST) * vn * ny;
+          m.vx *= 0.985;
+        }
+      }
+    }
+
+    if (m.x < m.r) { m.x = m.r; m.vx *= -REST; }
+    if (m.x > W - m.r) { m.x = W - m.r; m.vx *= -REST; }
+
+    m.trail.push({ x: m.x, y: m.y });
+    if (m.trail.length > 12) m.trail.shift();
+  }
+
+  for (let i = 0; i < marbles.length; i++) {
+    for (let j = i + 1; j < marbles.length; j++) {
+      const a = marbles[i], b = marbles[j];
+      const dx = b.x - a.x, dy = b.y - a.y;
+      const d = Math.sqrt(dx * dx + dy * dy) || 1;
+      const min = a.r + b.r;
+      if (d < min) {
+        const nx = dx / d, ny = dy / d;
+        const overlap = (min - d) * 0.5;
+        a.x -= nx * overlap; a.y -= ny * overlap;
+        b.x += nx * overlap; b.y += ny * overlap;
+        const vn = (a.vx - b.vx) * nx + (a.vy - b.vy) * ny;
+        if (vn > 0) {
+          a.vx -= vn * nx * REST;
+          a.vy -= vn * ny * REST;
+          b.vx += vn * nx * REST;
+          b.vy += vn * ny * REST;
+        }
+      }
+    }
+  }
+
+  marbles = marbles.filter(m => m.y < H + 40);
+  if (marbles.length > 36) marbles.shift();
+}
+
+function frame(now) {
+  const t = (now - start) / 1000;
+  if (t > spawnT) {
+    spawnMarble();
+    spawnT = t + 0.5 + Math.random() * 0.6;
+  }
+  stepMarbles();
+
+  ctx.setTransform(DPR, 0, 0, DPR, 0, 0);
+  ctx.fillStyle = rgba(theme.surface, 1);
+  ctx.fillRect(0, 0, W, H);
+
+  ctx.lineCap = "round";
+  for (const seg of segments) {
+    if (seg.peg) {
+      ctx.beginPath();
+      ctx.arc(seg.x, seg.y, seg.r, 0, Math.PI * 2);
+      ctx.fillStyle = rgba(theme.outline, 0.45);
+      ctx.fill();
+      ctx.strokeStyle = rgba(theme.secondary, 0.5);
+      ctx.lineWidth = 1.5;
+      ctx.stroke();
+      continue;
+    }
+    ctx.beginPath();
+    ctx.moveTo(seg.x1, seg.y1);
+    ctx.lineTo(seg.x2, seg.y2);
+    ctx.strokeStyle = rgba(seg.floor ? theme.outline : theme.secondary, seg.floor ? 0.35 : 0.55);
+    ctx.lineWidth = seg.floor ? 3 : 4;
+    ctx.stroke();
+  }
+
+  ctx.globalCompositeOperation = "lighter";
+  for (const m of marbles) {
+    if (m.trail.length > 1) {
+      ctx.beginPath();
+      ctx.moveTo(m.trail[0].x, m.trail[0].y);
+      for (let i = 1; i < m.trail.length; i++) ctx.lineTo(m.trail[i].x, m.trail[i].y);
+      ctx.strokeStyle = rgba(m.color, 0.2);
+      ctx.lineWidth = m.r * 0.55;
+      ctx.stroke();
+    }
+    const g = ctx.createRadialGradient(
+      m.x - m.r * 0.3, m.y - m.r * 0.3, 0, m.x, m.y, m.r
+    );
+    g.addColorStop(0, rgba(m.color, 0.95));
+    g.addColorStop(1, rgba(m.color, 0.4));
+    ctx.beginPath();
+    ctx.arc(m.x, m.y, m.r, 0, Math.PI * 2);
+    ctx.fillStyle = g;
+    ctx.fill();
+  }
+  ctx.globalCompositeOperation = "source-over";
+
+  requestAnimationFrame(frame);
+}
+
+function resize() {
+  W = innerWidth; H = innerHeight;
+  DPR = Math.min(devicePixelRatio || 1, 2);
+  canvas.width  = Math.floor(W * DPR);
+  canvas.height = Math.floor(H * DPR);
+  buildTrack();
+}
+addEventListener("resize", resize, { passive: true });
+
+addEventListener("pointermove", () => {
+  document.body.classList.add("show-cursor");
+  clearTimeout(cursorTimer);
+  cursorTimer = setTimeout(() => document.body.classList.remove("show-cursor"), 2500);
+}, { passive: true });
+
+addEventListener("keydown", e => {
+  if (e.key.toLowerCase() === "c") clockWrap.classList.toggle("hidden");
+  if (e.key.toLowerCase() === "r") buildTrack();
+});
+
+function fallbackClock() {
+  function update() {
+    const n = new Date();
+    let h = n.getHours();
+    const ap = h >= 12 ? "PM" : "AM";
+    h = h % 12 || 12;
+    clockEl.innerHTML =
+      `${String(h).padStart(2,"0")}:${String(n.getMinutes()).padStart(2,"0")}` +
+      `<span class="ampm">${ap}</span>`;
+    dateEl.textContent = n.toLocaleDateString("en-US", {
+      weekday: "short", month: "short", day: "numeric"
+    }).toUpperCase();
+  }
+  update();
+  setInterval(update, 1000);
+}
+
+addEventListener("load", () => {
+  loadTheme();
+  resize();
+  const s = document.createElement("script");
+  s.src = "clock-shared.js";
+  s.onload = () => {
+    try {
+      if (typeof startClock === "function") startClock(clockEl, dateEl);
+      else fallbackClock();
+    } catch { fallbackClock(); }
+  };
+  s.onerror = fallbackClock;
+  document.head.appendChild(s);
+  hintEl.classList.add("show");
+  setTimeout(() => hintEl.classList.remove("show"), 4000);
+  requestAnimationFrame(frame);
+});
+</script>
+</body>
+</html>

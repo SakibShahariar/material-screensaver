@@ -3,16 +3,13 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Material Screensaver — Origami</title>
+<title>cymatics</title>
 <style>
 :root {
   --primary_rgb: 138 206 255;
   --secondary_rgb: 180 199 233;
   --tertiary_rgb: 186 196 250;
-  --primary_container_rgb: 0 75 111;
-  --secondary_container_rgb: 53 72 99;
-  --tertiary_container_rgb: 58 68 114;
-  --surface_rgb: 12 20 27;
+  --surface_rgb: 8 12 18;
   --outline_rgb: 137 146 154;
 }
 * { margin: 0; padding: 0; box-sizing: border-box; }
@@ -33,7 +30,7 @@ canvas { display: block; width: 100vw; height: 100vh; }
   border-radius: 20px;
   background: radial-gradient(
     ellipse at 30% 70%,
-    rgb(var(--surface_rgb) / .88) 0%,
+    rgb(var(--surface_rgb) / .9) 0%,
     rgb(var(--surface_rgb) / .55) 55%,
     transparent 100%
   );
@@ -107,17 +104,22 @@ const dateEl  = document.getElementById("date");
 const hintEl  = document.getElementById("hint");
 const clockWrap = document.getElementById("clock-wrap");
 
-let W = 0, H = 0, DPR = 1;
+let W = 0, H = 0, DPR = 1, cx = 0, cy = 0;
 let theme = {};
-let roleList = [];
-let grid = [];
+let grains = [];
 let start = performance.now();
-let lastT = 0;
 let cursorTimer;
 
-const CELL_SIZE = 88;
+// Chladni modes slowly morph (n, m pairs)
+const MODES = [
+  [2, 3], [3, 5], [4, 3], [5, 4], [3, 4], [6, 5], [2, 5]
+];
+let modeIdx = 0;
+let modeBlend = 0;
+
+const GRAIN_COUNT = 2200;
 const reduceMotion = matchMedia("(prefers-reduced-motion: reduce)").matches;
-const speedMul = reduceMotion ? 0.3 : 0.85;
+const speedMul = reduceMotion ? 0.25 : 0.65;
 
 function readRGB(name, fb = [160, 160, 160]) {
   const r = getComputedStyle(document.documentElement).getPropertyValue(name).trim();
@@ -130,130 +132,106 @@ function rgba(c, a = 1) {
 
 function loadTheme() {
   theme = {
-    surface:            readRGB("--surface_rgb", [12, 20, 27]),
-    primary:            readRGB("--primary_rgb", [138, 206, 255]),
-    secondary:          readRGB("--secondary_rgb", [180, 199, 233]),
-    tertiary:           readRGB("--tertiary_rgb", [186, 196, 250]),
-    primaryContainer:   readRGB("--primary_container_rgb", [0, 75, 111]),
-    secondaryContainer: readRGB("--secondary_container_rgb", [53, 72, 99]),
-    tertiaryContainer:  readRGB("--tertiary_container_rgb", [58, 68, 114]),
-    outline:            readRGB("--outline_rgb", [137, 146, 154])
+    surface:   readRGB("--surface_rgb", [8, 12, 18]),
+    primary:   readRGB("--primary_rgb", [138, 206, 255]),
+    secondary: readRGB("--secondary_rgb", [180, 199, 233]),
+    tertiary:  readRGB("--tertiary_rgb", [186, 196, 250]),
+    outline:   readRGB("--outline_rgb", [137, 146, 154])
   };
-
-  roleList = [
-    theme.primary,
-    theme.secondary,
-    theme.tertiary,
-    theme.primaryContainer,
-    theme.secondaryContainer,
-    theme.tertiaryContainer
-  ];
-
-  for (const cell of grid) {
-    cell.colorA = roleList[Math.floor(Math.random() * roleList.length)];
-    cell.colorB = roleList[Math.floor(Math.random() * roleList.length)];
-  }
-
   document.body.style.background = rgba(theme.surface);
   clockEl.style.color = rgba(theme.primary, 1);
   dateEl.style.color  = rgba(theme.secondary, 0.95);
   hintEl.style.color  = rgba(theme.outline, 0.6);
 }
 
-function makeGrid() {
-  grid = [];
-  const cols = Math.ceil(W / CELL_SIZE) + 1;
-  const rows = Math.ceil(H / CELL_SIZE) + 1;
-  const offsetX = (W - cols * CELL_SIZE) / 2;
-  const offsetY = (H - rows * CELL_SIZE) / 2;
-  const n = Math.max(1, roleList.length);
+function chladni(nx, ny, x, y, t) {
+  // Rectangular Chladni approximation in normalized [-1,1]
+  const a = Math.sin(nx * Math.PI * x) * Math.sin(ny * Math.PI * y);
+  const b = Math.sin(ny * Math.PI * x) * Math.sin(nx * Math.PI * y);
+  return a - b * Math.cos(t * 0.15);
+}
 
-  for (let r = 0; r < rows; r++) {
-    for (let c = 0; c < cols; c++) {
-      grid.push({
-        cx: offsetX + c * CELL_SIZE + CELL_SIZE / 2,
-        cy: offsetY + r * CELL_SIZE + CELL_SIZE / 2,
-        colorA: roleList[Math.floor(Math.random() * n)] || [140, 200, 255],
-        colorB: roleList[Math.floor(Math.random() * n)] || [100, 140, 180],
-        state: 0,
-        flipping: false,
-        flipProgress: 0,
-        nextFlip: Math.random() * 7
-      });
-    }
+function initGrains() {
+  grains = [];
+  for (let i = 0; i < GRAIN_COUNT; i++) {
+    grains.push({
+      x: (Math.random() * 2 - 1),
+      y: (Math.random() * 2 - 1),
+      vx: 0,
+      vy: 0,
+      colorIdx: i % 3
+    });
   }
 }
 
 function resize() {
   W = innerWidth; H = innerHeight;
+  cx = W * 0.5; cy = H * 0.5;
   DPR = Math.min(devicePixelRatio || 1, 2);
   canvas.width  = Math.floor(W * DPR);
   canvas.height = Math.floor(H * DPR);
   ctx.setTransform(DPR, 0, 0, DPR, 0, 0);
-  makeGrid();
+  initGrains();
 }
 addEventListener("resize", resize, { passive: true });
 
-function drawCell(cell) {
-  const size = CELL_SIZE * 0.8;
-  let scaleX = 1;
-  let color = cell.state === 0 ? cell.colorA : cell.colorB;
-
-  if (cell.flipping) {
-    scaleX = Math.cos(cell.flipProgress * Math.PI);
-    if (cell.state === 0) {
-      color = cell.flipProgress < 0.5 ? cell.colorA : cell.colorB;
-    } else {
-      color = cell.flipProgress < 0.5 ? cell.colorB : cell.colorA;
-    }
-  }
-
-  ctx.save();
-  ctx.translate(cell.cx, cell.cy);
-  ctx.scale(Math.max(0.02, Math.abs(scaleX)), 1);
-
-  ctx.beginPath();
-  ctx.moveTo(0, -size / 2);
-  ctx.lineTo(size / 2, 0);
-  ctx.lineTo(0, size / 2);
-  ctx.lineTo(-size / 2, 0);
-  ctx.closePath();
-
-  ctx.fillStyle = rgba(color, 0.88);
-  ctx.fill();
-
-  ctx.strokeStyle = rgba(theme.surface, 0.95);
-  ctx.lineWidth = 2.5;
-  ctx.stroke();
-
-  ctx.restore();
-}
-
 function frame(now) {
   const t = ((now - start) / 1000) * speedMul;
-  const dt = Math.min(0.05, t - lastT || 0.016);
-  lastT = t;
+
+  // Morph between modes every ~12s
+  modeBlend += 0.00035 * speedMul * 60 * 0.016;
+  if (modeBlend >= 1) {
+    modeBlend = 0;
+    modeIdx = (modeIdx + 1) % MODES.length;
+  }
+  const m0 = MODES[modeIdx];
+  const m1 = MODES[(modeIdx + 1) % MODES.length];
+  const s = modeBlend * modeBlend * (3 - 2 * modeBlend);
+  const nx = m0[0] + (m1[0] - m0[0]) * s;
+  const ny = m0[1] + (m1[1] - m0[1]) * s;
 
   ctx.setTransform(DPR, 0, 0, DPR, 0, 0);
-  ctx.fillStyle = rgba(theme.surface, 1);
+  ctx.fillStyle = rgba(theme.surface, 0.18);
   ctx.fillRect(0, 0, W, H);
 
-  for (const cell of grid) {
-    if (!cell.flipping && t >= cell.nextFlip) {
-      cell.flipping = true;
-      cell.flipProgress = 0;
+  const scale = Math.min(W, H) * 0.42;
+  const colors = [theme.primary, theme.secondary, theme.tertiary];
+
+  ctx.globalCompositeOperation = "lighter";
+
+  for (const g of grains) {
+    // Sample field gradient → push grains toward nodal lines (|amp| ~ 0)
+    const eps = 0.012;
+    const v = chladni(nx, ny, g.x, g.y, t);
+    const vx = (chladni(nx, ny, g.x + eps, g.y, t) - v) / eps;
+    const vy = (chladni(nx, ny, g.x, g.y + eps, t) - v) / eps;
+
+    // Move toward nodes (where amplitude is near zero)
+    const force = -v * 0.45;
+    g.vx = g.vx * 0.92 + (vx * force) * 0.08;
+    g.vy = g.vy * 0.92 + (vy * force) * 0.08;
+    g.x += g.vx * 0.04;
+    g.y += g.vy * 0.04;
+
+    // Soft bounds
+    if (g.x < -1.05 || g.x > 1.05 || g.y < -1.05 || g.y > 1.05) {
+      g.x = Math.random() * 2 - 1;
+      g.y = Math.random() * 2 - 1;
+      g.vx = g.vy = 0;
     }
-    if (cell.flipping) {
-      cell.flipProgress += dt * 1.5;
-      if (cell.flipProgress >= 1) {
-        cell.flipping = false;
-        cell.state = cell.state === 0 ? 1 : 0;
-        cell.nextFlip = t + 3.5 + Math.random() * 9;
-      }
-    }
-    drawCell(cell);
+
+    const px = cx + g.x * scale;
+    const py = cy + g.y * scale;
+    const nearNode = Math.max(0, 1 - Math.abs(v) * 3);
+    const a = 0.15 + nearNode * 0.55;
+
+    ctx.beginPath();
+    ctx.arc(px, py, 1.1 + nearNode * 0.8, 0, Math.PI * 2);
+    ctx.fillStyle = rgba(colors[g.colorIdx], a);
+    ctx.fill();
   }
 
+  ctx.globalCompositeOperation = "source-over";
   requestAnimationFrame(frame);
 }
 
@@ -264,9 +242,7 @@ addEventListener("pointermove", () => {
 }, { passive: true });
 
 addEventListener("keydown", e => {
-  if (e.key.toLowerCase() === "c") {
-    clockWrap.classList.toggle("hidden");
-  }
+  if (e.key.toLowerCase() === "c") clockWrap.classList.toggle("hidden");
 });
 
 function fallbackClock() {
@@ -289,8 +265,6 @@ function fallbackClock() {
 addEventListener("load", () => {
   loadTheme();
   resize();
-  loadTheme();
-
   const s = document.createElement("script");
   s.src = "clock-shared.js";
   s.onload = () => {
@@ -301,10 +275,8 @@ addEventListener("load", () => {
   };
   s.onerror = fallbackClock;
   document.head.appendChild(s);
-
   hintEl.classList.add("show");
   setTimeout(() => hintEl.classList.remove("show"), 4000);
-
   requestAnimationFrame(frame);
 });
 </script>

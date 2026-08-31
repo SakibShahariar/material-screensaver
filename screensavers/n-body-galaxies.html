@@ -3,13 +3,13 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Material Screensaver — Hyper-Tesseract 4D</title>
+<title>n-body-galaxies</title>
 <style>
 :root {
   --primary_rgb: 138 206 255;
   --secondary_rgb: 180 199 233;
   --tertiary_rgb: 186 196 250;
-  --surface_rgb: 8 13 18;
+  --surface_rgb: 4 8 14;
   --outline_rgb: 137 146 154;
 }
 * { margin: 0; padding: 0; box-sizing: border-box; }
@@ -30,8 +30,8 @@ canvas { display: block; width: 100vw; height: 100vh; }
   border-radius: 20px;
   background: radial-gradient(
     ellipse at 30% 70%,
-    rgb(var(--surface_rgb) / .85) 0%,
-    rgb(var(--surface_rgb) / .5) 55%,
+    rgb(var(--surface_rgb) / .9) 0%,
+    rgb(var(--surface_rgb) / .55) 55%,
     transparent 100%
   );
   pointer-events: none;
@@ -92,7 +92,7 @@ canvas { display: block; width: 100vw; height: 100vh; }
   <div id="clock">00:00<span class="ampm">AM</span></div>
   <div id="date">MON, JAN 1</div>
 </div>
-<div id="hint">C · toggle clock</div>
+<div id="hint">C · toggle · R reset</div>
 
 <script>
 "use strict";
@@ -106,34 +106,17 @@ const clockWrap = document.getElementById("clock-wrap");
 
 let W = 0, H = 0, DPR = 1, cx = 0, cy = 0;
 let theme = {};
+let stars = [];
+let hubs = []; // two massive centers
 let start = performance.now();
 let cursorTimer;
+let camX = 0, camY = 0;
 
+const G = 48;
+const DT = 0.028;
+const STAR_COUNT = 900;
 const reduceMotion = matchMedia("(prefers-reduced-motion: reduce)").matches;
-const speedMul = reduceMotion ? 0.22 : 0.7;
-
-// 16 vertices of unit tesseract
-const verts4 = [];
-for (let i = 0; i < 16; i++) {
-  verts4.push([
-    (i & 1) ? 1 : -1,
-    (i & 2) ? 1 : -1,
-    (i & 4) ? 1 : -1,
-    (i & 8) ? 1 : -1
-  ]);
-}
-
-// 32 edges (differ by one axis)
-const edges = [];
-for (let i = 0; i < 16; i++) {
-  for (let j = i + 1; j < 16; j++) {
-    let diff = 0;
-    for (let c = 0; c < 4; c++) {
-      if (verts4[i][c] !== verts4[j][c]) diff++;
-    }
-    if (diff === 1) edges.push([i, j]);
-  }
-}
+const speedMul = reduceMotion ? 0.35 : 0.85;
 
 function readRGB(name, fb = [160, 160, 160]) {
   const r = getComputedStyle(document.documentElement).getPropertyValue(name).trim();
@@ -146,7 +129,7 @@ function rgba(c, a = 1) {
 
 function loadTheme() {
   theme = {
-    surface:   readRGB("--surface_rgb", [8, 13, 18]),
+    surface:   readRGB("--surface_rgb", [4, 8, 14]),
     primary:   readRGB("--primary_rgb", [138, 206, 255]),
     secondary: readRGB("--secondary_rgb", [180, 199, 233]),
     tertiary:  readRGB("--tertiary_rgb", [186, 196, 250]),
@@ -158,121 +141,166 @@ function loadTheme() {
   hintEl.style.color  = rgba(theme.outline, 0.6);
 }
 
+function spawnDisk(hx, hy, mass, color, count, radius, spin) {
+  // Circular disk with approximate Keplerian tangential velocity around hub
+  for (let i = 0; i < count; i++) {
+    const a = Math.random() * Math.PI * 2;
+    const r = Math.sqrt(Math.random()) * radius;
+    const x = hx + Math.cos(a) * r;
+    const y = hy + Math.sin(a) * r;
+    // tangential speed ~ sqrt(GM/r) softened
+    const speed = Math.sqrt(G * mass / (r + 30)) * spin;
+    const vx = -Math.sin(a) * speed;
+    const vy =  Math.cos(a) * speed;
+    stars.push({
+      x, y, vx, vy,
+      color,
+      size: 0.7 + Math.random() * 1.4,
+      trail: []
+    });
+  }
+}
+
+function initGalaxies() {
+  stars = [];
+  const colors = [theme.primary, theme.secondary, theme.tertiary];
+
+  // Two hubs approaching on a gentle collision course
+  hubs = [
+    { x: cx - W * 0.22, y: cy - H * 0.05, vx: 0.35, vy: 0.05, m: 140, color: colors[0] },
+    { x: cx + W * 0.2,  y: cy + H * 0.06, vx: -0.3, vy: -0.04, m: 110, color: colors[1] }
+  ];
+
+  spawnDisk(hubs[0].x, hubs[0].y, hubs[0].m, colors[0], 480, Math.min(W, H) * 0.2, 1);
+  spawnDisk(hubs[1].x, hubs[1].y, hubs[1].m, colors[1], 420, Math.min(W, H) * 0.16, -1);
+
+  // A few halo stars
+  for (let i = 0; i < 40; i++) {
+    stars.push({
+      x: cx + (Math.random() - 0.5) * W * 0.9,
+      y: cy + (Math.random() - 0.5) * H * 0.9,
+      vx: (Math.random() - 0.5) * 0.2,
+      vy: (Math.random() - 0.5) * 0.2,
+      color: colors[2],
+      size: 0.5 + Math.random(),
+      trail: []
+    });
+  }
+
+  camX = 0; camY = 0;
+}
+
+function accelAt(x, y) {
+  let ax = 0, ay = 0;
+  for (const h of hubs) {
+    const dx = h.x - x;
+    const dy = h.y - y;
+    const d2 = dx * dx + dy * dy + 400; // softening
+    const inv = G * h.m / (d2 * Math.sqrt(d2));
+    ax += dx * inv;
+    ay += dy * inv;
+  }
+  return { ax, ay };
+}
+
+function step() {
+  const dt = DT * speedMul;
+
+  // Hubs attract each other
+  for (let i = 0; i < hubs.length; i++) {
+    let ax = 0, ay = 0;
+    for (let j = 0; j < hubs.length; j++) {
+      if (i === j) continue;
+      const dx = hubs[j].x - hubs[i].x;
+      const dy = hubs[j].y - hubs[i].y;
+      const d2 = dx * dx + dy * dy + 900;
+      const inv = G * hubs[j].m / (d2 * Math.sqrt(d2));
+      ax += dx * inv;
+      ay += dy * inv;
+    }
+    hubs[i].vx += ax * dt;
+    hubs[i].vy += ay * dt;
+    hubs[i].x += hubs[i].vx * dt * 12;
+    hubs[i].y += hubs[i].vy * dt * 12;
+  }
+
+  // Stars
+  for (const s of stars) {
+    const { ax, ay } = accelAt(s.x, s.y);
+    s.vx += ax * dt;
+    s.vy += ay * dt;
+    s.x += s.vx * dt * 14;
+    s.y += s.vy * dt * 14;
+
+    s.trail.push({ x: s.x, y: s.y });
+    if (s.trail.length > 10) s.trail.shift();
+  }
+
+  // Camera follows barycenter
+  let bx = 0, by = 0, m = 0;
+  for (const h of hubs) { bx += h.x * h.m; by += h.y * h.m; m += h.m; }
+  bx /= m; by /= m;
+  camX += (bx - cx - camX) * 0.02;
+  camY += (by - cy - camY) * 0.02;
+}
+
+function frame() {
+  step();
+
+  ctx.setTransform(DPR, 0, 0, DPR, 0, 0);
+  ctx.fillStyle = rgba(theme.surface, 0.22);
+  ctx.fillRect(0, 0, W, H);
+
+  ctx.save();
+  ctx.translate(-camX, -camY);
+
+  ctx.globalCompositeOperation = "lighter";
+
+  // Hub glow
+  for (const h of hubs) {
+    const g = ctx.createRadialGradient(h.x, h.y, 0, h.x, h.y, 50);
+    g.addColorStop(0, rgba(h.color, 0.35));
+    g.addColorStop(0.4, rgba(h.color, 0.08));
+    g.addColorStop(1, "transparent");
+    ctx.fillStyle = g;
+    ctx.beginPath();
+    ctx.arc(h.x, h.y, 50, 0, Math.PI * 2);
+    ctx.fill();
+  }
+
+  // Stars + short trails
+  for (const s of stars) {
+    if (s.trail.length > 1) {
+      ctx.beginPath();
+      ctx.moveTo(s.trail[0].x, s.trail[0].y);
+      for (let i = 1; i < s.trail.length; i++) {
+        ctx.lineTo(s.trail[i].x, s.trail[i].y);
+      }
+      ctx.strokeStyle = rgba(s.color, 0.15);
+      ctx.lineWidth = 1;
+      ctx.stroke();
+    }
+    ctx.beginPath();
+    ctx.arc(s.x, s.y, s.size, 0, Math.PI * 2);
+    ctx.fillStyle = rgba(s.color, 0.75);
+    ctx.fill();
+  }
+
+  ctx.globalCompositeOperation = "source-over";
+  ctx.restore();
+
+  requestAnimationFrame(frame);
+}
+
 function resize() {
   W = innerWidth; H = innerHeight;
   cx = W * 0.5; cy = H * 0.5;
   DPR = Math.min(devicePixelRatio || 1, 2);
   canvas.width  = Math.floor(W * DPR);
   canvas.height = Math.floor(H * DPR);
-  ctx.setTransform(DPR, 0, 0, DPR, 0, 0);
+  initGalaxies();
 }
 addEventListener("resize", resize, { passive: true });
-
-function project4(v, aXY, aZW, aXW, aYZ) {
-  let x = v[0], y = v[1], z = v[2], w = v[3];
-
-  // XY
-  let c = Math.cos(aXY), s = Math.sin(aXY);
-  let x1 = x * c - y * s;
-  let y1 = x * s + y * c;
-  x = x1; y = y1;
-
-  // ZW
-  c = Math.cos(aZW); s = Math.sin(aZW);
-  let z1 = z * c - w * s;
-  let w1 = z * s + w * c;
-  z = z1; w = w1;
-
-  // XW
-  c = Math.cos(aXW); s = Math.sin(aXW);
-  let x2 = x * c - w * s;
-  let w2 = x * s + w * c;
-  x = x2; w = w2;
-
-  // YZ (extra plane for richer motion)
-  c = Math.cos(aYZ); s = Math.sin(aYZ);
-  let y2 = y * c - z * s;
-  let z2 = y * s + z * c;
-  y = y2; z = z2;
-
-  // 4D → 3D
-  const d4 = 2.6;
-  const ws = 1 / (d4 - w);
-  const x3 = x * ws;
-  const y3 = y * ws;
-  const z3 = z * ws;
-
-  // 3D → 2D
-  const d3 = 3.4;
-  const zs = 1 / (d3 - z3);
-  const scale = Math.min(W, H) * 0.3;
-
-  return {
-    x: cx + x3 * scale * zs * 2.15,
-    y: cy + y3 * scale * zs * 2.15,
-    depth: w + z3
-  };
-}
-
-function frame(now) {
-  const t = ((now - start) / 1000) * speedMul * 0.38;
-
-  ctx.setTransform(DPR, 0, 0, DPR, 0, 0);
-  ctx.fillStyle = rgba(theme.surface, 0.28);
-  ctx.fillRect(0, 0, W, H);
-
-  const aXY = t * 0.72;
-  const aZW = t * 0.48;
-  const aXW = t * 0.28;
-  const aYZ = t * 0.18;
-
-  const projected = verts4.map(v => project4(v, aXY, aZW, aXW, aYZ));
-
-  // Depth-sort edges back → front
-  const edgeDraw = edges.map((e, i) => {
-    const p1 = projected[e[0]];
-    const p2 = projected[e[1]];
-    return {
-      p1, p2,
-      depth: (p1.depth + p2.depth) * 0.5,
-      idx: i
-    };
-  }).sort((a, b) => a.depth - b.depth);
-
-  const roles = [theme.primary, theme.secondary, theme.tertiary];
-  ctx.lineCap = "round";
-
-  for (const e of edgeDraw) {
-    const alpha = Math.max(0.12, Math.min(0.9, (e.depth + 2.2) * 0.24));
-    const col = roles[e.idx % 3] || theme.primary;
-
-    ctx.beginPath();
-    ctx.moveTo(e.p1.x, e.p1.y);
-    ctx.lineTo(e.p2.x, e.p2.y);
-    ctx.strokeStyle = rgba(col, alpha);
-    ctx.lineWidth = 1.5 + alpha * 1.2;
-    ctx.stroke();
-  }
-
-  // Vertices
-  for (const p of projected) {
-    const glow = Math.max(0.15, Math.min(0.95, (p.depth + 2.2) * 0.3));
-    const grad = ctx.createRadialGradient(p.x, p.y, 0, p.x, p.y, 12);
-    grad.addColorStop(0, rgba(theme.primary, glow * 0.7));
-    grad.addColorStop(1, "transparent");
-    ctx.fillStyle = grad;
-    ctx.beginPath();
-    ctx.arc(p.x, p.y, 12, 0, Math.PI * 2);
-    ctx.fill();
-
-    ctx.beginPath();
-    ctx.arc(p.x, p.y, 2.6, 0, Math.PI * 2);
-    ctx.fillStyle = rgba(theme.primary, 0.95);
-    ctx.fill();
-  }
-
-  requestAnimationFrame(frame);
-}
 
 addEventListener("pointermove", () => {
   document.body.classList.add("show-cursor");
@@ -281,9 +309,8 @@ addEventListener("pointermove", () => {
 }, { passive: true });
 
 addEventListener("keydown", e => {
-  if (e.key.toLowerCase() === "c") {
-    clockWrap.classList.toggle("hidden");
-  }
+  if (e.key.toLowerCase() === "c") clockWrap.classList.toggle("hidden");
+  if (e.key.toLowerCase() === "r") initGalaxies();
 });
 
 function fallbackClock() {
@@ -306,7 +333,6 @@ function fallbackClock() {
 addEventListener("load", () => {
   loadTheme();
   resize();
-
   const s = document.createElement("script");
   s.src = "clock-shared.js";
   s.onload = () => {
@@ -317,10 +343,8 @@ addEventListener("load", () => {
   };
   s.onerror = fallbackClock;
   document.head.appendChild(s);
-
   hintEl.classList.add("show");
   setTimeout(() => hintEl.classList.remove("show"), 4000);
-
   requestAnimationFrame(frame);
 });
 </script>

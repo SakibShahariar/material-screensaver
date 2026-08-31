@@ -1,0 +1,394 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>soft-body-creatures</title>
+<style>
+:root {
+  --primary_rgb: 138 206 255;
+  --secondary_rgb: 180 199 233;
+  --tertiary_rgb: 186 196 250;
+  --surface_rgb: 8 12 18;
+  --outline_rgb: 137 146 154;
+}
+* { margin: 0; padding: 0; box-sizing: border-box; }
+html, body {
+  width: 100%; height: 100%; overflow: hidden;
+  background: rgb(var(--surface_rgb));
+  cursor: none;
+  font-family: "Google Sans", "Segoe UI", system-ui, sans-serif;
+}
+body.show-cursor { cursor: default; }
+canvas { display: block; width: 100vw; height: 100vh; }
+
+#clock-wrap {
+  position: fixed;
+  left: clamp(20px, 2.5vw, 40px);
+  bottom: clamp(16px, 2vw, 28px);
+  padding: 18px 26px 14px;
+  border-radius: 20px;
+  background: radial-gradient(
+    ellipse at 30% 70%,
+    rgb(var(--surface_rgb) / .9) 0%,
+    rgb(var(--surface_rgb) / .55) 55%,
+    transparent 100%
+  );
+  pointer-events: none;
+  transition: opacity .7s ease;
+  z-index: 10;
+}
+#clock-wrap.hidden { opacity: 0; }
+
+#clock {
+  font-weight: 200;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: -2px;
+  font-size: clamp(40px, 5.5vw, 78px);
+  color: rgb(var(--primary_rgb));
+  text-shadow:
+    0 0 2px rgb(var(--surface_rgb)),
+    0 0 14px rgb(var(--surface_rgb) / .95),
+    0 0 36px rgb(var(--primary_rgb) / .5),
+    0 2px 14px rgba(0,0,0,.85);
+  line-height: 1;
+}
+#clock .ampm {
+  font-size: .26em;
+  margin-left: 10px;
+  opacity: .78;
+  vertical-align: 22%;
+  letter-spacing: 2px;
+  font-weight: 400;
+}
+#date {
+  margin-top: 8px;
+  font-size: clamp(11px, 1.05vw, 14px);
+  letter-spacing: 4px;
+  text-transform: uppercase;
+  color: rgb(var(--secondary_rgb));
+  text-shadow:
+    0 0 8px rgb(var(--surface_rgb) / .9),
+    0 1px 8px rgba(0,0,0,.7);
+  opacity: .95;
+}
+
+#hint {
+  position: fixed; right: 28px; bottom: 24px; z-index: 10;
+  font-size: 11px; letter-spacing: 1.5px;
+  color: rgb(var(--outline_rgb) / .55);
+  opacity: 0; transition: opacity 1s ease;
+  text-transform: uppercase;
+  pointer-events: none;
+  text-shadow: 0 1px 8px rgb(var(--surface_rgb));
+}
+#hint.show { opacity: .7; }
+</style>
+<link rel="stylesheet" href="matugen-colors.css">
+</head>
+<body>
+<canvas id="c"></canvas>
+<div id="clock-wrap">
+  <div id="clock">00:00<span class="ampm">AM</span></div>
+  <div id="date">MON, JAN 1</div>
+</div>
+<div id="hint">C · toggle · drag bodies</div>
+
+<script>
+"use strict";
+
+const canvas = document.getElementById("c");
+const ctx = canvas.getContext("2d", { alpha: false, desynchronized: true });
+const clockEl = document.getElementById("clock");
+const dateEl  = document.getElementById("date");
+const hintEl  = document.getElementById("hint");
+const clockWrap = document.getElementById("clock-wrap");
+
+let W = 0, H = 0, DPR = 1;
+let theme = {};
+let creatures = [];
+let start = performance.now();
+let cursorTimer;
+let mouse = { x: 0, y: 0, down: false };
+let grab = null; // { creature, pointIdx }
+
+const NODES = 14;
+const reduceMotion = matchMedia("(prefers-reduced-motion: reduce)").matches;
+const speedMul = reduceMotion ? 0.4 : 1;
+
+function readRGB(name, fb = [160, 160, 160]) {
+  const r = getComputedStyle(document.documentElement).getPropertyValue(name).trim();
+  const p = r.split(/\s+/).map(Number);
+  return (p.length === 3 && p.every(n => !isNaN(n))) ? p : fb;
+}
+function rgba(c, a = 1) {
+  return `rgba(${c[0]},${c[1]},${c[2]},${a})`;
+}
+
+function loadTheme() {
+  theme = {
+    surface:   readRGB("--surface_rgb", [8, 12, 18]),
+    primary:   readRGB("--primary_rgb", [138, 206, 255]),
+    secondary: readRGB("--secondary_rgb", [180, 199, 233]),
+    tertiary:  readRGB("--tertiary_rgb", [186, 196, 250]),
+    outline:   readRGB("--outline_rgb", [137, 146, 154])
+  };
+  document.body.style.background = rgba(theme.surface);
+  clockEl.style.color = rgba(theme.primary, 1);
+  dateEl.style.color  = rgba(theme.secondary, 0.95);
+  hintEl.style.color  = rgba(theme.outline, 0.6);
+}
+
+function makeCreature(cx, cy, radius, color) {
+  const pts = [];
+  for (let i = 0; i < NODES; i++) {
+    const a = (i / NODES) * Math.PI * 2;
+    const x = cx + Math.cos(a) * radius;
+    const y = cy + Math.sin(a) * radius;
+    pts.push({ x, y, px: x, py: y });
+  }
+  // Rest area ≈ π r² (shoelace target)
+  const area0 = Math.PI * radius * radius;
+  return {
+    pts,
+    radius,
+    area0,
+    color,
+    phase: Math.random() * Math.PI * 2,
+    drift: (Math.random() - 0.5) * 0.15
+  };
+}
+
+function initCreatures() {
+  const colors = [theme.primary, theme.secondary, theme.tertiary];
+  creatures = [];
+  const n = 5;
+  for (let i = 0; i < n; i++) {
+    const r = Math.min(W, H) * (0.06 + Math.random() * 0.05);
+    creatures.push(makeCreature(
+      W * (0.2 + Math.random() * 0.6),
+      H * (0.25 + Math.random() * 0.5),
+      r,
+      colors[i % 3]
+    ));
+  }
+}
+
+function shoelace(pts) {
+  let a = 0;
+  for (let i = 0; i < pts.length; i++) {
+    const j = (i + 1) % pts.length;
+    a += pts[i].x * pts[j].y - pts[j].x * pts[i].y;
+  }
+  return a * 0.5;
+}
+
+function stepCreature(c, t) {
+  const pts = c.pts;
+  const breathe = 1 + 0.08 * Math.sin(t * 1.2 + c.phase);
+  const targetArea = c.area0 * breathe;
+
+  // Verlet
+  for (const p of pts) {
+    const vx = (p.x - p.px) * 0.97;
+    const vy = (p.y - p.py) * 0.97;
+    p.px = p.x;
+    p.py = p.y;
+    p.x += vx + c.drift * speedMul;
+    p.y += vy + 0.04 * speedMul;
+  }
+
+  // Constraints: edges + pressure
+  for (let iter = 0; iter < 4; iter++) {
+    // Edge length toward equal circumference segments
+    const rest = (2 * Math.PI * c.radius * breathe) / NODES;
+    for (let i = 0; i < NODES; i++) {
+      const a = pts[i];
+      const b = pts[(i + 1) % NODES];
+      const dx = b.x - a.x, dy = b.y - a.y;
+      const dist = Math.sqrt(dx * dx + dy * dy) || 0.001;
+      const diff = (rest - dist) / dist * 0.5;
+      const ox = dx * diff, oy = dy * diff;
+      a.x -= ox; a.y -= oy;
+      b.x += ox; b.y += oy;
+    }
+
+    // Pressure (area)
+    const area = shoelace(pts);
+    const err = targetArea - area;
+    const force = err * 0.008;
+    // centroid
+    let cx = 0, cy = 0;
+    for (const p of pts) { cx += p.x; cy += p.y; }
+    cx /= NODES; cy /= NODES;
+    for (const p of pts) {
+      const dx = p.x - cx, dy = p.y - cy;
+      const len = Math.sqrt(dx * dx + dy * dy) || 1;
+      p.x += (dx / len) * force;
+      p.y += (dy / len) * force;
+    }
+  }
+
+  // Bounds
+  for (const p of pts) {
+    if (p.x < 10) { p.x = 10; p.px = p.x + 1; }
+    if (p.x > W - 10) { p.x = W - 10; p.px = p.x - 1; }
+    if (p.y < 10) { p.y = 10; p.py = p.y + 1; }
+    if (p.y > H - 10) { p.y = H - 10; p.py = p.y - 1; }
+  }
+}
+
+function separateCreatures() {
+  for (let i = 0; i < creatures.length; i++) {
+    for (let j = i + 1; j < creatures.length; j++) {
+      const a = creatures[i], b = creatures[j];
+      let acx = 0, acy = 0, bcx = 0, bcy = 0;
+      for (const p of a.pts) { acx += p.x; acy += p.y; }
+      for (const p of b.pts) { bcx += p.x; bcy += p.y; }
+      acx /= NODES; acy /= NODES;
+      bcx /= NODES; bcy /= NODES;
+      const dx = bcx - acx, dy = bcy - acy;
+      const dist = Math.sqrt(dx * dx + dy * dy) || 1;
+      const minD = (a.radius + b.radius) * 0.95;
+      if (dist < minD) {
+        const push = (minD - dist) * 0.5;
+        const nx = dx / dist, ny = dy / dist;
+        for (const p of a.pts) { p.x -= nx * push * 0.15; p.y -= ny * push * 0.15; }
+        for (const p of b.pts) { p.x += nx * push * 0.15; p.y += ny * push * 0.15; }
+      }
+    }
+  }
+}
+
+function drawCreature(c) {
+  const pts = c.pts;
+  // Soft fill
+  ctx.beginPath();
+  ctx.moveTo(pts[0].x, pts[0].y);
+  for (let i = 1; i < pts.length; i++) ctx.lineTo(pts[i].x, pts[i].y);
+  ctx.closePath();
+
+  let cx = 0, cy = 0;
+  for (const p of pts) { cx += p.x; cy += p.y; }
+  cx /= NODES; cy /= NODES;
+
+  const g = ctx.createRadialGradient(cx, cy, 0, cx, cy, c.radius * 1.4);
+  g.addColorStop(0, rgba(c.color, 0.45));
+  g.addColorStop(0.7, rgba(c.color, 0.15));
+  g.addColorStop(1, rgba(c.color, 0));
+  ctx.fillStyle = g;
+  ctx.fill();
+
+  ctx.strokeStyle = rgba(c.color, 0.7);
+  ctx.lineWidth = 2;
+  ctx.stroke();
+
+  // Nodes
+  for (const p of pts) {
+    ctx.beginPath();
+    ctx.arc(p.x, p.y, 2.2, 0, Math.PI * 2);
+    ctx.fillStyle = rgba(c.color, 0.85);
+    ctx.fill();
+  }
+}
+
+function frame(now) {
+  const t = ((now - start) / 1000) * speedMul;
+
+  if (grab && mouse.down) {
+    const p = grab.creature.pts[grab.pointIdx];
+    p.x = mouse.x;
+    p.y = mouse.y;
+    p.px = mouse.x;
+    p.py = mouse.y;
+  }
+
+  for (const c of creatures) stepCreature(c, t);
+  separateCreatures();
+
+  ctx.setTransform(DPR, 0, 0, DPR, 0, 0);
+  ctx.fillStyle = rgba(theme.surface, 1);
+  ctx.fillRect(0, 0, W, H);
+
+  for (const c of creatures) drawCreature(c);
+
+  requestAnimationFrame(frame);
+}
+
+function resize() {
+  W = innerWidth; H = innerHeight;
+  DPR = Math.min(devicePixelRatio || 1, 2);
+  canvas.width  = Math.floor(W * DPR);
+  canvas.height = Math.floor(H * DPR);
+  initCreatures();
+}
+addEventListener("resize", resize, { passive: true });
+
+addEventListener("pointerdown", e => {
+  mouse.down = true;
+  mouse.x = e.clientX;
+  mouse.y = e.clientY;
+  grab = null;
+  let best = 40;
+  for (const c of creatures) {
+    for (let i = 0; i < c.pts.length; i++) {
+      const d = Math.hypot(c.pts[i].x - mouse.x, c.pts[i].y - mouse.y);
+      if (d < best) {
+        best = d;
+        grab = { creature: c, pointIdx: i };
+      }
+    }
+  }
+  document.body.classList.add("show-cursor");
+});
+addEventListener("pointerup", () => { mouse.down = false; grab = null; });
+addEventListener("pointermove", e => {
+  mouse.x = e.clientX;
+  mouse.y = e.clientY;
+  document.body.classList.add("show-cursor");
+  clearTimeout(cursorTimer);
+  cursorTimer = setTimeout(() => document.body.classList.remove("show-cursor"), 2500);
+}, { passive: true });
+
+addEventListener("keydown", e => {
+  if (e.key.toLowerCase() === "c") clockWrap.classList.toggle("hidden");
+  if (e.key.toLowerCase() === "r") initCreatures();
+});
+
+function fallbackClock() {
+  function update() {
+    const n = new Date();
+    let h = n.getHours();
+    const ap = h >= 12 ? "PM" : "AM";
+    h = h % 12 || 12;
+    clockEl.innerHTML =
+      `${String(h).padStart(2,"0")}:${String(n.getMinutes()).padStart(2,"0")}` +
+      `<span class="ampm">${ap}</span>`;
+    dateEl.textContent = n.toLocaleDateString("en-US", {
+      weekday: "short", month: "short", day: "numeric"
+    }).toUpperCase();
+  }
+  update();
+  setInterval(update, 1000);
+}
+
+addEventListener("load", () => {
+  loadTheme();
+  resize();
+  const s = document.createElement("script");
+  s.src = "clock-shared.js";
+  s.onload = () => {
+    try {
+      if (typeof startClock === "function") startClock(clockEl, dateEl);
+      else fallbackClock();
+    } catch { fallbackClock(); }
+  };
+  s.onerror = fallbackClock;
+  document.head.appendChild(s);
+  hintEl.classList.add("show");
+  setTimeout(() => hintEl.classList.remove("show"), 4000);
+  requestAnimationFrame(frame);
+});
+</script>
+</body>
+</html>

@@ -3,16 +3,14 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Material Screensaver — Origami</title>
+<title>Material Screensaver — Magnetic Field</title>
 <style>
 :root {
   --primary_rgb: 138 206 255;
   --secondary_rgb: 180 199 233;
   --tertiary_rgb: 186 196 250;
   --primary_container_rgb: 0 75 111;
-  --secondary_container_rgb: 53 72 99;
-  --tertiary_container_rgb: 58 68 114;
-  --surface_rgb: 12 20 27;
+  --surface_rgb: 8 12 18;
   --outline_rgb: 137 146 154;
 }
 * { margin: 0; padding: 0; box-sizing: border-box; }
@@ -33,7 +31,7 @@ canvas { display: block; width: 100vw; height: 100vh; }
   border-radius: 20px;
   background: radial-gradient(
     ellipse at 30% 70%,
-    rgb(var(--surface_rgb) / .88) 0%,
+    rgb(var(--surface_rgb) / .9) 0%,
     rgb(var(--surface_rgb) / .55) 55%,
     transparent 100%
   );
@@ -109,15 +107,15 @@ const clockWrap = document.getElementById("clock-wrap");
 
 let W = 0, H = 0, DPR = 1;
 let theme = {};
-let roleList = [];
-let grid = [];
+let poles = [];
+let particles = [];
 let start = performance.now();
-let lastT = 0;
 let cursorTimer;
 
-const CELL_SIZE = 88;
+const POLE_COUNT = 4;
+const PARTICLE_COUNT = 900;
 const reduceMotion = matchMedia("(prefers-reduced-motion: reduce)").matches;
-const speedMul = reduceMotion ? 0.3 : 0.85;
+const speedMul = reduceMotion ? 0.25 : 0.7;
 
 function readRGB(name, fb = [160, 160, 160]) {
   const r = getComputedStyle(document.documentElement).getPropertyValue(name).trim();
@@ -130,29 +128,13 @@ function rgba(c, a = 1) {
 
 function loadTheme() {
   theme = {
-    surface:            readRGB("--surface_rgb", [12, 20, 27]),
-    primary:            readRGB("--primary_rgb", [138, 206, 255]),
-    secondary:          readRGB("--secondary_rgb", [180, 199, 233]),
-    tertiary:           readRGB("--tertiary_rgb", [186, 196, 250]),
-    primaryContainer:   readRGB("--primary_container_rgb", [0, 75, 111]),
-    secondaryContainer: readRGB("--secondary_container_rgb", [53, 72, 99]),
-    tertiaryContainer:  readRGB("--tertiary_container_rgb", [58, 68, 114]),
-    outline:            readRGB("--outline_rgb", [137, 146, 154])
+    surface:   readRGB("--surface_rgb", [8, 12, 18]),
+    primary:   readRGB("--primary_rgb", [138, 206, 255]),
+    secondary: readRGB("--secondary_rgb", [180, 199, 233]),
+    tertiary:  readRGB("--tertiary_rgb", [186, 196, 250]),
+    outline:   readRGB("--outline_rgb", [137, 146, 154]),
+    primaryContainer: readRGB("--primary_container_rgb", [0, 75, 111])
   };
-
-  roleList = [
-    theme.primary,
-    theme.secondary,
-    theme.tertiary,
-    theme.primaryContainer,
-    theme.secondaryContainer,
-    theme.tertiaryContainer
-  ];
-
-  for (const cell of grid) {
-    cell.colorA = roleList[Math.floor(Math.random() * roleList.length)];
-    cell.colorB = roleList[Math.floor(Math.random() * roleList.length)];
-  }
 
   document.body.style.background = rgba(theme.surface);
   clockEl.style.color = rgba(theme.primary, 1);
@@ -160,28 +142,45 @@ function loadTheme() {
   hintEl.style.color  = rgba(theme.outline, 0.6);
 }
 
-function makeGrid() {
-  grid = [];
-  const cols = Math.ceil(W / CELL_SIZE) + 1;
-  const rows = Math.ceil(H / CELL_SIZE) + 1;
-  const offsetX = (W - cols * CELL_SIZE) / 2;
-  const offsetY = (H - rows * CELL_SIZE) / 2;
-  const n = Math.max(1, roleList.length);
-
-  for (let r = 0; r < rows; r++) {
-    for (let c = 0; c < cols; c++) {
-      grid.push({
-        cx: offsetX + c * CELL_SIZE + CELL_SIZE / 2,
-        cy: offsetY + r * CELL_SIZE + CELL_SIZE / 2,
-        colorA: roleList[Math.floor(Math.random() * n)] || [140, 200, 255],
-        colorB: roleList[Math.floor(Math.random() * n)] || [100, 140, 180],
-        state: 0,
-        flipping: false,
-        flipProgress: 0,
-        nextFlip: Math.random() * 7
-      });
-    }
+function initPoles() {
+  poles = [];
+  for (let i = 0; i < POLE_COUNT; i++) {
+    poles.push({
+      x: (0.2 + Math.random() * 0.6) * W,
+      y: (0.2 + Math.random() * 0.6) * H,
+      charge: i % 2 === 0 ? 1 : -1,
+      phase: Math.random() * Math.PI * 2,
+      speed: 0.08 + Math.random() * 0.12,
+      radius: 40 + Math.random() * 50
+    });
   }
+}
+
+function initParticles() {
+  particles = [];
+  for (let i = 0; i < PARTICLE_COUNT; i++) {
+    particles.push({
+      x: Math.random() * W,
+      y: Math.random() * H,
+      age: Math.random() * 100,
+      life: 80 + Math.random() * 120,
+      size: 0.6 + Math.random() * 1.2
+    });
+  }
+}
+
+function fieldAt(x, y) {
+  let fx = 0, fy = 0;
+  for (const p of poles) {
+    const dx = x - p.x;
+    const dy = y - p.y;
+    const d2 = dx * dx + dy * dy + 80;
+    const inv = p.charge / d2;
+    fx += dx * inv;
+    fy += dy * inv;
+  }
+  const len = Math.sqrt(fx * fx + fy * fy) + 0.0001;
+  return { fx: fx / len, fy: fy / len, strength: len };
 }
 
 function resize() {
@@ -190,70 +189,77 @@ function resize() {
   canvas.width  = Math.floor(W * DPR);
   canvas.height = Math.floor(H * DPR);
   ctx.setTransform(DPR, 0, 0, DPR, 0, 0);
-  makeGrid();
+  initPoles();
+  initParticles();
 }
 addEventListener("resize", resize, { passive: true });
 
-function drawCell(cell) {
-  const size = CELL_SIZE * 0.8;
-  let scaleX = 1;
-  let color = cell.state === 0 ? cell.colorA : cell.colorB;
-
-  if (cell.flipping) {
-    scaleX = Math.cos(cell.flipProgress * Math.PI);
-    if (cell.state === 0) {
-      color = cell.flipProgress < 0.5 ? cell.colorA : cell.colorB;
-    } else {
-      color = cell.flipProgress < 0.5 ? cell.colorB : cell.colorA;
-    }
-  }
-
-  ctx.save();
-  ctx.translate(cell.cx, cell.cy);
-  ctx.scale(Math.max(0.02, Math.abs(scaleX)), 1);
-
-  ctx.beginPath();
-  ctx.moveTo(0, -size / 2);
-  ctx.lineTo(size / 2, 0);
-  ctx.lineTo(0, size / 2);
-  ctx.lineTo(-size / 2, 0);
-  ctx.closePath();
-
-  ctx.fillStyle = rgba(color, 0.88);
-  ctx.fill();
-
-  ctx.strokeStyle = rgba(theme.surface, 0.95);
-  ctx.lineWidth = 2.5;
-  ctx.stroke();
-
-  ctx.restore();
-}
-
 function frame(now) {
   const t = ((now - start) / 1000) * speedMul;
-  const dt = Math.min(0.05, t - lastT || 0.016);
-  lastT = t;
 
-  ctx.setTransform(DPR, 0, 0, DPR, 0, 0);
-  ctx.fillStyle = rgba(theme.surface, 1);
-  ctx.fillRect(0, 0, W, H);
-
-  for (const cell of grid) {
-    if (!cell.flipping && t >= cell.nextFlip) {
-      cell.flipping = true;
-      cell.flipProgress = 0;
-    }
-    if (cell.flipping) {
-      cell.flipProgress += dt * 1.5;
-      if (cell.flipProgress >= 1) {
-        cell.flipping = false;
-        cell.state = cell.state === 0 ? 1 : 0;
-        cell.nextFlip = t + 3.5 + Math.random() * 9;
-      }
-    }
-    drawCell(cell);
+  // Drift poles slowly
+  for (const p of poles) {
+    p.x = W * 0.5 + Math.cos(t * p.speed + p.phase) * p.radius * (W / 400);
+    p.y = H * 0.5 + Math.sin(t * p.speed * 0.85 + p.phase * 1.3) * p.radius * (H / 400);
   }
 
+  ctx.setTransform(DPR, 0, 0, DPR, 0, 0);
+  ctx.fillStyle = rgba(theme.surface, 0.12);
+  ctx.fillRect(0, 0, W, H);
+
+  ctx.globalCompositeOperation = "lighter";
+
+  const colors = [theme.primary, theme.secondary, theme.tertiary];
+
+  for (let i = 0; i < particles.length; i++) {
+    const pt = particles[i];
+    const f = fieldAt(pt.x, pt.y);
+
+    const px = pt.x;
+    const py = pt.y;
+    pt.x += f.fx * 2.4;
+    pt.y += f.fy * 2.4;
+    pt.age++;
+
+    const lifeRatio = pt.age / pt.life;
+    const fade = lifeRatio < 0.1
+      ? lifeRatio / 0.1
+      : lifeRatio > 0.75
+        ? Math.max(0, 1 - (lifeRatio - 0.75) / 0.25)
+        : 1;
+
+    const col = colors[i % 3];
+    const alpha = fade * 0.45 * Math.min(1, f.strength * 40);
+
+    ctx.strokeStyle = rgba(col, alpha);
+    ctx.lineWidth = pt.size;
+    ctx.lineCap = "round";
+    ctx.beginPath();
+    ctx.moveTo(px, py);
+    ctx.lineTo(pt.x, pt.y);
+    ctx.stroke();
+
+    if (pt.age > pt.life || pt.x < -20 || pt.x > W + 20 || pt.y < -20 || pt.y > H + 20) {
+      pt.x = Math.random() * W;
+      pt.y = Math.random() * H;
+      pt.age = 0;
+      pt.life = 70 + Math.random() * 110;
+    }
+  }
+
+  // Soft pole markers
+  for (const p of poles) {
+    const col = p.charge > 0 ? theme.primary : theme.tertiary;
+    const g = ctx.createRadialGradient(p.x, p.y, 0, p.x, p.y, 28);
+    g.addColorStop(0, rgba(col, 0.2));
+    g.addColorStop(1, "transparent");
+    ctx.fillStyle = g;
+    ctx.beginPath();
+    ctx.arc(p.x, p.y, 28, 0, Math.PI * 2);
+    ctx.fill();
+  }
+
+  ctx.globalCompositeOperation = "source-over";
   requestAnimationFrame(frame);
 }
 
@@ -289,7 +295,6 @@ function fallbackClock() {
 addEventListener("load", () => {
   loadTheme();
   resize();
-  loadTheme();
 
   const s = document.createElement("script");
   s.src = "clock-shared.js";
