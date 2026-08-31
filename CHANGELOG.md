@@ -5,6 +5,18 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.2.2] - 2026-08-30
+### Fixed
+- Desktop file `Exec=` now uses `%h/.local/bin/...` + `TryExec` so the settings app launches reliably even when `~/.local/bin` is not in `$PATH`.
+- Icon install places the PNG under the hicolor theme (`48x48/apps`) and runs a proper `gtk-update-icon-cache`.
+- Removed dead `_show_cursor_temporarily` body and its call sites (cursor is permanently hidden for non-interactive styles; solar-system manages its own).
+- Dropped leftover `"browser": "auto"` config key (Chromium backend removed in v2.0).
+- After `lock_after_seconds` fires, the screensaver is now closed (previously it stayed running under the lock screen).
+- README style count corrected to 53; Solar System description updated to Canvas 2D.
+### Changed
+- CI: install real GI/WebKit deps + shellcheck, add import smoke test, systemd unit checks, stricter HTML sanity (CDN detection, shared-helper presence).
+- `install.sh`: safer `find`-based chmod, atomic copy via `cp -a .../.`, dual icon locations.
+
 ## [2.2.1] - 2026-08-28
 ### Fixed
 - Cursor hidden from first paint — previous `Gdk` blank on `win`+`web` overridden by WebKit CSS, so arrow showed until motion. Now injects `* { cursor: none !important; }` via `WebKit.UserStyleSheet` before `load_uri` + `Gdk` blank (`1×1` transparent `Pixbuf→Texture`) + `JS` `cursor='none'` with robust Wayland schedule (`idle` + `50/200/600/1200ms` + `realize`/`map`, `100/500ms` fullscreen retries) — `bin/material-screensaver-ctl.py:287,350`.
@@ -41,6 +53,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Random mode `random` `bin/material-screensaver-ctl.py:32,gui.py:94`, `12h/24h` clock `clock_format`.
 - Hardening: desktop portability, `shutil.which`, daemon `RemoveWatch` leak fix, stale PID cleanup, atomic `install.sh`, CI workflow.
 
+[2.2.2]: https://github.com/SakibShahariar/material-screensaver/compare/v2.2.1...v2.2.2
 [2.2.1]: https://github.com/SakibShahariar/material-screensaver/compare/v2.2.0...v2.2.1
 [2.2.0]: https://github.com/SakibShahariar/material-screensaver/compare/v2.1.0...v2.2.0
 [2.1.0]: https://github.com/SakibShahariar/material-screensaver/compare/v2.0.0...v2.1.0

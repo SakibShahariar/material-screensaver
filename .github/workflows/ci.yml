@@ -17,16 +17,45 @@ jobs:
         with:
           python-version: "3.x"
 
-      - name: Python syntax check
-        run: python3 -m py_compile bin/*.py
+      - name: Install system dependencies
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq \
+            python3-gi \
+            gir1.2-gtk-4.0 \
+            gir1.2-adw-1 \
+            gir1.2-webkit-6.0 \
+            gir1.2-gdkpixbuf-2.0 \
+            desktop-file-utils \
+            shellcheck
 
-      - name: Bash syntax check
-        run: bash -n install.sh
+      - name: Python syntax + import smoke test
+        run: |
+          python3 -m py_compile bin/*.py
+          python3 -c "
+          import gi
+          gi.require_version('Gtk', '4.0')
+          gi.require_version('Adw', '1')
+          gi.require_version('WebKit', '6.0')
+          from gi.repository import Gtk, Adw, WebKit, Gio, GLib, Gdk
+          print('GI imports OK')
+          "
+
+      - name: Bash syntax + shellcheck
+        run: |
+          bash -n install.sh
+          shellcheck -x install.sh
 
       - name: Desktop file validation
         run: |
-          sudo apt-get update -qq && sudo apt-get install -y -qq desktop-file-utils
           desktop-file-validate applications/material-screensaver-settings.desktop
+          # Ensure Exec uses a resolvable path form
+          grep -E '^Exec=%h/\.local/bin/' applications/material-screensaver-settings.desktop
+
+      - name: Systemd unit sanity
+        run: |
+          grep -q 'ExecStart=.*material-screensaver-ctl.py daemon' systemd/material-screensaver.service
+          grep -q 'WantedBy=graphical-session.target' systemd/material-screensaver.service
 
       - name: No invalid CSS rgba(var) pattern
         run: |
@@ -34,7 +63,7 @@ jobs:
             echo "Found invalid rgba(var(--x), ...) — use rgb(var(--x) / alpha)"
             exit 1
           fi
-          if grep -rnE 'rgb\(var\(--[a-z_]+\)\s*,' screensavers/; then
+          if grep -rnE 'rgb\(var\(--[a-zA-Z0-9_-]+\)\s*,' screensavers/; then
             echo "Found rgb(var(--x), comma) — use rgb(var(--x) / alpha)"
             exit 1
           fi
@@ -43,19 +72,28 @@ jobs:
       - name: HTML sanity
         run: |
           python3 << 'PY'
-          import glob, re, sys
-          ok=True
-          for p in sorted(glob.glob("screensavers/*.html")):
-              t=open(p).read()
+          import glob, re, sys, os
+          ok = True
+          htmls = sorted(glob.glob("screensavers/*.html"))
+          if not htmls:
+              print("FAIL: no HTML screensavers found")
+              sys.exit(1)
+          for p in htmls:
+              t = open(p, encoding="utf-8", errors="replace").read()
+              name = os.path.basename(p)
               if "matugen-colors.css" not in t:
-                  print(f"FAIL {p}: missing matugen link"); ok=False
+                  print(f"FAIL {name}: missing matugen link"); ok = False
               if t.count("<script") != t.count("</script>"):
-                  print(f"FAIL {p}: script tag mismatch"); ok=False
+                  print(f"FAIL {name}: script tag mismatch"); ok = False
               if '<meta name="viewport"' not in t:
-                  print(f"FAIL {p}: missing viewport meta"); ok=False
+                  print(f"FAIL {name}: missing viewport meta"); ok = False
+              # no external CDN leftovers
+              if re.search(r"https?://(cdn\.|unpkg\.|jsdelivr|googleapis)", t, re.I):
+                  print(f"FAIL {name}: external CDN reference"); ok = False
+          # shared helpers must exist
+          for helper in ("clock-shared.js", "theme-shared.js"):
+              if not os.path.isfile(os.path.join("screensavers", helper)):
+                  print(f"FAIL: missing shared helper {helper}"); ok = False
+          print(f"Checked {len(htmls)} HTML files")
           sys.exit(0 if ok else 1)
           PY
-
-      - name: Shell check (if available)
-        run: |
-          if command -v shellcheck >/dev/null 2>&1; then shellcheck install.sh; else echo "shellcheck not installed — skipping"; fi
