@@ -26,10 +26,11 @@ import random
 import subprocess
 import atexit
 import signal
+from urllib.parse import urlencode
 
 SCREENSAVER_DIR = os.path.expanduser("~/.local/share/material-screensaver/screensavers")
 CONFIG_PATH = os.path.expanduser("~/.config/material-screensaver/config.json")
-DEFAULT_CONFIG = {"active": None, "idle_seconds": 300, "clock_format": "24h", "random": False, "browser": "auto", "lock_after_seconds": 300, "close_on_mouse": True}
+DEFAULT_CONFIG = {"active": None, "idle_seconds": 300, "clock_format": "24h", "random": False, "lock_after_seconds": 300, "close_on_mouse": True}
 
 # D-Bus service for daemon delegation (PID file gone)
 SERVICE_NAME = "io.github.sakib.MaterialScreensaver"
@@ -54,15 +55,48 @@ _is_viewer_mode = False  # True in viewer subprocess (isolated WebKit, daemon st
 _viewer_loop = None  # GLib.MainLoop for viewer subprocess
 
 
-def load_config():
+def _valid_int(value, minimum, maximum):
+    """Return an integer in range, or None without accepting bool as an int."""
+    if isinstance(value, bool):
+        return None
+    try:
+        value = int(value)
+    except (TypeError, ValueError, OverflowError):
+        return None
+    return value if minimum <= value <= maximum else None
+
+
+def normalize_config(data):
+    """Return a safe, complete configuration from untrusted JSON data."""
     cfg = dict(DEFAULT_CONFIG)
-    if os.path.exists(CONFIG_PATH):
-        try:
-            with open(CONFIG_PATH) as f:
-                cfg.update(json.load(f))
-        except (json.JSONDecodeError, OSError):
-            pass
+    if not isinstance(data, dict):
+        return cfg
+
+    active = data.get("active")
+    if active is None or isinstance(active, str):
+        cfg["active"] = active
+    for key in ("random", "close_on_mouse"):
+        if isinstance(data.get(key), bool):
+            cfg[key] = data[key]
+    idle = _valid_int(data.get("idle_seconds"), 1, 86400)
+    if idle is not None:
+        cfg["idle_seconds"] = idle
+    lock = _valid_int(data.get("lock_after_seconds"), 0, 86400)
+    if lock is not None:
+        cfg["lock_after_seconds"] = lock
+    if data.get("clock_format") in ("12h", "24h"):
+        cfg["clock_format"] = data["clock_format"]
     return cfg
+
+
+def load_config():
+    if not os.path.exists(CONFIG_PATH):
+        return dict(DEFAULT_CONFIG)
+    try:
+        with open(CONFIG_PATH, encoding="utf-8") as f:
+            return normalize_config(json.load(f))
+    except (json.JSONDecodeError, OSError, TypeError, ValueError):
+        return dict(DEFAULT_CONFIG)
 
 
 def list_screensavers():
@@ -82,6 +116,11 @@ def get_active_html_path(cfg):
     if active and active in screensavers:
         return screensavers[active]
     return next(iter(screensavers.values()))  # alphabetically first
+
+
+def has_graphical_session():
+    """Avoid initializing GTK/WebKit when no display connection is possible."""
+    return bool(os.environ.get("WAYLAND_DISPLAY") or os.environ.get("DISPLAY"))
 
 
 # ---------- SessionManager inhibit ----------
@@ -187,7 +226,7 @@ def _create_viewer_windows(html_path, clock_format="24h"):
     gi.require_version("Gtk", "4.0")
     gi.require_version("Gdk", "4.0")
     gi.require_version("WebKit", "6.0")
-    from gi.repository import Gtk, Gdk, WebKit, GLib
+    from gi.repository import Gtk, Gdk, Gio, WebKit, GLib
 
     # Always clean orphans before create — second Show often ghosts if previous Hide left bwrap
     try:
@@ -226,7 +265,10 @@ def _create_viewer_windows(html_path, clock_format="24h"):
     if not monitors:
         monitors = [None]
 
-    uri = f"file://{html_path}?format={clock_format}"
+    # Build a real file URI so user-added names containing spaces, #, ?, or
+    # non-ASCII characters are not misinterpreted as URL syntax.
+    uri = Gio.File.new_for_path(html_path).get_uri()
+    uri = f"{uri}?{urlencode({'format': clock_format})}"
     windows = []
     global _ephemeral_ctx
     if _ephemeral_ctx is None:
@@ -318,6 +360,11 @@ def _create_viewer_windows(html_path, clock_format="24h"):
                     return True
                 if is_super:
                     return True
+                # With mouse dismissal disabled, the advertised fallback is
+                # an ordinary key press.  Do not let it leak to the page.
+                if not load_config().get("close_on_mouse", True):
+                    hide_viewer()
+                    return True
                 return False
             except Exception:
                 try:
@@ -333,19 +380,27 @@ def _create_viewer_windows(html_path, clock_format="24h"):
                     pass
                 return False
         def on_click(ctrl, n_press, x, y, _win=win, _web=web):
-            try:
-                _show_cursor_temporarily(_win, _web)
-            except Exception:
-                pass
-            return
+            # Non-interactive styles keep cursor permanently hidden.
+            # Interactive (solar-system) manages its own cursor via page CSS.
+            hide_viewer()
+            return True
         def on_motion(ctrl, x, y, _win=win, _web=web):
-            # Only Super+Q closes — motion just shows cursor briefly
+            # Non-interactive: cursor stays hidden. Interactive styles handle their own.
+            # The daemon has Mutter's user-active watch, but standalone
+            # mode does not.  Ignore map-time pointer events, then honor the
+            # normal close-on-mouse setting locally as well.
             try:
-                _show_cursor_temporarily(_win, _web)
+                shown_at = getattr(_win, "_show_time", 0)
+                if (load_config().get("close_on_mouse", True)
+                        and shown_at
+                        and GLib.get_monotonic_time() - shown_at > 500000):
+                    hide_viewer()
+                    return True
             except Exception:
                 pass
-            return
-        # cursor helpers — hidden by default, show 1.2s on movement (blank Gdk cursor on win+web)
+            return False
+        # cursor helpers — permanently hidden for non-interactive styles
+        # (solar-system is interactive and manages cursor via body.show-cursor CSS)
         try:
             gi.require_version("GdkPixbuf", "2.0")
         except Exception:
@@ -387,33 +442,6 @@ def _create_viewer_windows(html_path, clock_format="24h"):
                     web.evaluate_javascript("document.documentElement.style.cursor='none';document.body&& (document.body.style.cursor='none')", -1, None, None, None, None, None)
                 except Exception:
                     pass
-        def _show_cursor_temporarily(w, web=None):
-            # hide except solar-system: never show via Gdk for any; solar-system manages via page CSS (body.show-cursor)
-            return
-            for tgt in ([w] + ([web] if web is not None else [])):
-                try:
-                    try:
-                        tgt.set_cursor(Gdk.Cursor.new_from_name("default", None))
-                    except Exception:
-                        tgt.set_cursor(None)
-                except Exception:
-                    pass
-            if web is not None:
-                try:
-                    web.evaluate_javascript("document.documentElement.style.cursor='auto';document.body&& (document.body.style.cursor='auto')", -1, None, None, None, None, None)
-                except Exception:
-                    pass
-            from gi.repository import GLib as _GLib2
-            def _rehide():
-                try:
-                    _hide_cursor(w, web)
-                except Exception:
-                    pass
-                return False
-            try:
-                _GLib2.timeout_add(1200, _rehide)
-            except Exception:
-                pass
         # robust initial hide — Wayland resets cursor on map/fullscreen, so schedule after realize/map/timeouts
         def _hide_now():
             try:
@@ -634,17 +662,14 @@ def _lock_screen():
                         "--object-path", "/org/gnome/ScreenSaver",
                         "--method", "org.gnome.ScreenSaver.Lock"],
                        capture_output=True, timeout=3)
-        return
     except Exception:
-        pass
-    try:
-        subprocess.run(["loginctl", "lock-session"], capture_output=True, timeout=3)
-    except Exception:
-        pass
-    try:
-        subprocess.run(["xdg-screensaver", "lock"], capture_output=True, timeout=3)
-    except Exception:
-        pass
+        try:
+            subprocess.run(["loginctl", "lock-session"], capture_output=True, timeout=3)
+        except Exception:
+            try:
+                subprocess.run(["xdg-screensaver", "lock"], capture_output=True, timeout=3)
+            except Exception:
+                pass
 
 def _schedule_lock():
     global _lock_timeout_id
@@ -668,6 +693,11 @@ def _schedule_lock():
             _lock_timeout_id=None
             if is_viewer_active():
                 _lock_screen()
+                # Close screensaver after locking so it does not stay running under the lock screen
+                try:
+                    hide_viewer()
+                except Exception:
+                    pass
             return False
         _lock_timeout_id = GLib.timeout_add_seconds(secs, _do_lock)
     except Exception:
@@ -988,6 +1018,9 @@ def _daemon_switch_to_idle_watch():
 def run_viewer(html_path, clock_format="24h"):
     """Viewer subprocess entry point — isolated WebKit, daemon stays 30M flat."""
     global _is_viewer_mode, _viewer_loop, _viewer_windows
+    if not has_graphical_session():
+        print("No graphical session available; cannot start screensaver viewer.", file=sys.stderr)
+        return False
     _is_viewer_mode = True
     # Viewer handles its own SIGTERM/SIGINT to exit cleanly when daemon Hide kills it
     try:
@@ -1513,6 +1546,9 @@ def start():
     ok, _ = _call_daemon("Show")
     if ok:
         return
+    if not has_graphical_session():
+        print("No graphical session available; cannot start screensaver.", file=sys.stderr)
+        sys.exit(1)
     # Fallback: standalone viewer (blocking)
     cfg = load_config()
     html_path = get_active_html_path(cfg)
@@ -1596,20 +1632,9 @@ def toggle():
     if is_viewer_active():
         hide_viewer()
     else:
-        # fallback local toggle — same ordering as show_viewer()
-        cfg = load_config()
-        html_path = get_active_html_path(cfg)
-        if html_path is None:
-            return
-        clock_format = cfg.get("clock_format", "24h")
-        try:
-            global _viewer_windows
-            _inhibit()
-            _inhibit_overview()
-            _viewer_windows = _create_viewer_windows(html_path, clock_format)
-            _schedule_lock()
-        except Exception:
-            pass
+        # The fallback must run a GTK main loop; creating windows and then
+        # returning immediately destroys the viewer with this CLI process.
+        start()
 
 
 def run_daemon():
@@ -1829,6 +1854,7 @@ if __name__ == "__main__":
         if hp is None:
             print("viewer requires html_path", file=sys.stderr)
             sys.exit(1)
-        run_viewer(hp, cf)
+        if run_viewer(hp, cf) is False:
+            sys.exit(1)
     else:
         sys.exit(__doc__)

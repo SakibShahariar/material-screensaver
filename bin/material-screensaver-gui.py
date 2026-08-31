@@ -16,6 +16,7 @@ import sys
 import json
 import glob
 import subprocess
+from urllib.parse import urlencode
 
 SCREENSAVER_DIR = os.path.expanduser("~/.local/share/material-screensaver/screensavers")
 CONFIG_PATH = os.path.expanduser("~/.config/material-screensaver/config.json")
@@ -39,15 +40,49 @@ def get_keybinding_settings():
         child.set_string("command", f"{CTL_SCRIPT} toggle")
     return child
 
-def load_config():
-    cfg = {"active": None, "idle_seconds": 300, "browser": "auto", "clock_format": "24h", "random": False, "lock_after_seconds": 300, "close_on_mouse": True}
-    if os.path.exists(CONFIG_PATH):
-        try:
-            with open(CONFIG_PATH) as f:
-                cfg.update(json.load(f))
-        except (json.JSONDecodeError, OSError):
-            pass
+DEFAULT_CONFIG = {"active": None, "idle_seconds": 300, "clock_format": "24h", "random": False, "lock_after_seconds": 300, "close_on_mouse": True}
+
+
+def _valid_int(value, minimum, maximum):
+    if isinstance(value, bool):
+        return None
+    try:
+        value = int(value)
+    except (TypeError, ValueError, OverflowError):
+        return None
+    return value if minimum <= value <= maximum else None
+
+
+def normalize_config(data):
+    """Return a complete, safe configuration from user-editable JSON."""
+    cfg = dict(DEFAULT_CONFIG)
+    if not isinstance(data, dict):
+        return cfg
+    active = data.get("active")
+    if active is None or isinstance(active, str):
+        cfg["active"] = active
+    for key in ("random", "close_on_mouse"):
+        if isinstance(data.get(key), bool):
+            cfg[key] = data[key]
+    idle = _valid_int(data.get("idle_seconds"), 1, 86400)
+    if idle is not None:
+        cfg["idle_seconds"] = idle
+    lock = _valid_int(data.get("lock_after_seconds"), 0, 86400)
+    if lock is not None:
+        cfg["lock_after_seconds"] = lock
+    if data.get("clock_format") in ("12h", "24h"):
+        cfg["clock_format"] = data["clock_format"]
     return cfg
+
+
+def load_config():
+    if not os.path.exists(CONFIG_PATH):
+        return dict(DEFAULT_CONFIG)
+    try:
+        with open(CONFIG_PATH, encoding="utf-8") as f:
+            return normalize_config(json.load(f))
+    except (json.JSONDecodeError, OSError, TypeError, ValueError):
+        return dict(DEFAULT_CONFIG)
 
 
 def save_config(**updates):
@@ -275,7 +310,8 @@ class ScreensaverWindow(Adw.ApplicationWindow):
             fn = self.screensaver_files[idx]
             path = os.path.join(SCREENSAVER_DIR, fn)
             fmt = cfg.get("clock_format", "24h")
-            uri = f"file://{path}?format={fmt}"
+            uri = Gio.File.new_for_path(path).get_uri()
+            uri = f"{uri}?{urlencode({'format': fmt})}"
             try:
                 self.preview_web.load_uri(uri)
             except Exception:
