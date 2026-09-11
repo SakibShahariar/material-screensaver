@@ -30,7 +30,7 @@ from urllib.parse import urlencode
 
 SCREENSAVER_DIR = os.path.expanduser("~/.local/share/material-screensaver/screensavers")
 CONFIG_PATH = os.path.expanduser("~/.config/material-screensaver/config.json")
-DEFAULT_CONFIG = {"active": None, "idle_seconds": 300, "clock_format": "24h", "random": False, "lock_after_seconds": 300, "close_on_mouse": True}
+DEFAULT_CONFIG = {"active": None, "idle_seconds": 300, "clock_format": "24h", "random": False, "lock_after_seconds": 300}
 
 # D-Bus service for daemon delegation (PID file gone)
 SERVICE_NAME = "io.github.sakib.MaterialScreensaver"
@@ -56,8 +56,11 @@ _viewer_loop = None  # GLib.MainLoop for viewer subprocess
 
 
 def _valid_int(value, minimum, maximum):
-    """Return an integer in range, or None without accepting bool as an int."""
+    """Return an integer in range. Rejects bools and fractional floats (lossy
+    coercion would silently truncate user-edited config)."""
     if isinstance(value, bool):
+        return None
+    if isinstance(value, float) and not value.is_integer():
         return None
     try:
         value = int(value)
@@ -75,7 +78,7 @@ def normalize_config(data):
     active = data.get("active")
     if active is None or isinstance(active, str):
         cfg["active"] = active
-    for key in ("random", "close_on_mouse"):
+    for key in ("random",):
         if isinstance(data.get(key), bool):
             cfg[key] = data[key]
     idle = _valid_int(data.get("idle_seconds"), 1, 86400)
@@ -360,11 +363,7 @@ def _create_viewer_windows(html_path, clock_format="24h"):
                     return True
                 if is_super:
                     return True
-                # With mouse dismissal disabled, the advertised fallback is
-                # an ordinary key press.  Do not let it leak to the page.
-                if not load_config().get("close_on_mouse", True):
-                    hide_viewer()
-                    return True
+                # Everything else falls through to the page (never closes).
                 return False
             except Exception:
                 try:
@@ -380,24 +379,12 @@ def _create_viewer_windows(html_path, clock_format="24h"):
                     pass
                 return False
         def on_click(ctrl, n_press, x, y, _win=win, _web=web):
-            # Non-interactive styles keep cursor permanently hidden.
-            # Interactive (solar-system) manages its own cursor via page CSS.
-            hide_viewer()
-            return True
+            # Clicks never dismiss — only Super+Q does. Do not consume, so
+            # interactive styles (solar-system) still receive them.
+            return False
         def on_motion(ctrl, x, y, _win=win, _web=web):
-            # Non-interactive: cursor stays hidden. Interactive styles handle their own.
-            # The daemon has Mutter's user-active watch, but standalone
-            # mode does not.  Ignore map-time pointer events, then honor the
-            # normal close-on-mouse setting locally as well.
-            try:
-                shown_at = getattr(_win, "_show_time", 0)
-                if (load_config().get("close_on_mouse", True)
-                        and shown_at
-                        and GLib.get_monotonic_time() - shown_at > 500000):
-                    hide_viewer()
-                    return True
-            except Exception:
-                pass
+            # Mouse movement never dismisses. Non-interactive styles keep the
+            # cursor hidden; interactive styles manage their own pointer.
             return False
         # cursor helpers — permanently hidden for non-interactive styles
         # (solar-system is interactive and manages cursor via body.show-cursor CSS)
@@ -654,22 +641,42 @@ def is_viewer_active():
     return False
 
 
+# Locks the session once the screensaver has been visible for lock_after_seconds.
+# Ordered by preference; each candidate must report success (rc==0) or the next
+# one is tried. A failing call (rc!=0, e.g. org.gnome.ScreenSaver absent on
+# modern GNOME) falls through instead of silently stopping the chain.
+LOCK_COMMANDS = [
+    ["gdbus", "call", "--session", "--dest", "org.gnome.ScreenSaver",
+     "--object-path", "/org/gnome/ScreenSaver",
+     "--method", "org.gnome.ScreenSaver.Lock"],
+    ["loginctl", "lock-session"],
+    ["xdg-screensaver", "lock"],
+]
+
+
 def _lock_screen():
     """Lock GNOME session — used after screensaver has been visible for lock_after_seconds."""
-    try:
-        # Try GNOME ScreenSaver first
-        subprocess.run(["gdbus", "call", "--session", "--dest", "org.gnome.ScreenSaver",
-                        "--object-path", "/org/gnome/ScreenSaver",
-                        "--method", "org.gnome.ScreenSaver.Lock"],
-                       capture_output=True, timeout=3)
-    except Exception:
+    for cmd in LOCK_COMMANDS:
         try:
-            subprocess.run(["loginctl", "lock-session"], capture_output=True, timeout=3)
+            r = subprocess.run(cmd, capture_output=True, timeout=3)
         except Exception:
-            try:
-                subprocess.run(["xdg-screensaver", "lock"], capture_output=True, timeout=3)
-            except Exception:
-                pass
+            continue  # binary missing or timed out -> try the next candidate
+        if r.returncode == 0:
+            return  # locked
+
+
+def _on_screen_saver_active_changed(active):
+    """React to external lock/unlock (GNOME ScreenSaver ActiveChanged signal).
+
+    When the session is locked externally (Super+L, loginctl lock-session,
+    GNOME Settings timer), tear down the screensaver so it doesn't linger
+    under/after the lock screen.
+    """
+    if active and is_viewer_active():
+        try:
+            hide_viewer()
+        except Exception:
+            pass
 
 def _schedule_lock():
     global _lock_timeout_id
@@ -798,15 +805,7 @@ def _inhibit_overview():
             print(f"[overview] inhibited overlay={_saved_overlay_key} shell={_saved_shell_toggle}", file=sys.stderr)
         except Exception:
             pass
-        # hide overview immediately if it was already visible and start blocker for double Super
-        try:
-            subprocess.run(["gdbus", "call", "--session", "--dest", "org.gnome.Shell",
-                            "--object-path", "/org/gnome/Shell",
-                            "--method", "org.gnome.Shell.Eval",
-                            "Main.overview.hide();"],
-                           capture_output=True, timeout=1)
-        except Exception:
-            pass
+        # start blocker for double Super
         try:
             _start_overview_block()
         except Exception:
@@ -924,19 +923,6 @@ def _start_overview_block():
                         print("[overview] re-asserted overlay='' (was non-empty)", file=sys.stderr)
                 except Exception:
                     pass
-                # hide overview if visible while screensaver active (double Super)
-                out = subprocess.run(["gdbus", "call", "--session", "--dest", "org.gnome.Shell",
-                                      "--object-path", "/org/gnome/Shell",
-                                      "--method", "org.gnome.Shell.Eval",
-                                      "Main.overview.visible"],
-                                     capture_output=True, text=True, timeout=1)
-                if out.returncode==0 and "true" in out.stdout.lower():
-                    subprocess.run(["gdbus", "call", "--session", "--dest", "org.gnome.Shell",
-                                    "--object-path", "/org/gnome/Shell",
-                                    "--method", "org.gnome.Shell.Eval",
-                                    "Main.overview.hide();"],
-                                   capture_output=True, timeout=1)
-                    print("[overview] hid double-Super overview", file=sys.stderr)
             except Exception:
                 pass
             return True
@@ -965,27 +951,21 @@ except Exception:
     pass
 
 def _daemon_switch_to_active_watch():
-    """If daemon IdleMonitor is active, switch idle→active so mouse movement hides even manual Show (if close_on_mouse)."""
+    """Arm Mutter's user-active watch in the daemon.
+
+    Activity never closes the viewer anymore (Super+Q only), but a fired
+    active watch is how the daemon learns dismissal happened (the child's
+    hide runs in its own process with no _idle_proxy) and re-arms the idle
+    watch so the screensaver auto-shows again after the next idle period.
+    """
     try:
         if _idle_proxy is None:
             return
-        try:
-            if not load_config().get("close_on_mouse", True):
-                return
-        except Exception:
-            pass
         from gi.repository import GLib, Gio
-        # remove idle, add active
-        if _idle_watch_ids.get("idle") is not None:
-            try:
-                _idle_proxy.call_sync("RemoveWatch", GLib.Variant("(u)", (_idle_watch_ids["idle"],)), Gio.DBusCallFlags.NONE, -1, None)
-            except Exception:
-                pass
-            _idle_watch_ids["idle"]=None
         if _idle_watch_ids.get("active") is None:
             try:
-                res=_idle_proxy.call_sync("AddUserActiveWatch", None, Gio.DBusCallFlags.NONE, -1, None)
-                _idle_watch_ids["active"]=res.unpack()[0]
+                res = _idle_proxy.call_sync("AddUserActiveWatch", None, Gio.DBusCallFlags.NONE, -1, None)
+                _idle_watch_ids["active"] = res.unpack()[0]
             except Exception:
                 pass
     except Exception:
@@ -1736,23 +1716,13 @@ def run_daemon():
                 return
             (fired_id,) = params.unpack()
             if fired_id == _idle_watch_ids["idle"]:
+                # Idle reached -> show. Arm the active watch so Super+Q/activity
+                # re-arms the idle watch for the next cycle (it never closes).
                 show_viewer()
-                # Only watch for activity if close_on_mouse is on — otherwise stay until key/click
-                try:
-                    if load_config().get("close_on_mouse", True):
-                        add_active_watch()
-                    else:
-                        # keep idle watch removed, no active watch — manual key/click only
-                        pass
-                except Exception:
-                    add_active_watch()
+                add_active_watch()
             elif fired_id == _idle_watch_ids["active"]:
-                try:
-                    if not load_config().get("close_on_mouse", True):
-                        return
-                except Exception:
-                    pass
-                hide_viewer()
+                # Activity after showing (e.g. Super+Q in the child) -> re-arm
+                # the idle watch for next time. Never dismisses here.
                 add_idle_watch()
 
         try:
@@ -1768,6 +1738,24 @@ def run_daemon():
     # Setup watches on idle after app startup
     def on_startup(app):
         setup_idle_watches()
+        # Monitor external locks (Super+L, loginctl, GNOME settings timer) so
+        # the screensaver is dismissed instead of lingering after unlock.
+        try:
+            ss_bus = Gio.bus_get_sync(Gio.BusType.SESSION, None)
+            ss_proxy = Gio.DBusProxy.new_sync(
+                ss_bus, Gio.DBusProxyFlags.NONE, None,
+                "org.gnome.ScreenSaver", "/org/gnome/ScreenSaver",
+                "org.gnome.ScreenSaver", None)
+            def _on_lock_signal(_proxy, _sender, sig, params):
+                if sig == "ActiveChanged":
+                    try:
+                        (active,) = params.unpack()
+                        _on_screen_saver_active_changed(active)
+                    except Exception:
+                        pass
+            ss_proxy.connect("g-signal", _on_lock_signal)
+        except Exception:
+            pass
         # Own D-Bus name for delegation (same as before, but ensure app holds it)
         try:
             def on_bus_acquired(conn, name):

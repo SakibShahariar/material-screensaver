@@ -15,6 +15,7 @@ import os
 import sys
 import json
 import glob
+import random
 import subprocess
 from urllib.parse import urlencode
 
@@ -40,11 +41,13 @@ def get_keybinding_settings():
         child.set_string("command", f"{CTL_SCRIPT} toggle")
     return child
 
-DEFAULT_CONFIG = {"active": None, "idle_seconds": 300, "clock_format": "24h", "random": False, "lock_after_seconds": 300, "close_on_mouse": True}
+DEFAULT_CONFIG = {"active": None, "idle_seconds": 300, "clock_format": "24h", "random": False, "lock_after_seconds": 300}
 
 
 def _valid_int(value, minimum, maximum):
     if isinstance(value, bool):
+        return None
+    if isinstance(value, float) and not value.is_integer():
         return None
     try:
         value = int(value)
@@ -61,7 +64,7 @@ def normalize_config(data):
     active = data.get("active")
     if active is None or isinstance(active, str):
         cfg["active"] = active
-    for key in ("random", "close_on_mouse"):
+    for key in ("random",):
         if isinstance(data.get(key), bool):
             cfg[key] = data[key]
     idle = _valid_int(data.get("idle_seconds"), 1, 86400)
@@ -178,11 +181,18 @@ class ScreensaverWindow(Adw.ApplicationWindow):
             except Exception:
                 pass
             frame.set_child(self.preview_web)
+            click = Gtk.GestureClick()
+            click.connect("pressed", lambda *_: self._update_preview())
+            self.preview_web.add_controller(click)
             # wrap frame in a row-like container for PreferencesGroup
             box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL)
             box.append(frame)
+            hint = Gtk.Label(label="Click the preview to refresh (shuffles in random mode)")
+            hint.add_css_class("caption")
+            hint.add_css_class("dim-label")
+            hint.set_margin_top(6)
+            box.append(hint)
             preview_group_live.add(box)
-            # overlay label for random
             self._update_preview()
         else:
             self.preview_web = None
@@ -198,15 +208,6 @@ class ScreensaverWindow(Adw.ApplicationWindow):
         self.lock_row.set_title("Lock after")
         self.lock_row.set_subtitle("Minutes on screensaver before lock (0 = never)")
         timing_group.add(self.lock_row)
-
-        # --- Interaction ---
-        interact_group = Adw.PreferencesGroup(title="Interaction")
-        page.add(interact_group)
-        self.mouse_switch = Gtk.Switch(valign=Gtk.Align.CENTER)
-        mouse_row = Adw.ActionRow(title="Close on mouse movement", subtitle="Move mouse to hide (off = key/click only)")
-        mouse_row.add_suffix(self.mouse_switch)
-        mouse_row.set_activatable_widget(self.mouse_switch)
-        interact_group.add(mouse_row)
 
         # --- Clock format ---
         clock_group = Adw.PreferencesGroup(title="Clock")
@@ -238,21 +239,6 @@ class ScreensaverWindow(Adw.ApplicationWindow):
         self.shortcut_row.add_suffix(change_btn)
         shortcut_group.add(self.shortcut_row)
 
-        # --- Preview ---
-        preview_group = Adw.PreferencesGroup(title="Preview")
-        page.add(preview_group)
-        preview_row = Adw.ActionRow(title="Test it now")
-        box = Gtk.Box(spacing=6, valign=Gtk.Align.CENTER)
-        start_btn = Gtk.Button(label="Start")
-        start_btn.add_css_class("suggested-action")
-        start_btn.connect("clicked", self.on_start_clicked)
-        stop_btn = Gtk.Button(label="Stop")
-        stop_btn.connect("clicked", self.on_stop_clicked)
-        box.append(start_btn)
-        box.append(stop_btn)
-        preview_row.add_suffix(box)
-        preview_group.add(preview_row)
-
         toolbar_view.set_content(page)
         self.set_content(toolbar_view)
 
@@ -263,7 +249,6 @@ class ScreensaverWindow(Adw.ApplicationWindow):
         self.combo_row.connect("notify::selected", self.on_screensaver_changed)
         self.idle_row.connect("notify::value", self.on_idle_changed)
         self.lock_row.connect("notify::value", self.on_lock_changed)
-        self.mouse_switch.connect("notify::active", self.on_mouse_toggled)
         self.ampm_switch.connect("notify::active", self.on_ampm_toggled)
         self.autostart_switch.connect("notify::active", self.on_autostart_toggled)
 
@@ -281,7 +266,6 @@ class ScreensaverWindow(Adw.ApplicationWindow):
 
         self.idle_row.set_value(cfg.get("idle_seconds", 300) / 60)
         self.lock_row.set_value(cfg.get("lock_after_seconds", 300) / 60)
-        self.mouse_switch.set_active(cfg.get("close_on_mouse", True))
 
         self.ampm_switch.set_active(cfg.get("clock_format", "24h") == "12h")
 
@@ -296,16 +280,12 @@ class ScreensaverWindow(Adw.ApplicationWindow):
     def _update_preview(self):
         if not HAS_WEBKIT or not hasattr(self, "preview_web") or self.preview_web is None:
             return
-        # if random, show first file as preview hint
         cfg = load_config()
         if cfg.get("random", False):
-            # show a hint that random is on
-            try:
-                self.preview_web.load_uri("about:blank")
-            except Exception:
-                pass
-            return
-        idx = self.combo_row.get_selected()
+            # Random mode previews a random style each refresh.
+            idx = random.randrange(len(self.screensaver_files)) if self.screensaver_files else -1
+        else:
+            idx = self.combo_row.get_selected()
         if 0 <= idx < len(self.screensaver_files):
             fn = self.screensaver_files[idx]
             path = os.path.join(SCREENSAVER_DIR, fn)
@@ -382,9 +362,6 @@ class ScreensaverWindow(Adw.ApplicationWindow):
     def on_lock_changed(self, row, _pspec):
         save_config(lock_after_seconds=int(row.get_value() * 60))
 
-    def on_mouse_toggled(self, switch, _pspec):
-        save_config(close_on_mouse=switch.get_active())
-
     def on_ampm_toggled(self, switch, _pspec):
         save_config(clock_format="12h" if switch.get_active() else "24h")
         self._update_preview()
@@ -392,12 +369,6 @@ class ScreensaverWindow(Adw.ApplicationWindow):
     def on_autostart_toggled(self, switch, _pspec):
         action = "enable" if switch.get_active() else "disable"
         subprocess.run(["systemctl", "--user", action, "--now", SERVICE_NAME])
-
-    def on_start_clicked(self, _btn):
-        subprocess.Popen([CTL_SCRIPT, "start"])
-
-    def on_stop_clicked(self, _btn):
-        subprocess.Popen([CTL_SCRIPT, "stop"])
 
 
 class ScreensaverApp(Adw.Application):

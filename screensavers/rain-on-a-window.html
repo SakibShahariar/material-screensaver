@@ -1,0 +1,426 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Material Screensaver — Rain on a Window</title>
+<style>
+:root {
+  --primary_rgb: 138 206 255;
+  --primary_container_rgb: 0 75 111;
+  --secondary_rgb: 180 199 233;
+  --secondary_container_rgb: 53 72 99;
+  --tertiary_rgb: 186 196 250;
+  --tertiary_container_rgb: 58 68 114;
+  --inverse_primary_rgb: 0 100 145;
+  --surface_rgb: 12 20 27;
+  --surface_bright_rgb: 50 58 65;
+  --outline_rgb: 137 146 154;
+}
+* { margin: 0; padding: 0; box-sizing: border-box; }
+html, body {
+  width: 100%; height: 100%; overflow: hidden;
+  background: rgb(var(--surface_rgb));
+  cursor: none;
+  font-family: "Google Sans", "Segoe UI", system-ui, sans-serif;
+}
+body.show-cursor { cursor: default; }
+canvas { display: block; width: 100vw; height: 100vh; }
+
+#clock {
+  position: fixed;
+  left: clamp(28px, 3vw, 48px);
+  bottom: clamp(40px, 4.5vw, 56px);
+  font-weight: 200;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: -2px;
+  font-size: clamp(40px, 5.5vw, 78px);
+  color: rgb(var(--primary_rgb));
+  text-shadow:
+    0 0 40px rgb(var(--primary_rgb) / .4),
+    0 2px 16px rgba(0,0,0,.6);
+  pointer-events: none;
+  transition: opacity .7s ease;
+}
+#clock .ampm {
+  font-size: .26em;
+  margin-left: 10px;
+  opacity: .7;
+  vertical-align: 22%;
+  letter-spacing: 2px;
+  font-weight: 400;
+}
+#date {
+  position: fixed;
+  left: clamp(30px, 3.1vw, 50px);
+  bottom: clamp(18px, 2.2vw, 28px);
+  font-size: clamp(11px, 1.05vw, 14px);
+  letter-spacing: 4px;
+  text-transform: uppercase;
+  color: rgb(var(--secondary_rgb) / .88);
+  text-shadow: 0 1px 10px rgba(0,0,0,.5);
+  pointer-events: none;
+  transition: opacity .7s ease;
+}
+#clock.hidden, #date.hidden { opacity: 0; }
+
+#hint {
+  position: fixed; right: 28px; bottom: 24px;
+  font-size: 11px; letter-spacing: 1.5px;
+  color: rgb(var(--outline_rgb) / .55);
+  opacity: 0; transition: opacity 1s ease;
+  text-transform: uppercase;
+  pointer-events: none;
+  text-shadow: 0 1px 6px rgb(var(--surface_rgb));
+}
+#hint.show { opacity: .7; }
+</style>
+<link rel="stylesheet" href="matugen-colors.css">
+</head>
+<body>
+<canvas id="c"></canvas>
+<div id="clock">00:00<span class="ampm">AM</span></div>
+<div id="date">MON, JAN 1</div>
+<div id="hint">C · toggle clock</div>
+
+<script>
+"use strict";
+
+const canvas = document.getElementById("c");
+const ctx = canvas.getContext("2d", { alpha: false, desynchronized: true });
+const clockEl = document.getElementById("clock");
+const dateEl  = document.getElementById("date");
+const hintEl  = document.getElementById("hint");
+
+let W = 0, H = 0, DPR = 1;
+let theme = {};
+let bokeh = [];
+let drops = [];
+let trail = null;          // offscreen fading watermarks left by sliding drops
+let cursorTimer;
+let start = performance.now();
+
+const reduceMotion = matchMedia("(prefers-reduced-motion: reduce)").matches;
+const speedMul = reduceMotion ? 0.25 : 1;
+
+function readRGB(name, fb = [160, 160, 160]) {
+  const r = getComputedStyle(document.documentElement).getPropertyValue(name).trim();
+  const p = r.split(/\s+/).map(Number);
+  return (p.length === 3 && p.every(n => !isNaN(n))) ? p : fb;
+}
+function rgba(c, a = 1) {
+  return `rgba(${c[0]},${c[1]},${c[2]},${a})`;
+}
+
+function loadTheme() {
+  theme = {
+    surface:            readRGB("--surface_rgb", [12, 20, 27]),
+    surfaceBright:      readRGB("--surface_bright_rgb", [50, 58, 65]),
+    primary:            readRGB("--primary_rgb", [138, 206, 255]),
+    primaryContainer:   readRGB("--primary_container_rgb", [0, 75, 111]),
+    secondary:          readRGB("--secondary_rgb", [180, 199, 233]),
+    secondaryContainer: readRGB("--secondary_container_rgb", [53, 72, 99]),
+    tertiary:           readRGB("--tertiary_rgb", [186, 196, 250]),
+    tertiaryContainer:  readRGB("--tertiary_container_rgb", [58, 68, 114]),
+    inversePrimary:     readRGB("--inverse_primary_rgb", [0, 100, 145]),
+    outline:            readRGB("--outline_rgb", [137, 146, 154])
+  };
+  document.body.style.background = rgba(theme.surface);
+  clockEl.style.color = rgba(theme.primary, 0.97);
+  dateEl.style.color  = rgba(theme.secondary, 0.88);
+  hintEl.style.color  = rgba(theme.outline, 0.6);
+}
+
+function resize() {
+  W = innerWidth; H = innerHeight;
+  DPR = Math.min(devicePixelRatio || 1, 2);
+  canvas.width  = Math.floor(W * DPR);
+  canvas.height = Math.floor(H * DPR);
+  ctx.setTransform(DPR, 0, 0, DPR, 0, 0);
+  if (!trail) {
+    trail = document.createElement("canvas");
+  }
+  trail.width  = Math.floor(W * DPR);
+  trail.height = Math.floor(H * DPR);
+  const tctx = trail.getContext("2d");
+  tctx.setTransform(DPR, 0, 0, DPR, 0, 0);
+  tctx.clearRect(0, 0, W, H);
+
+  bokeh = [];
+  const warm = [theme.primary, theme.secondary, theme.tertiary,
+                theme.secondaryContainer, theme.tertiaryContainer,
+                theme.primaryContainer];
+  const count = Math.round(Math.min(34, Math.max(18, (W * H) / 42000)));
+  for (let i = 0; i < count; i++) {
+    const col = warm[Math.floor(Math.random() * warm.length)];
+    const glow = Math.random() < 0.18;
+    bokeh.push({
+      x: Math.random() * W,
+      // city lights sit lower on the scene
+      y: H * (0.04 + Math.random() * 0.92),
+      r: glow ? 14 + Math.random() * 30 : 3 + Math.random() * 8,
+      c: col,
+      a: 0.05 + Math.random() * 0.22,
+      blink: Math.random() * Math.PI * 2,
+      blinkSp: 0.2 + Math.random() * 0.9
+    });
+  }
+  // few big soft washes (street glow / horizon)
+  for (let i = 0; i < 3; i++) {
+    bokeh.push({
+      x: Math.random() * W,
+      y: H * (0.62 + Math.random() * 0.34),
+      r: 80 + Math.random() * 150,
+      c: warm[Math.floor(Math.random() * 3)],
+      a: 0.03 + Math.random() * 0.04,
+      blink: 0, blinkSp: 0
+    });
+  }
+  drops = [];
+  const dCount = Math.round(Math.min(150, Math.max(60, (W * H) / 11000)));
+  for (let i = 0; i < dCount; i++) {
+    drops.push(makeDrop());
+  }
+}
+
+function makeDrop() {
+  return {
+    x: Math.random() * W,
+    y: Math.random() * H,
+    r: 2 + Math.random() * 3.5,
+    vy: 0,
+    sliding: false,
+    wob: Math.random() * Math.PI * 2,
+    wobSp: 3 + Math.random() * 4,
+    stain: 0.5 + Math.random() * 0.5
+  };
+}
+
+function drawBokeh(t) {
+  const g = ctx.createLinearGradient(0, 0, 0, H);
+  g.addColorStop(0, rgba(theme.surface, 1));
+  g.addColorStop(0.55, rgba(theme.surface, 1));
+  g.addColorStop(1, rgba(theme.surfaceBright, 0.55));
+  ctx.fillStyle = g;
+  ctx.fillRect(0, 0, W, H);
+
+  ctx.globalCompositeOperation = "screen";
+  for (const b of bokeh) {
+    const blink = 0.75 + 0.25 * Math.sin(t * b.blinkSp + b.blink);
+    const grad = ctx.createRadialGradient(b.x, b.y, 0, b.x, b.y, b.r);
+    grad.addColorStop(0, rgba(b.c, b.a * blink));
+    grad.addColorStop(0.55, rgba(b.c, b.a * blink * 0.45));
+    grad.addColorStop(1, rgba(b.c, 0));
+    ctx.fillStyle = grad;
+    ctx.fillRect(b.x - b.r, b.y - b.r, b.r * 2, b.r * 2);
+  }
+  ctx.globalCompositeOperation = "source-over";
+}
+
+const COALESCE = 4;   // drops closer than this merge
+
+function stepDrops(dt, t) {
+  const list = drops;
+  for (let i = 0; i < list.length; i++) {
+    const d = list[i];
+    if (!d.sliding) {
+      // moisture growth; big drops get heavy and start sliding
+      d.r += dt * (0.55 + (H / 1080) * 0.9) * 0.04;
+      if (Math.random() < 0.06) d.wob += Math.random() * 0.8 - 0.4;
+      if (Math.random() < 0.25) {
+        // occasionally pickup a satellite droplet
+        d.r = Math.min(d.r + dt * 0.8, 6.4);
+      }
+      if (d.r > 6.2 + Math.random() * 1.4) {
+        d.sliding = true;
+        d.vy = 0.5 + Math.random() * 1.2;
+      }
+    } else {
+      d.vy = Math.min(d.vy + dt * 30 * (1 + d.r * 0.04), 220 + d.r * 26);
+      d.y += d.vy * dt;
+      d.x += Math.sin(t * d.wobSp + d.wob) * 0.55 * dt;
+      if (Math.random() < dt * 2.2) {
+        // leave a watermark while travelling
+        trackWater(d.x, d.y - 2, d.r * (0.4 + Math.random() * 0.5));
+      }
+      if (d.y > H + 20) {
+        // reached the sill: slide along the bottom edge briefly then vanish
+        d.sliding = false;
+        d.r = 2 + Math.random() * 3;
+        d.vy = 0;
+        d.y = Math.random() * H;
+        d.x = Math.random() * W;
+      }
+    }
+  }
+  // coalesce neighbouring drops into the bigger one
+  for (let i = 0; i < list.length; i++) {
+    const a = list[i];
+    for (let j = i + 1; j < list.length; j++) {
+      const b = list[j];
+      if (a.dead || b.dead) continue;
+      const dx = a.x - b.x, dy = a.y - b.y;
+      const rr = Math.max(a.r, b.r);
+      if (dx * dx + dy * dy < COALESCE * COALESCE + rr * rr) {
+        if (a.r >= b.r) {
+          a.r = Math.min(Math.sqrt(a.r * a.r + b.r * b.r), 9);
+          a.sliding = a.sliding || b.sliding;
+          b.dead = true;
+        }
+      }
+    }
+  }
+  for (let i = list.length - 1; i >= 0; i--) {
+    if (list[i].dead) list.splice(i, 1);
+  }
+  while (list.length < 55) list.push(makeDrop());
+}
+
+function trackWater(x, y, w) {
+  if (!trail) return;
+  const tctx = trail.getContext("2d");
+  const g = tctx.createLinearGradient(0, y - w * 2, 0, y + w * 6);
+  g.addColorStop(0, rgba(theme.primary, 0));
+  g.addColorStop(0.4, rgba(theme.primary, 0.05));
+  g.addColorStop(1, rgba(theme.primary, 0.015));
+  tctx.strokeStyle = g;
+  tctx.lineWidth = Math.max(1, w * 0.55);
+  tctx.lineCap = "round";
+  tctx.beginPath();
+  tctx.moveTo(x, y - w * 2);
+  tctx.lineTo(x, y + w * 6);
+  tctx.stroke();
+}
+
+function drawDrop(d, t) {
+  const { x, y, r } = d;
+  if (r < 1.2) return;
+
+  // glass body (soft dark rim so it reads as a lens)
+  const body = ctx.createRadialGradient(x, y, r * 0.1, x, y, r);
+  body.addColorStop(0, rgba(theme.primary, 0)  );
+  body.addColorStop(0.72, rgba(theme.primary, 0.02));
+  body.addColorStop(0.92, rgba(theme.surfaceBright, 0.34));
+  body.addColorStop(0.985, rgba(theme.primary, 0.22));
+  body.addColorStop(1, rgba(theme.primary, 0));
+  ctx.fillStyle = body;
+  ctx.beginPath();
+  ctx.arc(x, y, r, 0, Math.PI * 2);
+  ctx.fill();
+
+  // specular catch: bright cap at the top-left from the window light
+  const spec = ctx.createRadialGradient(
+    x - r * 0.34, y - r * 0.38, r * 0.02, x - r * 0.34, y - r * 0.38, r * 0.5);
+  spec.addColorStop(0, rgba([255, 255, 255], 0.5));
+  spec.addColorStop(0.35, rgba(theme.primary, 0.22));
+  spec.addColorStop(1, rgba(theme.primary, 0));
+  ctx.fillStyle = spec;
+  ctx.beginPath();
+  ctx.arc(x, y, r, 0, Math.PI * 2);
+  ctx.fill();
+
+  // faint bottom bounce light
+  ctx.strokeStyle = rgba(theme.secondary, 0.12);
+  ctx.lineWidth = 0.75;
+  ctx.beginPath();
+  ctx.arc(x, y, r * 0.92, Math.PI * 1.05, Math.PI * 1.95);
+  ctx.stroke();
+
+  if (d.sliding) {
+    ctx.strokeStyle = rgba(theme.primary, 0.16);
+    ctx.lineWidth = Math.max(1, r * 0.22);
+    ctx.lineCap = "round";
+    ctx.beginPath();
+    ctx.moveTo(x, y - r);
+    ctx.lineTo(x + Math.sin(t * d.wobSp + d.wob) * 1.5, y + r);
+    ctx.stroke();
+  }
+}
+
+function frame(now) {
+  const dt = Math.min(0.05, (now - start) / 1000);
+  const t = now / 1000 * speedMul;
+  start = now;
+
+  drawBokeh(t);
+
+  // dry out old watermarks a touch
+  if (trail) {
+    const tctx = trail.getContext("2d");
+    tctx.globalCompositeOperation = "destination-out";
+    tctx.fillStyle = rgba(theme.surface, dt * 0.15);
+    tctx.fillRect(0, 0, W, H);
+    tctx.globalCompositeOperation = "source-over";
+  }
+  if (trail) ctx.drawImage(trail, 0, 0, W, H);
+
+  stepDrops(dt, t);
+  for (const d of drops) drawDrop(d, t);
+
+  // faint diagonal window sheen moving very slowly
+  ctx.save();
+  ctx.globalAlpha = 0.035;
+  const sheen = ctx.createLinearGradient(
+    -W * 0.4, H * 0.5, W * 1.3, H * 0.2);
+  sheen.addColorStop(0, rgba(theme.secondary, 0));
+  sheen.addColorStop(0.5, rgba(theme.secondary, 1));
+  sheen.addColorStop(1, rgba(theme.secondary, 0));
+  ctx.fillStyle = sheen;
+  ctx.fillRect(0, 0, W, H);
+  ctx.restore();
+
+  requestAnimationFrame(frame);
+}
+
+addEventListener("pointermove", () => {
+  document.body.classList.add("show-cursor");
+  clearTimeout(cursorTimer);
+  cursorTimer = setTimeout(() => document.body.classList.remove("show-cursor"), 2500);
+}, { passive: true });
+
+addEventListener("keydown", e => {
+  if (e.key.toLowerCase() === "c") {
+    clockEl.classList.toggle("hidden");
+    dateEl.classList.toggle("hidden");
+  }
+});
+
+function fallbackClock() {
+  function update() {
+    const n = new Date();
+    let h = n.getHours();
+    const ap = h >= 12 ? "PM" : "AM";
+    h = h % 12 || 12;
+    clockEl.innerHTML =
+      `${String(h).padStart(2,"0")}:${String(n.getMinutes()).padStart(2,"0")}` +
+      `<span class="ampm">${ap}</span>`;
+    dateEl.textContent = n.toLocaleDateString("en-US", {
+      weekday: "short", month: "short", day: "numeric"
+    }).toUpperCase();
+  }
+  update();
+  setInterval(update, 1000);
+}
+
+addEventListener("load", () => {
+  loadTheme();
+  resize();
+  requestAnimationFrame(frame);
+
+  const s = document.createElement("script");
+  s.src = "clock-shared.js";
+  s.onload = () => {
+    try {
+      if (typeof startClock === "function") startClock(clockEl, dateEl);
+      else fallbackClock();
+    } catch { fallbackClock(); }
+  };
+  s.onerror = fallbackClock;
+  document.head.appendChild(s);
+
+  hintEl.classList.add("show");
+  setTimeout(() => hintEl.classList.remove("show"), 4000);
+});
+</script>
+</body>
+</html>

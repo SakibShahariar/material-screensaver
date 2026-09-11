@@ -1,0 +1,8 @@
+{
+  "uuid": "material-screensaver-gestures@io.github.sakib",
+  "name": "Material Screensaver Gesture Guard",
+  "description": "Blocks 3-finger touchpad swipes (workspace switch, overview, alt-tab) while the Material screensaver's fullscreen viewer is focused, so swipes can't reveal other desktops.",
+  "shell-version": ["45", "46", "47", "48", "49", "50"],
+  "version-name": "1.0",
+  "version": 1
+}

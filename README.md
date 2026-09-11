@@ -9,19 +9,18 @@ Since GNOME dropped native animated screensavers, these run as standalone HTML/J
 pages in a fullscreen `WebKitGTK` (`WebKit 6.0` + `Gtk 4`) window — one per monitor —
 with `SessionManager` inhibit and input grab while visible, triggered automatically after
 an idle timeout (via GNOME's `org.gnome.Mutter.IdleMonitor`) or manually via a
-keyboard shortcut. No external browser, no PID file.
+keyboard shortcut. The only way to dismiss it is **Super+Q** — mouse, keys and clicks
+are ignored (interactive styles still respond to them in-page). No external browser,
+no PID file.
 
 ## Styles included
 
-Blob, Flow, Ripple, Orbit, Kaleidoscope, Constellation, Solar System (Canvas 2D),
-Lorenz Attractor, Fireworks, Fireflies, Typewriter, Terrain, Vinyl, City, Bubbles,
-Origami, Lanterns, Rain, Koi Pond, DNA, Oscilloscope, Sakura, Paper Boats, Bounce,
-Fractal Zoom (GLSL/WebGL), Falling Sand, Voronoi, Game of Life, Glitch, Organic
-Harmonic Field (GLSL/WebGL), Solar Orbit, Aurora Wave, Hyper-Tesseract, Metaphysical
-Horizon, Ambient Mesh, Quantum Interference, Starfield, Strange Attractor Flow,
-Snow Globe, Lava Lamp, Jellyfish, Spirograph, Circuit Board, Autumn Leaves, Radar,
-Paper Cranes, plus additional styles (soft-body creatures, n-body galaxies,
-marble run, magnetic field lines, wave-function collapse, and more) — **53 total**.
+Solar System, Starfield, N-Body Galaxies, Cymatics, Kaleidoscope, Magnetic Field
+Lines, Strange Attractor Flow, Soft-Body Creatures, Blob, Flow, Bounce, Game of Life,
+Wave-Function Collapse, Circuit Board, Glitch, Constellation, Voronoi, Origami,
+Paper Cranes, Sakura, Lanterns, Rain, Bubbles, City, Autumn Leaves, Fireworks,
+Typewriter, Quantum Interference (GLSL/WebGL), Organic Harmonic Field (GLSL/WebGL),
+Metaphysical Horizon, Rain on a Window — **31 total**.
 
 All pull their color palette live from a [matugen](https://github.com/InioX/matugen)
 generated stylesheet, so they follow your current wallpaper-derived Material You theme.
@@ -58,6 +57,13 @@ This places files under `~/.local/bin`, `~/.local/share/material-screensaver/`,
 then enables the idle-watching systemd service and opens the settings GUI. The app
 also shows up in GNOME's Activities search with its own icon once installed.
 
+A companion GNOME Shell extension (`extensions/material-screensaver-gestures@io.github.sakib`)
+is installed and enabled as part of this. It stops 3-finger touchpad swipes
+(workspace switch / overview / alt-tab) from firing while the screensaver's fullscreen
+viewer is focused — it self-guards by window title, so normal desktop gestures are
+untouched. Because the shell only discovers extensions at login, **log out and back in
+once** after a fresh install for it to take effect.
+
 ## Manage
 
 Run the settings app (search "Material Screensaver Settings" in the app grid, or
@@ -68,7 +74,6 @@ Run the settings app (search "Material Screensaver Settings" in the app grid, or
 - toggle 12-hour/24-hour clock format
 - set a keyboard shortcut to toggle it manually
 - enable/disable the automatic idle-triggered daemon
-- preview (start/stop) on demand
 
 Adding a new style later is just dropping a new `.html` file into
 `~/.local/share/material-screensaver/screensavers/` — it shows up in the picker
@@ -82,3 +87,28 @@ material-screensaver-ctl.py stop     # force stop
 material-screensaver-ctl.py toggle   # start if not running, stop if running
 material-screensaver-ctl.py daemon   # run the idle-watching loop (used by the systemd service)
 ```
+
+## Tests
+
+Run the suite (Python stdlib `unittest` + `node --check` for JS syntax):
+
+```bash
+python3 -m unittest discover -s tests -v
+```
+
+Checks every `.html` for structure (doctype/viewport/matugen link/CDN), theming
+consistency (clock & theme helper usage, valid `rgb(var(--x) / alpha)` CSS),
+JS syntax of every inline script and both shared helpers, config parsing edge
+cases (malformed JSON, bool/float/non-int rejection, bounds), screensaver
+selection (random/fallback/unicode filenames), the screen-lock command
+fallback chain (`gdbus` → `loginctl` → `xdg-screensaver`), external-lock
+handling, lock *scheduling* (fire-after-timeout, zero/negative disable, cancel,
+reschedule dedup, inactive-viewer guard — via a real GLib loop with mocked
+side-effects), and install/desktop/systemd packaging. Point it at an installed
+copy with `MS_TEST_SCREENSAVERS_DIR=~/.local/share/material-screensaver/screensavers`.
+
+The only untested portion is the live interaction with the GNOME session itself
+(actual `Mutter.IdleMonitor` watch registration, the SessionManager inhibit,
+and locking a real session), which needs a running desktop.
+
+## Manual control

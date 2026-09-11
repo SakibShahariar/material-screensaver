@@ -5,6 +5,57 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+### Removed
+- "Test it now" preview group (Start/Stop buttons) from the settings GUI — the inline
+  Live Preview thumbnail already shows the selected style.
+### Added
+- New screensaver styles **Rain on a Window** (Canvas 2D, blob.html-shaped, full clock
+  + hint + `prefers-reduced-motion` handling). README "Styles included" list + count
+  updated (the test-suite count check parses that line dynamically). Collection total
+  is now 31.
+- 6 further styles (Dinner Under Wisteria, Steam Train at Night, Lighthouse Beam,
+  Cherry Blossom Stream, Forest Fireflies, Subway Platform) were authored, trialed,
+  then removed; none kept. README count temporarily rose to 37 then reverted.
+- 11 further new styles (Moonlit Surf, Milky Way Ridge, Butterfly Migration, Black
+  Hole Disc, Wet Street Neon, Harbor Cranes, Sand Mandala, Frost on Glass, Mycelium
+  Pulse, Paper Lantern Parade, Zodiac Sky) were authored, trialed, then removed
+  (kept only Rain on a Window). Collection total is now 31.
+### Fixed
+- Desktop file `Exec=`/`TryExec=` now use `%h/.local/bin/material-screensaver-gui.py` so the
+  settings app launches from the app grid even when `~/.local/bin` is absent from `$PATH`
+  (regression vs the v2.2.2 changelog claim).
+- `_valid_int` (ctl + gui) rejects fractional floats instead of silently truncating
+  (`300.9` → `300`) in user-editable config.
+- Lock fallback chain: a failing `gdbus`/`org.gnome.ScreenSaver` call (rc≠0) now falls
+  through to `loginctl lock-session` / `xdg-screensaver lock`. Previously a nonzero
+  `subprocess.run` exit was never detected, so the screen never locked on systems where
+  the GNOME ScreenSaver D-Bus service is absent.
+- External locks (Super+L, `loginctl lock-session`, GNOME Settings timer) now dismiss the
+  screensaver: the daemon subscribes to `org.gnome.ScreenSaver.ActiveChanged` and hides
+  the viewer when the session locks, so it no longer keeps running after unlock.
+### Changed
+- Dismissal is now **Super+Q only**: mouse movement, clicks and ordinary keys no longer
+  close the screensaver (interactive styles still receive them in-page for their own use);
+  removed the now-meaningless `close_on_mouse` config key and its settings-toggle.
+  The daemon no longer arms Mutter's user-active watch, since activity no longer dismisses.
+- 3-finger touchpad swipes no longer switch workspace/overview over the screensaver: a
+  companion shell extension (`extensions/material-screensaver-gestures@io.github.sakib`)
+  consumes `TOUCHPAD_SWIPE` events while the fullscreen viewer is focused (self-guarded
+  by window title). Installed + enabled by `install.sh`; takes effect after one re-login.
+  Note: `org.gnome.Shell.Eval` is disabled since GNOME 45, so the previous `Shell.Eval`
+  overview-hide has been a silent no-op on modern GNOME.
+- Live preview stays active when **Random** is enabled (it previews a random style on
+  every refresh instead of blanking); clicking the preview loads the next one — a random
+  style in random mode.
+### Added
+- Test suite under `tests/`: JS syntax via `node --check` on every inline script + shared
+  helpers, theming consistency (clock/theme helper usage, `rgb(var(--x) / alpha)` CSS lint),
+  HTML structure, config-parsing edge cases, screensaver selection, lock command fallback
+  chain, lock scheduling (fire/cancel/disable/dedup/inactive-guard via GLib loop),
+  external-lock handling, packaging checks.
+- CI: consolidated static checks into the suite, added a `tests` job (GI + Node).
+
 ## [2.2.2] - 2026-08-30
 ### Fixed
 - Desktop file `Exec=` now uses `%h/.local/bin/...` + `TryExec` so the settings app launches reliably even when `~/.local/bin` is not in `$PATH`.

@@ -43,6 +43,30 @@ cp "$SCRIPT_DIR"/icons/material-screensaver-icon.png \
 cp "$SCRIPT_DIR"/systemd/material-screensaver.service ~/.config/systemd/user/
 cp "$SCRIPT_DIR"/applications/material-screensaver-settings.desktop ~/.local/share/applications/
 
+# Companion GNOME Shell extension: blocks 3-finger touchpad swipes while the
+# screensaver's fullscreen viewer is focused. Self-guarded by window title, so
+# normal desktop gestures are untouched. The shell must be restarted/re-logged
+# once for a newly installed extension to be discovered; afterwards it loads.
+EXT_UUID="material-screensaver-gestures@io.github.sakib"
+EXT_BASE=~/.local/share/gnome-shell/extensions
+mkdir -p "$EXT_BASE"
+rm -rf "$EXT_BASE/$EXT_UUID"
+cp -a "$SCRIPT_DIR/extensions/$EXT_UUID" "$EXT_BASE/"
+python3 - "$EXT_UUID" <<'PY'
+import ast, subprocess, sys
+uuid = sys.argv[1]
+try:
+    raw = subprocess.run(["gsettings", "get", "org.gnome.shell", "enabled-extensions"],
+                         capture_output=True, text=True).stdout.strip()
+    enabled = ast.literal_eval(raw) if raw.startswith("[") else []
+except Exception:
+    enabled = []
+if uuid not in enabled:
+    enabled.append(uuid)
+    subprocess.run(["gsettings", "set", "org.gnome.shell", "enabled-extensions",
+                    "[{}]".format(", ".join("'%s'" % x for x in enabled))], capture_output=True)
+PY
+
 systemctl --user daemon-reload || true
 systemctl --user enable --now material-screensaver.service 2>/dev/null || \
   echo "Enable service failed (no user bus) — run systemctl --user enable --now material-screensaver.service after login" >&2
