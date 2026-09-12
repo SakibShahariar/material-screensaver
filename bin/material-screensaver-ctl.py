@@ -1112,13 +1112,14 @@ def show_viewer():
         try:
             from gi.repository import GLib
             def _watch_child():
+                global _is_showing, _viewer_process
                 if _viewer_process is None:
                     return False
                 try:
                     if _viewer_process.poll() is not None:
                         # child exited (e.g., Super+Q) — cleanup daemon state
-                        global _is_showing
                         _is_showing = False
+                        _viewer_process = None
                         try:
                             _uninhibit()
                         except Exception:
@@ -1547,7 +1548,8 @@ def start():
         gi.require_version("Gtk", "4.0")
         gi.require_version("WebKit", "6.0")
         from gi.repository import Gtk, GLib
-        global _viewer_windows
+        global _viewer_windows, _is_showing
+        _is_showing = True
         _inhibit()
         _inhibit_overview()
         _viewer_windows = _create_viewer_windows(html_path, clock_format)
@@ -1569,6 +1571,7 @@ def start():
                 loop.quit()
             except Exception:
                 pass
+            return GLib.SOURCE_REMOVE
         try:
             GLib.unix_signal_add(GLib.PRIORITY_DEFAULT, signal.SIGTERM, handle_sigterm)
         except Exception:
@@ -1579,11 +1582,13 @@ def start():
             hide_viewer()
         except Exception:
             pass
+        _is_showing = False
         _uninhibit()
         _restore_overview()
         _cancel_lock()
     except Exception as e:
         print(f"Failed to start screensaver viewer: {e}", file=sys.stderr)
+        _is_showing = False
         sys.exit(1)
 
 
