@@ -91,6 +91,9 @@ def load_config():
 def save_config(**updates):
     cfg = load_config()
     cfg.update(updates)
+    # Always write a normalized config so bad values (e.g. fractional
+    # idle from a hand-edited JSON) cannot persist across restarts.
+    cfg = normalize_config(cfg)
     os.makedirs(os.path.dirname(CONFIG_PATH), exist_ok=True)
     tmp = CONFIG_PATH + ".tmp"
     try:

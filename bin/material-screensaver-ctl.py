@@ -1629,6 +1629,11 @@ def toggle():
 
 
 def run_daemon():
+    if not has_graphical_session():
+        print("No graphical session (WAYLAND_DISPLAY/DISPLAY unset); "
+              "material-screensaver daemon exiting.", file=sys.stderr)
+        sys.exit(0)
+
     import gi
     gi.require_version("Gio", "2.0")
     gi.require_version("Gtk", "4.0")
