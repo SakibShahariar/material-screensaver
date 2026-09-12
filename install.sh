@@ -37,6 +37,8 @@ mv ~/.local/share/material-screensaver/screensavers.tmp ~/.local/share/material-
 # Proper hicolor icon placement (plus legacy fallback location)
 cp "$SCRIPT_DIR"/icons/material-screensaver-icon.png \
    ~/.local/share/icons/hicolor/48x48/apps/material-screensaver.png
+cp "$SCRIPT_DIR"/icons/material-screensaver-icon.svg \
+   ~/.local/share/icons/hicolor/scalable/apps/material-screensaver.svg
 cp "$SCRIPT_DIR"/icons/material-screensaver-icon.png \
    ~/.local/share/icons/material-screensaver.png
 
