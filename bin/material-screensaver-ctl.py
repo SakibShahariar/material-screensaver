@@ -1067,9 +1067,11 @@ def run_viewer(html_path, clock_format="24h"):
 def show_viewer():
     """Show screensaver viewer — daemon spawns isolated viewer subprocess (keeps daemon lean)."""
     global _viewer_windows, _is_showing, _viewer_process
-    if _is_showing:
-        return True
-    if is_viewer_active():
+    # Stronger TOCTOU guard: claim the showing state and keep the flag set
+    # until hide_viewer() or the child-watch cleanup clears it. The previous
+    # finally-always-clear only protected the short spawn window and allowed
+    # concurrent Show/Toggle races under D-Bus + timers.
+    if _is_showing or is_viewer_active():
         return True
     _is_showing = True
     cfg = load_config()
@@ -1082,7 +1084,7 @@ def show_viewer():
     if _viewer_process is not None:
         try:
             if _viewer_process.poll() is None:
-                _is_showing = False
+                # Keep _is_showing True — viewer is live
                 return True
             else:
                 _viewer_process = None
@@ -1115,6 +1117,8 @@ def show_viewer():
                 try:
                     if _viewer_process.poll() is not None:
                         # child exited (e.g., Super+Q) — cleanup daemon state
+                        global _is_showing
+                        _is_showing = False
                         try:
                             _uninhibit()
                         except Exception:
@@ -1138,14 +1142,14 @@ def show_viewer():
             GLib.timeout_add(500, _watch_child)
         except Exception:
             pass
+        # Success: leave _is_showing True until hide / child exit
         return True
     except Exception as e:
         print(f"Failed to show screensaver: {e}", file=sys.stderr)
         import traceback
         traceback.print_exc()
-        return False
-    finally:
         _is_showing = False
+        return False
 
 
 def hide_viewer():
@@ -1212,6 +1216,8 @@ def hide_viewer():
         except Exception:
             _viewer_process = None
         # daemon inhibit/overlay cleanup (viewer subprocess already exited, but daemon inhibited)
+        global _is_showing
+        _is_showing = False
         try:
             _uninhibit()
         except Exception:
@@ -1638,6 +1644,12 @@ def run_daemon():
     # Ensure overlay/hold cleaned on SIGTERM/SIGINT (systemd stop)
     try:
         def _sig_handler(*_a):
+            # Tear down viewer first so overlay-key is restored while we still
+            # have a live session, then release the application hold and quit.
+            try:
+                hide_viewer()
+            except Exception:
+                pass
             try:
                 _restore_overview()
             except Exception:
@@ -1655,10 +1667,10 @@ def run_daemon():
             except Exception:
                 pass
             try:
-                GLib.MainLoop().quit
+                app.quit()
             except Exception:
                 pass
-            return False
+            return GLib.SOURCE_REMOVE
         GLib.unix_signal_add(GLib.PRIORITY_DEFAULT, signal.SIGTERM, _sig_handler)
         GLib.unix_signal_add(GLib.PRIORITY_DEFAULT, signal.SIGINT, _sig_handler)
         GLib.unix_signal_add(GLib.PRIORITY_DEFAULT, signal.SIGHUP, _sig_handler)
