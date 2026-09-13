@@ -338,6 +338,12 @@ class ScreensaverWindow(Adw.ApplicationWindow):
             if not Gtk.accelerator_valid(keyval, mods):
                 return True  # modifier-only press, keep waiting
             accel = Gtk.accelerator_name(keyval, mods)
+            # Super+Q is reserved for dismissing the screensaver; binding the
+            # toggle to the same chord would race with the close handler.
+            if accel.lower() in ("<super>q", "<meta>q"):
+                title.set_label("Super+Q is reserved for close")
+                hint.set_label("Choose a different shortcut — Esc to cancel")
+                return True
             get_keybinding_settings().set_string("binding", accel)
             self.refresh_shortcut_label()
             dialog.close()

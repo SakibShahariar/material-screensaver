@@ -1820,6 +1820,52 @@ def run_daemon():
             ss_proxy.connect("g-signal", _on_lock_signal)
         except Exception:
             pass
+        # Re-create the viewer when the monitor topology changes while it is
+        # showing (hotplug / docking). Hide then Show rebuilds one window per
+        # current monitor. Debounced so a burst of items-changed doesn't
+        # thrash.
+        try:
+            display = Gdk.Display.get_default()
+            if display is not None:
+                monitors = display.get_monitors()
+                _mon_rebuild_id = {"id": None}
+
+                def _rebuild_for_monitors(*_a):
+                    _mon_rebuild_id["id"] = None
+                    if not is_viewer_active():
+                        return False
+                    try:
+                        hide_viewer()
+                    except Exception:
+                        pass
+                    # small delay so the old process group is fully reaped
+                    def _reshow():
+                        try:
+                            show_viewer()
+                        except Exception:
+                            pass
+                        return False
+                    GLib.timeout_add(350, _reshow)
+                    return False
+
+                def _on_monitors_changed(*_a):
+                    if not is_viewer_active():
+                        return
+                    # debounce
+                    if _mon_rebuild_id["id"] is not None:
+                        try:
+                            GLib.source_remove(_mon_rebuild_id["id"])
+                        except Exception:
+                            pass
+                    _mon_rebuild_id["id"] = GLib.timeout_add(400, _rebuild_for_monitors)
+
+                try:
+                    monitors.connect("items-changed", _on_monitors_changed)
+                except Exception:
+                    # older Gdk may not expose the signal on the list model
+                    pass
+        except Exception:
+            pass
         # Own D-Bus name for delegation (same as before, but ensure app holds it)
         try:
             def on_bus_acquired(conn, name):
