@@ -197,26 +197,68 @@ def _get_shared_context():
     return _shared_web_context
 
 def _kill_orphan_webkit():
-    """Kill any lingering bwrap/WebKit children of this daemon (ghost btop). Returns count killed."""
+    """Kill any lingering bwrap/WebKit children (and grandchildren) of this
+    process (ghost btop entries after Hide). Returns count killed."""
     try:
-        import os, signal, subprocess
-        out = subprocess.run(["ps", "--ppid", str(os.getpid()), "-o", "pid=,args="],
-                             capture_output=True, text=True, timeout=2)
-        killed=0
-        for line in out.stdout.splitlines():
-            line=line.strip()
-            if not line:
-                continue
-            parts=line.split(None,1)
+        import os, signal, subprocess, time
+        my_pid = os.getpid()
+        # Collect direct children + one level of grandchildren so WebKit
+        # NetworkProcess / WebProcess that reparented under bwrap are still seen.
+        candidates = []
+        for ppid in (my_pid,):
             try:
-                pid=int(parts[0])
+                out = subprocess.run(
+                    ["ps", "--ppid", str(ppid), "-o", "pid=,args="],
+                    capture_output=True, text=True, timeout=2)
             except Exception:
                 continue
-            cmd=parts[1] if len(parts)>1 else ""
-            if "WebKitNetworkProcess" in cmd or "WebKitWebProcess" in cmd or ("bwrap" in cmd and "xdg-dbus-proxy" in cmd):
+            for line in out.stdout.splitlines():
+                line = line.strip()
+                if not line:
+                    continue
+                parts = line.split(None, 1)
+                try:
+                    pid = int(parts[0])
+                except Exception:
+                    continue
+                cmd = parts[1] if len(parts) > 1 else ""
+                candidates.append((pid, cmd))
+                # also scan this child's children
+                try:
+                    out2 = subprocess.run(
+                        ["ps", "--ppid", str(pid), "-o", "pid=,args="],
+                        capture_output=True, text=True, timeout=1)
+                    for line2 in out2.stdout.splitlines():
+                        line2 = line2.strip()
+                        if not line2:
+                            continue
+                        p2 = line2.split(None, 1)
+                        try:
+                            candidates.append((int(p2[0]), p2[1] if len(p2) > 1 else ""))
+                        except Exception:
+                            pass
+                except Exception:
+                    pass
+
+        killed = 0
+        to_reap = []
+        for pid, cmd in candidates:
+            if ("WebKitNetworkProcess" in cmd or "WebKitWebProcess" in cmd
+                    or ("bwrap" in cmd and "xdg-dbus-proxy" in cmd)
+                    or "WebKitGTK" in cmd):
                 try:
                     os.kill(pid, signal.SIGTERM)
-                    killed+=1
+                    to_reap.append(pid)
+                    killed += 1
+                except Exception:
+                    pass
+        # Give them a moment, then SIGKILL any that linger
+        if to_reap:
+            time.sleep(0.15)
+            for pid in to_reap:
+                try:
+                    os.kill(pid, 0)  # still alive?
+                    os.kill(pid, signal.SIGKILL)
                 except Exception:
                     pass
         return killed

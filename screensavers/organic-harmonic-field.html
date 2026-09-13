@@ -282,9 +282,11 @@ if (!gl) {
     const uSurf = gl.getUniformLocation(prog, "uSurf");
 
     let t0 = performance.now();
+    const reduceMotion = matchMedia("(prefers-reduced-motion: reduce)").matches;
+    const speedMul = reduceMotion ? 0.15 : 1;
 
     function frame(now) {
-      const t = (now - t0) / 1000;
+      const t = ((now - t0) / 1000) * speedMul;
       gl.uniform2f(uRes, canvas.width, canvas.height);
       gl.uniform1f(uTime, t);
       gl.uniform3fv(uP, theme.primary);
