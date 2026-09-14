@@ -6,6 +6,17 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
+### Changed
+- Audit-driven hardening: systemd unit now sets conservative sandbox directives
+  (NoNewPrivileges, ProtectSystem/ControlGroups/KernelTunables, PrivateTmp, UMask,
+  etc.) — deliberately NOT the aggressive set (MemoryDenyWriteExecute, PrivateDevices,
+  RestrictAddressFamilies) since the unit's cgroup spawns the WebKit viewer child that
+  needs JIT, /dev/dri, local sockets, and user namespaces.
+- Inhibit/Uninhibit failures are now logged to stderr behind the MS_DEBUG env flag
+  instead of being silently swallowed (useful when GNOME SessionManager changes).
+- ctl.py: comment documenting why WebKit file-access grants are enabled (screensavers
+  load matugen-colors.css + shared helpers via relative file:// hrefs; pages are
+  trusted, networkless).
 ### Removed
 - "Test it now" preview group (Start/Stop buttons) from the settings GUI — the inline
   Live Preview thumbnail already shows the selected style.

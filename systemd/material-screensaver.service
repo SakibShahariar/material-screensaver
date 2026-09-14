@@ -10,6 +10,23 @@ Restart=on-failure
 RestartSec=3
 TimeoutStopSec=5
 KillMode=mixed
+# Conservative hardening: this unit's cgroup spawns the WebKit viewer child
+# (JIT, /dev/dri GPU access, unprivileged-user-namespace sandbox, local sockets),
+# so aggressive directives (MemoryDenyWriteExecute, PrivateDevices,
+# RestrictAddressFamilies=AF_UNIX, ProtectHome, RestrictNamespaces) would break it.
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectControlGroups=true
+ProtectKernelTunables=true
+ProtectClock=true
+ProtectHostname=true
+ProtectKernelModules=true
+ProtectKernelLogs=true
+LockPersonality=true
+RestrictRealtime=true
+RestrictSUIDSGID=true
+UMask=0077
 
 [Install]
 WantedBy=graphical-session.target

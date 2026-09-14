@@ -141,12 +141,22 @@ def _get_session_proxy():
     except Exception:
         return None
 
+def _dbg(msg):
+    """Best-effort debug log, active only when MS_DEBUG is set (keeps idle silent)."""
+    if os.environ.get("MS_DEBUG"):
+        try:
+            print(f"[material-screensaver] {msg}", file=sys.stderr, flush=True)
+        except Exception:
+            pass
+
+
 def _inhibit():
     global _viewer_inhibit_cookie, _viewer_inhibit_proxy
     if _viewer_inhibit_cookie is not None:
         return
     proxy = _get_session_proxy()
     if proxy is None:
+        _dbg("inhibit: no session proxy (SessionManager unavailable)")
         return
     try:
         from gi.repository import GLib
@@ -156,8 +166,8 @@ def _inhibit():
             0, -1, None)
         _viewer_inhibit_cookie = res.unpack()[0]
         _viewer_inhibit_proxy = proxy
-    except Exception:
-        pass
+    except Exception as e:
+        _dbg(f"inhibit failed: {e}")
 
 def _uninhibit():
     global _viewer_inhibit_cookie, _viewer_inhibit_proxy
@@ -167,8 +177,8 @@ def _uninhibit():
         from gi.repository import GLib
         _viewer_inhibit_proxy.call_sync("Uninhibit",
             GLib.Variant("(u)", (_viewer_inhibit_cookie,)), 0, -1, None)
-    except Exception:
-        pass
+    except Exception as e:
+        _dbg(f"uninhibit failed: {e}")
     _viewer_inhibit_cookie = None
     _viewer_inhibit_proxy = None
 
@@ -363,6 +373,10 @@ def _create_viewer_windows(html_path, clock_format="24h"):
             web = WebKit.WebView()
         settings = web.get_settings()
         try:
+            # Every screensaver loads matugen-colors.css (and ASCII-art helpers)
+            # via plain <link>/<script> relative hrefs, so file:// same-origin and
+            # cross-origin reads must stay enabled. Pages are our own trusted HTML
+            # with no network dependency; this grant is required, not accidental.
             settings.set_allow_file_access_from_file_urls(True)
             settings.set_allow_universal_access_from_file_urls(True)
             settings.set_enable_write_console_messages_to_stdout(False)
