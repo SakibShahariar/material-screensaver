@@ -54,7 +54,6 @@ _ephemeral_ctx = None  # single ephemeral WebContext reused across Shows (fixes 
 _is_viewer_mode = False  # True in viewer subprocess (isolated WebKit, daemon stays lean)
 _viewer_loop = None  # GLib.MainLoop for viewer subprocess
 
-
 def _valid_int(value, minimum, maximum):
     """Return an integer in range. Rejects bools and fractional floats (lossy
     coercion would silently truncate user-edited config)."""
@@ -67,7 +66,6 @@ def _valid_int(value, minimum, maximum):
     except (TypeError, ValueError, OverflowError):
         return None
     return value if minimum <= value <= maximum else None
-
 
 def normalize_config(data):
     """Return a safe, complete configuration from untrusted JSON data."""
@@ -91,7 +89,6 @@ def normalize_config(data):
         cfg["clock_format"] = data["clock_format"]
     return cfg
 
-
 def load_config():
     if not os.path.exists(CONFIG_PATH):
         return dict(DEFAULT_CONFIG)
@@ -101,12 +98,10 @@ def load_config():
     except (json.JSONDecodeError, OSError, TypeError, ValueError):
         return dict(DEFAULT_CONFIG)
 
-
 def list_screensavers():
     """Returns {filename: full_path} for every .html file in the screensavers dir."""
     paths = sorted(glob.glob(os.path.join(SCREENSAVER_DIR, "*.html")))
     return {os.path.basename(p): p for p in paths}
-
 
 def get_active_html_path(cfg):
     screensavers = list_screensavers()
@@ -120,11 +115,9 @@ def get_active_html_path(cfg):
         return screensavers[active]
     return next(iter(screensavers.values()))  # alphabetically first
 
-
 def has_graphical_session():
     """Avoid initializing GTK/WebKit when no display connection is possible."""
     return bool(os.environ.get("WAYLAND_DISPLAY") or os.environ.get("DISPLAY"))
-
 
 # ---------- SessionManager inhibit ----------
 def _get_session_proxy():
@@ -148,7 +141,6 @@ def _dbg(msg):
             print(f"[material-screensaver] {msg}", file=sys.stderr, flush=True)
         except Exception:
             pass
-
 
 def _inhibit():
     global _viewer_inhibit_cookie, _viewer_inhibit_proxy
@@ -181,7 +173,6 @@ def _uninhibit():
         _dbg(f"uninhibit failed: {e}")
     _viewer_inhibit_cookie = None
     _viewer_inhibit_proxy = None
-
 
 # ---------- WebKit viewer ----------
 # Shared WebKit context to avoid spawning a new NetworkProcess per Show
@@ -658,7 +649,6 @@ def _create_viewer_windows(html_path, clock_format="24h"):
 
     return windows
 
-
 def is_viewer_active():
     """Local check (no D-Bus). True if we have visible viewer windows in this process or subprocess."""
     global _viewer_windows, _viewer_process
@@ -679,7 +669,7 @@ def is_viewer_active():
         try:
             if w.get_visible():
                 return True
-        except Exception:
+        except Exception as e:
             continue
     # Fallback: scan toplevels for ghosts (created but not in _viewer_windows)
     try:
@@ -690,15 +680,14 @@ def is_viewer_active():
             try:
                 if tl.get_title() == "Material Screensaver" and tl.get_visible():
                     return True
-            except Exception:
+            except Exception as e:
                 continue
     except Exception:
-        pass
+            pass
     # Last resort: if any WebKit bwrap child still alive while we think hidden,
     # treat as active ghost (prevents Show from spawning duplicate that stays throttled)
     # We don't check here to avoid false positives during normal hide, but hide_viewer will clean anyway
     return False
-
 
 # Locks the session once the screensaver has been visible for lock_after_seconds.
 # Ordered by preference; each candidate must report success (rc==0) or the next
@@ -712,7 +701,6 @@ LOCK_COMMANDS = [
     ["xdg-screensaver", "lock"],
 ]
 
-
 def _lock_screen():
     """Lock GNOME session — used after screensaver has been visible for lock_after_seconds."""
     for cmd in LOCK_COMMANDS:
@@ -722,7 +710,6 @@ def _lock_screen():
             continue  # binary missing or timed out -> try the next candidate
         if r.returncode == 0:
             return  # locked
-
 
 def _on_screen_saver_active_changed(active):
     """React to external lock/unlock (GNOME ScreenSaver ActiveChanged signal).
@@ -1267,10 +1254,11 @@ def show_viewer():
         _is_showing = False
         return False
 
-
 def hide_viewer():
     """Hide/destroy viewer windows in this process. Thorough cleanup to prevent ghost dash/bwrap leak."""
     global _viewer_windows, _is_showing, _pending_sources, _ephemeral_ctx, _viewer_process, _is_viewer_mode, _viewer_loop
+    if not _is_showing and not is_viewer_active():
+        return False
     # Viewer subprocess: just close windows and exit, daemon handles inhibit/overlay via child watch
     if _is_viewer_mode:
         try:
@@ -1593,7 +1581,6 @@ def hide_viewer():
         pass
     return True
 
-
 # ---------- D-Bus delegation helpers ----------
 def _daemon_is_available():
     try:
@@ -1628,7 +1615,6 @@ def _call_daemon(method):
     except Exception as e:
         return False, str(e)
 
-
 def is_running():
     """Cross-process check: daemon IsActive if available, else local."""
     # Try daemon first
@@ -1639,7 +1625,6 @@ def is_running():
     except Exception:
         pass
     return is_viewer_active()
-
 
 def start():
     """Show screensaver. Delegates to daemon if running, else standalone viewer."""
@@ -1705,7 +1690,6 @@ def start():
         _is_showing = False
         sys.exit(1)
 
-
 def stop():
     """Hide screensaver. Delegates to daemon if running."""
     ok, _ = _call_daemon("Hide")
@@ -1728,7 +1712,6 @@ def stop():
         except Exception:
             pass
 
-
 def toggle():
     # Use daemon atomic Toggle if available (avoids IsActive→Show race)
     ok, _ = _call_daemon("Toggle")
@@ -1740,7 +1723,6 @@ def toggle():
         # The fallback must run a GTK main loop; creating windows and then
         # returning immediately destroys the viewer with this CLI process.
         start()
-
 
 def run_daemon():
     if not has_graphical_session():
@@ -2005,7 +1987,6 @@ def run_daemon():
             GLib.MainLoop().run()
         except Exception:
             pass
-
 
 if __name__ == "__main__":
     action = sys.argv[1] if len(sys.argv) > 1 else None
