@@ -1127,8 +1127,38 @@ def show_viewer():
     # until hide_viewer() or the child-watch cleanup clears it. The previous
     # finally-always-clear only protected the short spawn window and allowed
     # concurrent Show/Toggle races under D-Bus + timers.
-    if _is_showing or is_viewer_active():
+    # Recover from stale _is_showing (child crashed / fallback never visible)
+    # which previously left the daemon permanently blocked for both auto-idle
+    # and manual Toggle.
+    if is_viewer_active():
         return True
+    if _is_showing:
+        # Stale flag with no active viewer — clean up and allow retry
+        try:
+            if _viewer_process is not None:
+                try:
+                    if _viewer_process.poll() is None:
+                        # child still alive but not yet visible (transient)
+                        return True
+                    _viewer_process = None
+                except Exception:
+                    _viewer_process = None
+                    return True
+            try:
+                _uninhibit()
+            except Exception:
+                pass
+            try:
+                _restore_overview()
+            except Exception:
+                pass
+            try:
+                _cancel_lock()
+            except Exception:
+                pass
+        except Exception:
+            pass
+        _is_showing = False
     _is_showing = True
     cfg = load_config()
     html_path = get_active_html_path(cfg)
@@ -1169,13 +1199,34 @@ def show_viewer():
             from gi.repository import GLib
             def _watch_child():
                 global _is_showing, _viewer_process
-                if _viewer_process is None:
-                    return False
                 try:
-                    if _viewer_process.poll() is not None:
-                        # child exited (e.g., Super+Q) — cleanup daemon state
+                    if _viewer_process is not None:
+                        if _viewer_process.poll() is not None:
+                            # child exited (e.g., Super+Q) — cleanup daemon state
+                            _is_showing = False
+                            _viewer_process = None
+                            try:
+                                _uninhibit()
+                            except Exception:
+                                pass
+                            try:
+                                _restore_overview()
+                            except Exception:
+                                pass
+                            try:
+                                _cancel_lock()
+                            except Exception:
+                                pass
+                            try:
+                                _daemon_switch_to_idle_watch()
+                            except Exception:
+                                pass
+                            return False
+                        return True
+                    # Fallback / in-process case: no subprocess. If flag is stale
+                    # (no visible viewer) clear it so next Show is not blocked.
+                    if _is_showing and not is_viewer_active():
                         _is_showing = False
-                        _viewer_process = None
                         try:
                             _uninhibit()
                         except Exception:
@@ -1193,9 +1244,9 @@ def show_viewer():
                         except Exception:
                             pass
                         return False
+                    return bool(is_viewer_active())
                 except Exception:
                     return False
-                return True
             GLib.timeout_add(500, _watch_child)
         except Exception:
             pass
