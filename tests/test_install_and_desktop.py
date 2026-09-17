@@ -24,8 +24,18 @@ class TestScriptsAndUnits(unittest.TestCase):
         text = self._read("applications/material-screensaver-settings.desktop")
         m = re.search(r"^Exec=(.+)$", text, re.M)
         self.assertIsNotNone(m, "no Exec= line")
-        self.assertTrue(m.group(1).startswith("%h/.local/bin/material-screensaver-gui.py"),
-                        f"Exec should use %h/.local/bin, got: {m.group(1)}")
+        exec_line = m.group(1)
+        # Allow %h (systemd-style, expanded at install), sh -c with $HOME,
+        # or absolute path – all resolvable via install.sh or shell expansion.
+        self.assertTrue(
+            exec_line.startswith("%h/.local/bin/material-screensaver-gui.py")
+            or "material-screensaver-gui.py" in exec_line and ("$HOME" in exec_line or "%h" in exec_line or exec_line.startswith("sh -c")),
+            f"Exec should use resolvable path to gui, got: {exec_line}")
+        # TryExec if present must also be resolvable or omitted (no invalid %h without expansion)
+        m2 = re.search(r"^TryExec=(.+)$", text, re.M)
+        if m2:
+            self.assertFalse(m2.group(1).startswith("%h/") and "\\$HOME" not in exec_line,
+                             f"TryExec with literal %h hides entry (Exec should expand $HOME): {m2.group(1)}")
 
     def test_desktop_icon_matches_install_target(self):
         text = self._read("applications/material-screensaver-settings.desktop")

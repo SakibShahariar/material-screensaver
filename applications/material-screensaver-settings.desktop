@@ -2,8 +2,7 @@
 Type=Application
 Name=Material Screensaver Settings
 Comment=Choose and configure your Material screensaver
-Exec=%h/.local/bin/material-screensaver-gui.py
-TryExec=%h/.local/bin/material-screensaver-gui.py
+Exec=sh -c "exec \\$HOME/.local/bin/material-screensaver-gui.py"
 Icon=material-screensaver
 Terminal=false
 Categories=Settings;GTK;
