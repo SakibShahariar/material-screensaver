@@ -1072,11 +1072,11 @@ def run_viewer(html_path, clock_format="24h"):
         loop = GLib.MainLoop()
         _viewer_loop = loop
         def check_closed():
-            if not is_viewer_active():
-                loop.quit()
-                return False
+            # Keep viewer alive until SIGTERM/Super+Q; transient
+            # is_viewer_active() false during Wayland map should not quit.
+            # Daemon's _watch_child handles real exit via poll().
             return True
-        GLib.timeout_add(200, check_closed)
+        GLib.timeout_add(1000, check_closed)
         def _viewer_sig(*_a):
             try:
                 for w in list(_viewer_windows):
@@ -1205,7 +1205,8 @@ def show_viewer():
                 global _is_showing, _viewer_process
                 try:
                     if _viewer_process is not None:
-                        if _viewer_process.poll() is not None:
+                        poll = _viewer_process.poll()
+                        if poll is not None:
                             # child exited (e.g., Super+Q) — cleanup daemon state
                             _is_showing = False
                             _viewer_process = None

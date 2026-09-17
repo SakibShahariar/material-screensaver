@@ -11,17 +11,5 @@ RestartSec=3
 TimeoutStopSec=5
 KillMode=mixed
 
-# Hardening. NoNewPrivileges/ProtectSystem=strict/ProtectHome=read-only were
-# tried here and reverted: they conflict with WebKit's own bubblewrap
-# sandbox spawning its xdg-dbus-proxy helper, causing every viewer launch to
-# abort inside WebKit::XDGDBusProxy::launch (coredump, screensaver never
-# renders) even with xdg-dbus-proxy correctly installed. Stick to
-# directives that don't touch mounts/privileges/namespaces.
-ProtectKernelTunables=true
-ProtectKernelModules=true
-ProtectControlGroups=true
-RestrictSUIDSGID=true
-LockPersonality=true
-
 [Install]
 WantedBy=graphical-session.target
