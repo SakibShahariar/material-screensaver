@@ -1328,7 +1328,6 @@ def hide_viewer():
         except Exception:
             _viewer_process = None
         # daemon inhibit/overlay cleanup (viewer subprocess already exited, but daemon inhibited)
-        global _is_showing
         _is_showing = False
         try:
             _uninhibit()
