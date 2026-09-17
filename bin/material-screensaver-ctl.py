@@ -912,7 +912,11 @@ def _restore_overview():
             except Exception:
                 pass
             _saved_overlay_key=None
-        else:
+        elif _daemon_app is not None:
+            # Only daemon should auto-restore a leftover '' from a crash.
+            # Short-lived ctl toggle clients also register this atexit and
+            # would otherwise race with the daemon's inhibit (daemon sets ''
+            # then client atexit sees '' and restores 'Super').
             try:
                 cur = subprocess.run(["gsettings", "get", "org.gnome.mutter", "overlay-key"],
                                      capture_output=True, text=True, timeout=2)
