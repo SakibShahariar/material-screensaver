@@ -662,6 +662,9 @@ def _create_viewer_windows(html_path, clock_format="24h"):
 def is_viewer_active():
     """Local check (no D-Bus). True if we have visible viewer windows in this process or subprocess."""
     global _viewer_windows, _viewer_process
+    # If daemon says not showing, treat as not active even if toplevel ghost lingers briefly after hide
+    if not _is_showing:
+        return False
     # Isolated viewer subprocess alive?
     if _viewer_process is not None:
         try:
