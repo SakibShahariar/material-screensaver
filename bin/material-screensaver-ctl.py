@@ -1655,13 +1655,10 @@ def start():
         _schedule_lock()
         # For standalone, run main loop until windows closed
         loop = GLib.MainLoop()
-        # Poll for windows closed
+        # Poll for windows closed - keep alive until SIGTERM/Super+Q
         def check_closed():
-            if not is_viewer_active():
-                loop.quit()
-                return False
             return True
-        GLib.timeout_add(200, check_closed)
+        GLib.timeout_add(1000, check_closed)
         # Also handle SIGTERM
         import signal
         def handle_sigterm(*a):
