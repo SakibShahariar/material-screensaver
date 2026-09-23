@@ -6,6 +6,10 @@
 A collection of animated, matugen-themed "screensavers" for GNOME (Wayland), plus a
 GTK4/libadwaita settings app to manage them.
 
+## Contents
+
+[Styles](#styles-included) · [Requirements](#requirements) · [Install](#install) · [Manage](#manage) · [Manual control](#manual-control) · [Tests](#tests)
+
 Since GNOME dropped native animated screensavers, these run as standalone HTML/JS
 pages in a fullscreen `WebKitGTK` (`WebKit 6.0` + `Gtk 4`) window — one per monitor —
 with `SessionManager` inhibit and input grab while visible, triggered automatically after
@@ -27,15 +31,6 @@ All pull their color palette live from a [matugen](https://github.com/InioX/matu
 generated stylesheet, so they follow your current wallpaper-derived Material You theme.
 Shared helpers `screensavers/clock-shared.js` (clock) and `screensavers/theme-shared.js`
 (readRGB/rgba) are available for new styles to avoid duplicating theme code.
-
-Note: most files went through a Gemini update pass that reintroduced an invalid CSS
-`rgba(var(--x), alpha)` pattern (mixing space-separated variable expansion with a
-comma-separated alpha argument — invalid per spec, and the same category of bug that
-broke clock text once before). This has been mechanically batch-fixed to valid
-`rgb(var(--x) / alpha)` syntax across all affected files. The *new content* those
-files gained beyond that fix (new panels, features, effects) has not yet been
-individually deep-reviewed the way earlier additions were — only automated syntax
-and known-bug-pattern scanning has been done so far.
 
 ## Requirements
 
@@ -85,7 +80,7 @@ automatically.
 ```bash
 material-screensaver-ctl.py start    # force start
 material-screensaver-ctl.py stop     # force stop
-material-screensaver-ctl.py toggle   # start if not running, stop if running
+material-screensaver-ctl.py toggle   # show (repeat presses are safe); dismiss with any key / Super+Q / stop
 material-screensaver-ctl.py daemon   # run the idle-watching loop (used by the systemd service)
 ```
 
@@ -111,5 +106,3 @@ copy with `MS_TEST_SCREENSAVERS_DIR=~/.local/share/material-screensaver/screensa
 The only untested portion is the live interaction with the GNOME session itself
 (actual `Mutter.IdleMonitor` watch registration, the SessionManager inhibit,
 and locking a real session), which needs a running desktop.
-
-## Manual control
