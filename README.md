@@ -8,7 +8,7 @@ GTK4/libadwaita settings app to manage them.
 
 ## Contents
 
-[Styles](#styles-included) · [Requirements](#requirements) · [Install](#install) · [Manage](#manage) · [Manual control](#manual-control) · [Tests](#tests)
+[Styles](#styles-included) · [Screenshots](#screenshots) · [Requirements](#requirements) · [Install](#install) · [Manage](#manage) · [Manual control](#manual-control) · [Tests](#tests)
 
 Since GNOME dropped native animated screensavers, these run as standalone HTML/JS
 pages in a fullscreen `WebKitGTK` (`WebKit 6.0` + `Gtk 4`) window — one per monitor —
@@ -31,6 +31,16 @@ All pull their color palette live from a [matugen](https://github.com/InioX/matu
 generated stylesheet, so they follow your current wallpaper-derived Material You theme.
 Shared helpers `screensavers/clock-shared.js` (clock) and `screensavers/theme-shared.js`
 (readRGB/rgba) are available for new styles to avoid duplicating theme code.
+
+## Screenshots
+
+| | | |
+|---|---|---|
+| ![shot 1](screenshots/shot01.png) | ![shot 2](screenshots/shot02.png) | ![shot 3](screenshots/shot03.png) |
+| ![shot 4](screenshots/shot04.png) | ![shot 5](screenshots/shot05.png) | ![shot 6](screenshots/shot06.png) |
+| ![shot 7](screenshots/shot07.png) | ![shot 8](screenshots/shot08.png) | ![shot 9](screenshots/shot09.png) |
+| ![shot 10](screenshots/shot10.png) | ![shot 11](screenshots/shot11.png) | ![shot 12](screenshots/shot12.png) |
+| ![shot 13](screenshots/shot13.png) | ![shot 14](screenshots/shot14.png) | |
 
 ## Requirements
 
