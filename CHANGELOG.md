@@ -7,16 +7,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 ### Changed
-- Audit-driven hardening: systemd unit now sets conservative sandbox directives
-  (NoNewPrivileges, ProtectSystem/ControlGroups/KernelTunables, PrivateTmp, UMask,
-  etc.) — deliberately NOT the aggressive set (MemoryDenyWriteExecute, PrivateDevices,
-  RestrictAddressFamilies) since the unit's cgroup spawns the WebKit viewer child that
-  needs JIT, /dev/dri, local sockets, and user namespaces.
 - Inhibit/Uninhibit failures are now logged to stderr behind the MS_DEBUG env flag
   instead of being silently swallowed (useful when GNOME SessionManager changes).
-- ctl.py: comment documenting why WebKit file-access grants are enabled (screensavers
-  load matugen-colors.css + shared helpers via relative file:// hrefs; pages are
-  trusted, networkless).
+- WebKit no longer grants universal access from file URLs; local file access remains
+  enabled for sibling helper scripts and the Matugen stylesheet. A narrower resource
+  loading mechanism is still needed to fully isolate user-added scenes from other files.
 ### Removed
 - "Test it now" preview group (Start/Stop buttons) from the settings GUI — the inline
   Live Preview thumbnail already shows the selected style.
@@ -25,23 +20,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   + hint + `prefers-reduced-motion` handling). README "Styles included" list + count
   updated (the test-suite count check parses that line dynamically). Collection total
   is now 31.
-- 6 further styles (Dinner Under Wisteria, Steam Train at Night, Lighthouse Beam,
-  Cherry Blossom Stream, Forest Fireflies, Subway Platform) were authored, trialed,
-  then removed; none kept. README count temporarily rose to 37 then reverted.
-- 11 further new styles (Moonlit Surf, Milky Way Ridge, Butterfly Migration, Black
-  Hole Disc, Wet Street Neon, Harbor Cranes, Sand Mandala, Frost on Glass, Mycelium
-  Pulse, Paper Lantern Parade, Zodiac Sky) were authored, trialed, then removed
-  (kept only Rain on a Window). Collection total is now 31.
 ### Fixed
-- Desktop file `Exec=`/`TryExec=` now use `%h/.local/bin/material-screensaver-gui.py` so the
-  settings app launches from the app grid even when `~/.local/bin` is absent from `$PATH`
-  (regression vs the v2.2.2 changelog claim).
+- Desktop entry launches the settings app through a shell-expanded `$HOME` path; the
+  desktop-entry `Exec` field does not support systemd's `%h` specifier.
 - `_valid_int` (ctl + gui) rejects fractional floats instead of silently truncating
   (`300.9` → `300`) in user-editable config.
-- Lock fallback chain: a failing `gdbus`/`org.gnome.ScreenSaver` call (rc≠0) now falls
-  through to `loginctl lock-session` / `xdg-screensaver lock`. Previously a nonzero
-  `subprocess.run` exit was never detected, so the screen never locked on systems where
-  the GNOME ScreenSaver D-Bus service is absent.
+- Lock fallback chain: failed lock commands now fall through to the next candidate and
+  return an explicit failure if all candidates fail. The viewer remains visible unless a
+  lock command reports success.
+- An abnormal viewer subprocess exit now triggers an immediate lock attempt when locking
+  is configured; viewer stderr is sent to the user service journal for diagnosis.
 - External locks (Super+L, `loginctl lock-session`, GNOME Settings timer) now dismiss the
   screensaver: the daemon subscribes to `org.gnome.ScreenSaver.ActiveChanged` and hides
   the viewer when the session locks, so it no longer keeps running after unlock.
@@ -65,7 +53,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   HTML structure, config-parsing edge cases, screensaver selection, lock command fallback
   chain, lock scheduling (fire/cancel/disable/dedup/inactive-guard via GLib loop),
   external-lock handling, packaging checks.
-- CI: consolidated static checks into the suite, added a `tests` job (GI + Node).
+- CI: validate installer shell syntax, ShellCheck, desktop metadata, systemd unit markers,
+  Python syntax, GI imports, and the unittest suite with system Python so GUI logic tests
+  run instead of being silently skipped under `setup-python`.
 
 ## [2.2.2] - 2026-08-30
 ### Fixed
