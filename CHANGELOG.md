@@ -21,6 +21,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   updated (the test-suite count check parses that line dynamically). Collection total
   is now 31.
 ### Fixed
+- The daemon now uses GLib's child-watch notification for the isolated viewer instead
+  of polling its process every 500 ms; the watch is removed before synchronous shutdown
+  so GLib and `subprocess.Popen` cannot compete to reap the same child.
 - Desktop entry launches the settings app through a shell-expanded `$HOME` path; the
   desktop-entry `Exec` field does not support systemd's `%h` specifier.
 - `_valid_int` (ctl + gui) rejects fractional floats instead of silently truncating
