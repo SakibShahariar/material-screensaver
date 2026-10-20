@@ -19,6 +19,19 @@ class TestIdleWatchRefresh(unittest.TestCase):
     def test_timeout_change_refreshes_even_when_watch_exists(self):
         self.assertTrue(self.ctl._idle_watch_needs_refresh(600, 300, 42))
 
+    def test_timeout_change_is_deferred_while_viewer_is_active(self):
+        self.assertFalse(
+            self.ctl._idle_watch_needs_refresh(600, 300, 42, viewer_active=True)
+        )
+
+    def test_missing_watch_is_not_rearmed_during_session_lock(self):
+        self.assertFalse(
+            self.ctl._idle_watch_needs_refresh(600, 300, None, session_locked=True)
+        )
+
+    def test_timeout_change_refreshes_after_viewer_dismissal(self):
+        self.assertTrue(self.ctl._idle_watch_needs_refresh(600, 300, 42))
+
     def test_daemon_poll_checks_registration_state(self):
         path = os.path.join(support.REPO_ROOT, "bin", "material-screensaver-ctl.py")
         with open(path, encoding="utf-8") as handle:

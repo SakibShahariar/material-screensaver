@@ -822,8 +822,13 @@ def _lock_screen_async(on_complete):
         proc.wait_check_async(None, on_wait, None)
 
 
-def _idle_watch_needs_refresh(current_idle_seconds, last_idle_seconds, watch_id):
-    """Refresh when the timeout changes or registration is missing."""
+def _idle_watch_needs_refresh(
+    current_idle_seconds, last_idle_seconds, watch_id,
+    viewer_active=False, session_locked=False,
+):
+    """Refresh a stale/missing idle watch only while the desktop can activate it."""
+    if viewer_active or session_locked:
+        return False
     return current_idle_seconds != last_idle_seconds or watch_id is None
 
 
@@ -2104,7 +2109,10 @@ def run_daemon():
         def check_idle_config():
             try:
                 current = current_idle_seconds()
-                if _idle_watch_needs_refresh(current, last_idle_seconds[0], _idle_watch_ids.get("idle")) and not is_viewer_active():
+                if _idle_watch_needs_refresh(
+                    current, last_idle_seconds[0], _idle_watch_ids.get("idle"),
+                    viewer_active=is_viewer_active(), session_locked=_session_locked,
+                ):
                     if add_idle_watch():
                         last_idle_seconds[0] = current
             except Exception as exc:
