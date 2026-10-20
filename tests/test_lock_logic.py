@@ -112,7 +112,7 @@ class TestAbnormalViewerExit(unittest.TestCase):
     def setUp(self):
         self._orig = {
             "load_config": self.ctl.load_config,
-            "_lock_screen": self.ctl._lock_screen,
+            "_lock_screen_async": self.ctl._lock_screen_async,
         }
         self.lock_calls = 0
 
@@ -120,13 +120,13 @@ class TestAbnormalViewerExit(unittest.TestCase):
         for name, fn in self._orig.items():
             setattr(self.ctl, name, fn)
 
-    def _lock(self):
+    def _lock_async(self, callback):
         self.lock_calls += 1
-        return True
+        callback(True)
 
     def test_clean_exit_does_not_lock(self):
         self.ctl.load_config = lambda: {"lock_after_seconds": 300}
-        self.ctl._lock_screen = self._lock
+        self.ctl._lock_screen_async = self._lock_async
         self.ctl._handle_viewer_exit(0)
         self.assertEqual(self.lock_calls, 0)
 
