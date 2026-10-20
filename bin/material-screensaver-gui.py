@@ -61,6 +61,12 @@ def save_config(**updates):
     return config_store.save_config(CONFIG_PATH, **updates)
 
 
+def sync_matugen_colors_link(cfg=None):
+    if not isinstance(cfg, dict):
+        cfg = load_config()
+    return config_store.sync_matugen_colors_link(SCREENSAVER_DIR, cfg)
+
+
 def display_name(filename):
     """Prefer the scene's own title; retain a filename fallback for user scenes."""
     stem = os.path.splitext(filename)[0]

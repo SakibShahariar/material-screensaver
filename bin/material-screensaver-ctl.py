@@ -75,38 +75,9 @@ def list_screensavers():
     }
 
 def sync_matugen_colors_link(cfg=None):
-    """Update the scene-local stylesheet symlink to the configured Matugen file."""
-    cfg = cfg if isinstance(cfg, dict) else load_config()
-    target = cfg.get("matugen_colors_path", DEFAULT_MATUGEN_COLORS_PATH)
-    if not isinstance(target, str) or not os.path.isabs(target):
-        target = DEFAULT_MATUGEN_COLORS_PATH
-    link = os.path.join(SCREENSAVER_DIR, "matugen-colors.css")
-    if not os.path.isdir(SCREENSAVER_DIR):
-        return False
-    tmp = None
-    try:
-        if os.path.islink(link) and os.readlink(link) == target:
-            return True
-        # Do not overwrite a regular file a user deliberately placed here.
-        if os.path.lexists(link) and not os.path.islink(link):
-            print(f"Not replacing non-symlink Matugen stylesheet: {link}", file=sys.stderr)
-            return False
-        fd, tmp = tempfile.mkstemp(prefix=".matugen-colors-", dir=SCREENSAVER_DIR)
-        os.close(fd)
-        os.unlink(tmp)
-        os.symlink(target, tmp)
-        os.replace(tmp, link)
-        tmp = None
-        return True
-    except OSError as exc:
-        print(f"Could not update Matugen stylesheet link: {exc}", file=sys.stderr)
-        return False
-    finally:
-        if tmp is not None:
-            try:
-                os.unlink(tmp)
-            except OSError:
-                pass
+    if not isinstance(cfg, dict):
+        cfg = load_config()
+    return config_store.sync_matugen_colors_link(SCREENSAVER_DIR, cfg)
 
 def get_active_html_path(cfg):
     sync_matugen_colors_link(cfg)

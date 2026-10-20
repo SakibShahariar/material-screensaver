@@ -99,3 +99,39 @@ def save_config(config_path, **updates):
 def list_screensavers(screensaver_dir):
     """Return sorted full paths for HTML screensavers in the given directory."""
     return sorted(glob.glob(os.path.join(screensaver_dir, "*.html")))
+
+
+def sync_matugen_colors_link(screensaver_dir, cfg):
+    """Atomically point the scene-local stylesheet name at the configured CSS."""
+    target = cfg.get("matugen_colors_path", DEFAULT_MATUGEN_COLORS_PATH)
+    if not isinstance(target, str) or not os.path.isabs(target):
+        target = DEFAULT_MATUGEN_COLORS_PATH
+    link = os.path.join(screensaver_dir, "matugen-colors.css")
+    if not os.path.isdir(screensaver_dir):
+        return False
+    tmp = None
+    try:
+        if os.path.islink(link) and os.readlink(link) == target:
+            return True
+        # Do not overwrite a regular file a user deliberately placed here.
+        if os.path.lexists(link) and not os.path.islink(link):
+            print(f"Not replacing non-symlink Matugen stylesheet: {link}", file=sys.stderr)
+            return False
+        fd, tmp = tempfile.mkstemp(prefix=".matugen-colors-", dir=screensaver_dir)
+        os.close(fd)
+        os.unlink(tmp)
+        os.symlink(target, tmp)
+        os.replace(tmp, link)
+        tmp = None
+        return True
+    except OSError as exc:
+        print(f"Could not update Matugen stylesheet link: {exc}", file=sys.stderr)
+        return False
+    finally:
+        if tmp is not None:
+            try:
+                os.unlink(tmp)
+            except OSError:
+                pass
+
+
