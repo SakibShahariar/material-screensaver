@@ -67,37 +67,41 @@ class TestLockCommandChain(unittest.TestCase):
         )
 
     def test_first_candidate_success_stops_chain(self):
-        self._lock(returncodes=[0])
+        self.assertTrue(self._lock(returncodes=[0]))
         self.assertEqual(self.commands(), ["gdbus"])
 
     def test_nonzero_rc_falls_through_to_next_success(self):
         # The regression: gdbus returns rc=1 (service absent); before the fix,
         # loginctl was never attempted because subprocess.run does not raise on
         # a nonzero exit code.
-        self._lock(returncodes=[1, 0])
+        self.assertTrue(self._lock(returncodes=[1, 0]))
         self.assertEqual(self.commands(), ["gdbus", "loginctl"])
 
     def test_missing_binary_falls_through(self):
-        self._lock(returncodes=[FileNotFoundError(), 0])
+        self.assertTrue(self._lock(returncodes=[FileNotFoundError(), 0]))
         self.assertEqual(self.commands(), ["gdbus", "loginctl"])
 
-    def test_all_fail_silently(self):
-        # Must not raise even when every candidate fails.
-        self._lock(returncodes=[1, 2, 3])
+    def test_all_fail_returns_false(self):
+        # A caller must not mistake exhaustion of the fallback chain for success.
+        self.assertFalse(self._lock(returncodes=[1, 2, 3]))
         self.assertEqual(self.commands(), ["gdbus", "loginctl", "xdg-screensaver"])
+
+    def test_timeout_falls_through_to_next_candidate(self):
+        self.assertTrue(self._lock(returncodes=[real_subprocess.TimeoutExpired("gdbus", 3), 0]))
+        self.assertEqual(self.commands(), ["gdbus", "loginctl"])
 
     def test_no_candidates_is_noop(self):
         saved = self.ctl.LOCK_COMMANDS
         self.ctl.LOCK_COMMANDS = []
         try:
-            self._lock(returncodes=[])  # should not raise, no calls
+            self.assertFalse(self._lock(returncodes=[]))  # no command means no confirmed lock
             self.assertEqual(self.calls, [])
         finally:
             self.ctl.LOCK_COMMANDS = saved
 
     def _lock(self, returncodes):
         self.results = list(returncodes)
-        self.ctl._lock_screen()
+        return self.ctl._lock_screen()
 
 
 class TestExternalLockHandling(unittest.TestCase):

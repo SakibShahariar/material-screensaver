@@ -702,14 +702,23 @@ LOCK_COMMANDS = [
 ]
 
 def _lock_screen():
-    """Lock GNOME session — used after screensaver has been visible for lock_after_seconds."""
+    """Try supported session-lock commands; return True only when one succeeds."""
     for cmd in LOCK_COMMANDS:
         try:
             r = subprocess.run(cmd, capture_output=True, timeout=3)
-        except Exception:
+        except Exception as exc:
+            print(f"Session lock command failed ({cmd[0]}): {exc}", file=sys.stderr)
             continue  # binary missing or timed out -> try the next candidate
         if r.returncode == 0:
-            return  # locked
+            return True
+        detail = (r.stderr or b"").decode("utf-8", errors="replace").strip()
+        suffix = f": {detail}" if detail else ""
+        print(
+            f"Session lock command failed ({cmd[0]}, exit {r.returncode}){suffix}",
+            file=sys.stderr,
+        )
+    print("Unable to lock the session: all lock commands failed; keeping screensaver visible.", file=sys.stderr)
+    return False
 
 def _on_screen_saver_active_changed(active):
     """React to external lock/unlock (GNOME ScreenSaver ActiveChanged signal).
@@ -745,12 +754,13 @@ def _schedule_lock():
             global _lock_timeout_id
             _lock_timeout_id=None
             if is_viewer_active():
-                _lock_screen()
-                # Close screensaver after locking so it does not stay running under the lock screen
-                try:
-                    hide_viewer()
-                except Exception:
-                    pass
+                # Never dismiss the screensaver unless a lock command reports success.
+                # Otherwise the configured lock timeout would fail open.
+                if _lock_screen():
+                    try:
+                        hide_viewer()
+                    except Exception as exc:
+                        print(f"Failed to hide viewer after session lock: {exc}", file=sys.stderr)
             return False
         _lock_timeout_id = GLib.timeout_add_seconds(secs, _do_lock)
     except Exception:
