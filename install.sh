@@ -35,6 +35,12 @@ cleanup_screensaver_stage() {
     mv -- "$BACKUP_DIR" "$SCREENSAVERS_DIR" || \
       echo "WARNING: failed to restore previous screensavers from $BACKUP_DIR" >&2
   fi
+  # The service was stopped before staging. If installation fails, restart it
+  # against the restored/unchanged installation instead of leaving it stopped.
+  if [[ "$status" -ne 0 && -d "$SCREENSAVERS_DIR" ]]; then
+    systemctl --user start material-screensaver.service 2>/dev/null || \
+      echo "WARNING: previous screensavers were preserved, but the service could not be restarted." >&2
+  fi
   return "$status"
 }
 trap cleanup_screensaver_stage EXIT
