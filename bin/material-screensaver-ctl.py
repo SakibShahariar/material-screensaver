@@ -1873,6 +1873,8 @@ def run_daemon():
                 return False
 
         def add_active_watch():
+            # Never leave an idle watch armed while the viewer is showing.
+            remove_watch("idle")
             remove_watch("active")
             try:
                 result = _idle_proxy.call_sync("AddUserActiveWatch", None, Gio.DBusCallFlags.NONE, -1, None)
