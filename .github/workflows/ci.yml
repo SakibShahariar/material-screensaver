@@ -19,8 +19,8 @@ jobs:
 
       - name: Bash syntax + shellcheck
         run: |
-          bash -n install.sh
-          shellcheck -x install.sh
+          bash -n install.sh uninstall.sh
+          shellcheck -x install.sh uninstall.sh
 
       - name: Desktop file validation
         run: |

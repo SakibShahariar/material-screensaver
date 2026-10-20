@@ -1,0 +1,56 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+EXT_UUID="material-screensaver-gestures@io.github.sakib"
+DATA_DIR="$HOME/.local/share/material-screensaver"
+EXT_DIR="$HOME/.local/share/gnome-shell/extensions/$EXT_UUID"
+
+echo "Uninstalling Material Screensaver..."
+
+# Stop and disable the user service before removing its executable and unit.
+systemctl --user disable --now material-screensaver.service 2>/dev/null || true
+
+# Remove only this extension UUID from GNOME's list; preserve other extensions.
+python3 - "$EXT_UUID" <<'PY'
+import ast
+import subprocess
+import sys
+
+uuid = sys.argv[1]
+try:
+    result = subprocess.run(
+        ["gsettings", "get", "org.gnome.shell", "enabled-extensions"],
+        check=True, capture_output=True, text=True,
+    )
+    enabled = ast.literal_eval(result.stdout.strip())
+    if not isinstance(enabled, list):
+        raise ValueError("enabled-extensions did not return a list")
+    if uuid in enabled:
+        enabled.remove(uuid)
+        value = "[{}]".format(", ".join(repr(item) for item in enabled))
+        subprocess.run(
+            ["gsettings", "set", "org.gnome.shell", "enabled-extensions", value],
+            check=True, capture_output=True, text=True,
+        )
+except Exception as exc:
+    print(f"Warning: could not update GNOME's enabled-extensions setting: {exc}", file=sys.stderr)
+PY
+
+systemctl --user daemon-reload 2>/dev/null || true
+
+rm -f -- "$HOME/.local/bin/material-screensaver-ctl.py" \
+          "$HOME/.local/bin/material-screensaver-gui.py" \
+          "$HOME/.config/systemd/user/material-screensaver.service" \
+          "$HOME/.local/share/applications/material-screensaver-settings.desktop" \
+          "$HOME/.local/share/icons/material-screensaver.png" \
+          "$HOME/.local/share/icons/hicolor/48x48/apps/material-screensaver.png" \
+          "$HOME/.local/share/icons/hicolor/scalable/apps/material-screensaver.svg"
+rm -rf -- "${DATA_DIR:?}" "${EXT_DIR:?}"
+
+update-desktop-database "$HOME/.local/share/applications" 2>/dev/null || true
+gtk-update-icon-cache -f "$HOME/.local/share/icons/hicolor" 2>/dev/null || true
+gtk-update-icon-cache "$HOME/.local/share/icons" 2>/dev/null || true
+
+echo "Material Screensaver files removed."
+echo "User configuration was preserved at ~/.config/material-screensaver."
+echo "Log out and back in if GNOME Shell still has the extension loaded."

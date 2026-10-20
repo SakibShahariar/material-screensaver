@@ -105,6 +105,17 @@ class TestShellExtension(unittest.TestCase):
         self.assertIn('mv -- "$BACKUP_DIR" "$SCREENSAVERS_DIR"', sh)
         self.assertNotIn('rm -rf ~/.local/share/material-screensaver/screensavers', sh)
 
+    def test_uninstall_script_removes_only_project_files(self):
+        path = os.path.join(support.REPO_ROOT, "uninstall.sh")
+        result = subprocess.run(["bash", "-n", path], capture_output=True, text=True)
+        self.assertEqual(result.returncode, 0, result.stderr)
+        with open(path, encoding="utf-8") as f:
+            sh = f.read()
+        self.assertIn("systemctl --user disable --now material-screensaver.service", sh)
+        self.assertIn("enabled-extensions", sh)
+        self.assertIn('"${DATA_DIR:?}"', sh)
+        self.assertNotIn('rm -rf -- "$HOME/.config/material-screensaver"', sh)
+
     def test_install_sh_copies_and_enables_extension(self):
         text = subprocess.run(["bash", "-n", os.path.join(support.REPO_ROOT, "install.sh")],
                               capture_output=True, text=True)

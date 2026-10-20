@@ -88,6 +88,20 @@ material-screensaver-ctl.py daemon   # run the idle watcher (normally started by
 
 The viewer is dismissed with **Super+Q**. The configured keyboard shortcut can toggle it, and `stop` can also hide it from the command line. If the daemon is running, control commands delegate to it; otherwise, they start a standalone viewer.
 
+## Uninstall
+
+To stop and remove the user service, scripts, scenes, icons, desktop entry, and
+companion GNOME Shell extension, run the repository's `uninstall.sh` before
+deleting the source checkout:
+
+```sh
+bash uninstall.sh
+```
+
+The uninstall script removes only Material Screensaver's own extension UUID and
+preserves other enabled GNOME extensions and `~/.config/material-screensaver`
+user settings. Log out and back in if GNOME Shell still has the extension loaded.
+
 ## Tests
 
 Run the test suite from the repository root:
