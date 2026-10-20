@@ -16,6 +16,7 @@ mkdir -p ~/.local/bin \
 DATA_DIR="$HOME/.local/share/material-screensaver"
 SCREENSAVERS_DIR="$DATA_DIR/screensavers"
 TMP_DIR=""
+BACKUP_DIR="$DATA_DIR/.screensavers.backup.$"
 cleanup_screensaver_stage() {
   local status=$?
   if [[ -n "${TMP_DIR:-}" && -d "$TMP_DIR" ]]; then
