@@ -266,6 +266,49 @@ class TestGetActiveHTMLPath(CtlTestCase):
         self.assertEqual(os.path.basename(self.ctl.get_active_html_path(cfg)), "ザ・さくら.html")
 
 
+class TestSessionLockTransitions(CtlTestCase):
+    def test_lock_hides_viewer_and_does_not_rearm_idle_watch(self):
+        ctl = self.ctl
+        old_locked = ctl._session_locked
+        old_showing = ctl._is_showing
+        old_is_active = ctl.is_viewer_active
+        old_hide = ctl.hide_viewer
+        old_switch = ctl._daemon_switch_to_idle_watch
+        hidden = []
+        rearmed = []
+        try:
+            ctl._session_locked = False
+            ctl._is_showing = True
+            ctl.is_viewer_active = lambda: True
+            ctl.hide_viewer = lambda: hidden.append(True)
+            ctl._daemon_switch_to_idle_watch = lambda: rearmed.append(True)
+            ctl._on_screen_saver_active_changed(True)
+            self.assertTrue(ctl._session_locked)
+            self.assertEqual(hidden, [True])
+            self.assertEqual(rearmed, [])
+        finally:
+            ctl._session_locked = old_locked
+            ctl._is_showing = old_showing
+            ctl.is_viewer_active = old_is_active
+            ctl.hide_viewer = old_hide
+            ctl._daemon_switch_to_idle_watch = old_switch
+
+    def test_unlock_rearms_idle_watch(self):
+        ctl = self.ctl
+        old_locked = ctl._session_locked
+        old_switch = ctl._daemon_switch_to_idle_watch
+        rearmed = []
+        try:
+            ctl._session_locked = True
+            ctl._daemon_switch_to_idle_watch = lambda: rearmed.append(True)
+            ctl._on_screen_saver_active_changed(False)
+            self.assertFalse(ctl._session_locked)
+            self.assertEqual(rearmed, [True])
+        finally:
+            ctl._session_locked = old_locked
+            ctl._daemon_switch_to_idle_watch = old_switch
+
+
 class TestHasGraphicalSession(CtlTestCase):
     def test_empty_env(self):
         with tempfile.TemporaryDirectory() as d:

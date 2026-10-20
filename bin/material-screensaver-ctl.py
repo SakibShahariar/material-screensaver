@@ -48,6 +48,7 @@ _idle_proxy = None  # Gio.DBusProxy for org.gnome.Mutter.IdleMonitor (daemon onl
 _idle_watch_ids = {"idle": None, "active": None}
 _lock_timeout_id = None  # GLib source id for lock after screensaver
 _session_locked = False  # suppress idle-triggered shows during a GNOME lock
+_login1_session_proxy = None  # retain logind session proxy for lock notifications
 _saved_overlay_key = None  # saved org.gnome.mutter overlay-key while Super+Q is exclusive
 _saved_shell_toggle = None  # saved shell toggle-overview
 _is_showing = False  # guard double-Show TOCTOU
@@ -884,6 +885,55 @@ def _on_screen_saver_active_changed(active):
         _daemon_switch_to_idle_watch()
     except Exception as exc:
         print(f"Failed to re-arm idle watch after unlock: {exc}", file=sys.stderr)
+
+def _monitor_login1_session_lock():
+    """Use logind LockedHint as a fallback to GNOME's optional ScreenSaver signal."""
+    global _login1_session_proxy
+    try:
+        from gi.repository import Gio, GLib
+        bus = Gio.bus_get_sync(Gio.BusType.SYSTEM, None)
+        manager = Gio.DBusProxy.new_sync(
+            bus, Gio.DBusProxyFlags.NONE, None,
+            "org.freedesktop.login1", "/org/freedesktop/login1",
+            "org.freedesktop.login1.Manager", None,
+        )
+        session_id = os.environ.get("XDG_SESSION_ID")
+        if session_id:
+            result = manager.call_sync(
+                "GetSession", GLib.Variant("(s)", (session_id,)),
+                Gio.DBusCallFlags.NONE, 2000, None,
+            )
+        else:
+            result = manager.call_sync(
+                "GetSessionByPID", GLib.Variant("(u)", (os.getpid(),)),
+                Gio.DBusCallFlags.NONE, 2000, None,
+            )
+        (session_path,) = result.unpack()
+        proxy = Gio.DBusProxy.new_sync(
+            bus, Gio.DBusProxyFlags.NONE, None,
+            "org.freedesktop.login1", session_path,
+            "org.freedesktop.login1.Session", None,
+        )
+        _login1_session_proxy = proxy
+
+        def on_properties_changed(_proxy, changed, _invalidated):
+            value = changed.lookup_value("LockedHint", None)
+            if value is not None:
+                try:
+                    _on_screen_saver_active_changed(value.get_boolean())
+                except Exception as exc:
+                    print(f"Failed to process logind lock state: {exc}", file=sys.stderr)
+
+        proxy.connect("g-properties-changed", on_properties_changed)
+        locked = proxy.get_cached_property("LockedHint")
+        if locked is not None:
+            _on_screen_saver_active_changed(locked.get_boolean())
+        _dbg("subscribed to systemd-logind LockedHint")
+        return True
+    except Exception as exc:
+        print(f"Unable to monitor session lock state via systemd-logind: {exc}", file=sys.stderr)
+        return False
+
 
 def _schedule_lock():
     global _lock_timeout_id
@@ -2063,6 +2113,9 @@ def run_daemon():
             _dbg("subscribed to org.gnome.ScreenSaver ActiveChanged")
         except Exception as exc:
             print(f"Unable to monitor GNOME session lock state via org.gnome.ScreenSaver: {exc}", file=sys.stderr)
+        # GNOME's ScreenSaver D-Bus name is not present in every modern session.
+        # logind LockedHint provides an independent signal when that interface is absent.
+        _monitor_login1_session_lock()
         # Re-create the viewer when the monitor topology changes while it is
         # showing (hotplug / docking). Hide then Show rebuilds one window per
         # current monitor. Debounced so a burst of items-changed doesn't
