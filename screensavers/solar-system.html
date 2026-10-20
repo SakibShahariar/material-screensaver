@@ -956,14 +956,18 @@ speedInput.oninput = () => {
 };
 
 function fallbackClock() {
+  const use12h = new URLSearchParams(location.search).get("format") === "12h";
   function update() {
     const n = new Date();
     let h = n.getHours();
-    const ap = h >= 12 ? "PM" : "AM";
-    h = h % 12 || 12;
+    let suffix = "";
+    if (use12h) {
+      suffix = h >= 12 ? "PM" : "AM";
+      h = h % 12 || 12;
+    }
     clockEl.innerHTML =
-      `${String(h).padStart(2, "0")}:${String(n.getMinutes()).padStart(2, "0")}` +
-      `<span class="ampm">${ap}</span>`;
+      `${use12h ? h : String(h).padStart(2, "0")}:${String(n.getMinutes()).padStart(2, "0")}` +
+      (suffix ? `<span class="ampm">${suffix}</span>` : "");
     dateEl.textContent = n.toLocaleDateString("en-US", {
       weekday: "short", month: "short", day: "numeric"
     }).toUpperCase();

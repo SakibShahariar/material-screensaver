@@ -175,6 +175,15 @@ class TestJsSyntax(unittest.TestCase):
             except OSError:
                 pass
 
+    def test_solar_system_fallback_respects_clock_format(self):
+        text = _read(os.path.join(support.REPO_ROOT, "screensavers", "solar-system.html"))
+        start = text.index("function fallbackClock()")
+        end = text.index("\n}", start) + 2
+        fallback = text[start:end]
+        self.assertIn('new URLSearchParams(location.search).get("format") === "12h"', fallback)
+        self.assertIn('use12h ? h : String(h).padStart(2, "0")', fallback)
+        self.assertIn('(suffix ? `<span class="ampm">${suffix}</span>` : "")', fallback)
+
     def test_clock_and_theme_helpers_parse(self):
         for path in support.shared_helpers():
             if not os.path.isfile(path):
