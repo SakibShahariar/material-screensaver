@@ -16,7 +16,7 @@ mkdir -p ~/.local/bin \
 DATA_DIR="$HOME/.local/share/material-screensaver"
 SCREENSAVERS_DIR="$DATA_DIR/screensavers"
 TMP_DIR=""
-BACKUP_DIR="$(mktemp -u "$DATA_DIR/.screensavers.backup.XXXXXX")"
+BACKUP_DIR=""
 cleanup_screensaver_stage() {
   local status=$?
   if [[ -n "${TMP_DIR:-}" && -d "$TMP_DIR" ]]; then
@@ -24,9 +24,12 @@ cleanup_screensaver_stage() {
   fi
   # If interrupted between moving the old directory aside and installing the
   # staged replacement, restore the last known-good version.
-  if [[ -n "${BACKUP_DIR:-}" && -d "$BACKUP_DIR" && ! -e "$SCREENSAVERS_DIR" ]]; then
-    mv -- "$BACKUP_DIR" "$SCREENSAVERS_DIR" || \
-      echo "WARNING: failed to restore previous screensavers from $BACKUP_DIR" >&2
+  if [[ -n "${BACKUP_DIR:-}" && -d "$BACKUP_DIR/previous" && ! -e "$SCREENSAVERS_DIR" ]]; then
+    mv -- "$BACKUP_DIR/previous" "$SCREENSAVERS_DIR" || \
+      echo "WARNING: failed to restore previous screensavers from $BACKUP_DIR/previous" >&2
+  fi
+  if [[ -n "${BACKUP_DIR:-}" && -d "$BACKUP_DIR" ]]; then
+    rm -rf -- "$BACKUP_DIR"
   fi
   # The service was stopped before staging. If installation fails, restart it
   # against the restored/unchanged installation instead of leaving it stopped.
@@ -53,7 +56,10 @@ ln -sfn "$HOME/.config/matugen/matugen-colors.css" "$TMP_DIR/matugen-colors.css"
 find "$TMP_DIR" -type f -exec chmod 644 {} + 2>/dev/null || true
 
 if [[ -e "$SCREENSAVERS_DIR" ]]; then
-  mv -- "$SCREENSAVERS_DIR" "$BACKUP_DIR"
+  # Reserve a unique backup directory atomically; avoid mktemp -u, which has
+  # a race between choosing the path and moving the existing installation.
+  BACKUP_DIR="$(mktemp -d "$DATA_DIR/.screensavers.backup.XXXXXX")"
+  mv -- "$SCREENSAVERS_DIR" "$BACKUP_DIR/previous"
 fi
 if ! mv -- "$TMP_DIR" "$SCREENSAVERS_DIR"; then
   echo "Failed to install screensavers; attempting to restore the previous version." >&2
@@ -63,8 +69,9 @@ if ! mv -- "$TMP_DIR" "$SCREENSAVERS_DIR"; then
   exit 1
 fi
 TMP_DIR=""
-if [[ -d "$BACKUP_DIR" ]]; then
+if [[ -n "$BACKUP_DIR" && -d "$BACKUP_DIR" ]]; then
   rm -rf -- "$BACKUP_DIR"
+  BACKUP_DIR=""
 fi
 
 # Proper hicolor icon placement (plus legacy fallback location)
