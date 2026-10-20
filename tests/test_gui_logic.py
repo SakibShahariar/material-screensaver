@@ -185,6 +185,18 @@ class TestGuiLogic(unittest.TestCase):
         self.assertIn('self.preview_web.add_controller(click)', src)
         self.assertIn('click.connect("pressed", lambda *_', src)
 
+    def test_matugen_link_tracks_configured_target(self):
+        first = os.path.join(self._tmp.name, "first.css")
+        second = os.path.join(self._tmp.name, "second.css")
+        cfg = dict(self.gui.DEFAULT_CONFIG, matugen_colors_path=first)
+        self.assertTrue(self.gui.sync_matugen_colors_link(cfg))
+        link = os.path.join(self.gui.SCREENSAVER_DIR, "matugen-colors.css")
+        self.assertEqual(os.readlink(link), first)
+        self.assertTrue(self.gui.sync_matugen_colors_link(
+            dict(cfg, matugen_colors_path=second)
+        ))
+        self.assertEqual(os.readlink(link), second)
+
     def test_matugen_path_setting_is_present_and_applied(self):
         with open(os.path.join(support.REPO_ROOT, "bin", "material-screensaver-gui.py"),
                   encoding="utf-8") as f:
