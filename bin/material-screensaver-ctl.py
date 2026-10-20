@@ -45,6 +45,7 @@ _daemon_app = None  # Gtk.Application for daemon (Wayland fullscreen needs Appli
 _idle_proxy = None  # Gio.DBusProxy for org.gnome.Mutter.IdleMonitor (daemon only)
 _idle_watch_ids = {"idle": None, "active": None}
 _lock_timeout_id = None  # GLib source id for lock after screensaver
+_session_locked = False  # suppress idle-triggered shows during a GNOME lock
 _saved_overlay_key = None  # saved org.gnome.mutter overlay-key while Super+Q is exclusive
 _saved_shell_toggle = None  # saved shell toggle-overview
 _is_showing = False  # guard double-Show TOCTOU
@@ -746,17 +747,22 @@ def _handle_viewer_exit(returncode):
 
 
 def _on_screen_saver_active_changed(active):
-    """React to external lock/unlock (GNOME ScreenSaver ActiveChanged signal).
-
-    When the session is locked externally (Super+L, loginctl lock-session,
-    GNOME Settings timer), tear down the screensaver so it doesn't linger
-    under/after the lock screen.
-    """
-    if active and is_viewer_active():
-        try:
-            hide_viewer()
-        except Exception:
-            pass
+    """Track GNOME lock state and keep idle callbacks from reopening the viewer."""
+    global _session_locked
+    _session_locked = bool(active)
+    if _session_locked:
+        _dbg("session lock detected; hiding viewer and suspending idle watch")
+        if is_viewer_active() or _is_showing:
+            try:
+                hide_viewer()
+            except Exception as exc:
+                print(f"Failed to hide viewer on session lock: {exc}", file=sys.stderr)
+        return
+    _dbg("session unlocked; re-arming idle watch")
+    try:
+        _daemon_switch_to_idle_watch()
+    except Exception as exc:
+        print(f"Failed to re-arm idle watch after unlock: {exc}", file=sys.stderr)
 
 def _schedule_lock():
     global _lock_timeout_id
@@ -1849,6 +1855,9 @@ def run_daemon():
 
         def add_idle_watch():
             remove_watch("idle")
+            if _session_locked:
+                _dbg("idle watch not armed while session is locked")
+                return False
             try:
                 result = _idle_proxy.call_sync("AddIdleWatch", GLib.Variant("(t)", (current_idle_seconds() * 1000,)), Gio.DBusCallFlags.NONE, -1, None)
                 _idle_watch_ids["idle"] = result.unpack()[0]
@@ -1870,6 +1879,10 @@ def run_daemon():
                 return
             (fired_id,) = params.unpack()
             if fired_id == _idle_watch_ids["idle"]:
+                # Ignore stale WatchFired events delivered during a session lock.
+                if _session_locked:
+                    _dbg("ignored idle WatchFired while session is locked")
+                    return
                 # Idle reached -> show. Arm the active watch so Super+Q/activity
                 # re-arms the idle watch for the next cycle (it never closes).
                 show_viewer()
@@ -1923,11 +1936,12 @@ def run_daemon():
                     try:
                         (active,) = params.unpack()
                         _on_screen_saver_active_changed(active)
-                    except Exception:
-                        pass
+                    except Exception as exc:
+                        print(f"Failed to process GNOME session lock signal: {exc}", file=sys.stderr)
             ss_proxy.connect("g-signal", _on_lock_signal)
-        except Exception:
-            pass
+            _dbg("subscribed to org.gnome.ScreenSaver ActiveChanged")
+        except Exception as exc:
+            print(f"Unable to monitor GNOME session lock state via org.gnome.ScreenSaver: {exc}", file=sys.stderr)
         # Re-create the viewer when the monitor topology changes while it is
         # showing (hotplug / docking). Hide then Show rebuilds one window per
         # current monitor. Debounced so a burst of items-changed doesn't
