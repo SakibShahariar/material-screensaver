@@ -552,7 +552,8 @@ def main(argv=None):
     if args.list_screensavers:
         if args.preview:
             parser.error("--list-screensavers cannot be combined with --preview")
-        print("\n".join(scenes))
+        if scenes:
+            print("\n".join(scenes))
         return 0
     if args.preview:
         if os.path.basename(args.preview) != args.preview or args.preview not in scenes:
