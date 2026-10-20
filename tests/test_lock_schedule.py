@@ -33,7 +33,7 @@ class TestScheduleLock(unittest.TestCase):
         cls.GLib = GLib
 
         cls._orig = {
-            "lock_screen": cls.ctl._lock_screen,
+            "lock_screen_async": cls.ctl._lock_screen_async,
             "hide_viewer": cls.ctl.hide_viewer,
             "is_viewer_active": cls.ctl.is_viewer_active,
             "load_config": cls.ctl.load_config,
@@ -46,10 +46,10 @@ class TestScheduleLock(unittest.TestCase):
         self.cfg = {"active": "blob.html", "idle_seconds": 300,
                     "lock_after_seconds": 1, "clock_format": "24h",
                     "random": False}
-        def fake_lock():
+        def fake_lock_async(callback):
             self.calls.append("lock")
-            return True  # the scheduler hides only after a confirmed lock
-        self.ctl._lock_screen = fake_lock
+            callback(True)  # the scheduler hides only after a confirmed lock
+        self.ctl._lock_screen_async = fake_lock_async
         self.ctl.hide_viewer = lambda: self.calls.append("hide")
         self.ctl.is_viewer_active = lambda: self.viewer_active
         self.ctl.load_config = lambda: self.cfg
@@ -72,16 +72,16 @@ class TestScheduleLock(unittest.TestCase):
         self.ctl._schedule_lock()
         self.assertIsNotNone(self.ctl._lock_timeout_id, "expected a scheduled timeout")
         self.run_for(2500)
-        self.assertIn("lock", self.calls, "_lock_screen not called after lock_after_seconds")
+        self.assertIn("lock", self.calls, "_lock_screen_async not called after lock_after_seconds")
         self.assertIn("hide", self.calls, "viewer not hidden after locking")
         self.assertLess(self.calls.index("lock"), self.calls.index("hide"),
                         "must lock before hiding the viewer")
 
     def test_failed_lock_keeps_viewer_visible(self):
-        def failed_lock():
+        def failed_lock_async(callback):
             self.calls.append("lock")
-            return False
-        self.ctl._lock_screen = failed_lock
+            callback(False)
+        self.ctl._lock_screen_async = failed_lock_async
         self.ctl._schedule_lock()
         self.run_for(2500)
         self.assertIn("lock", self.calls, "lock command was not attempted")
