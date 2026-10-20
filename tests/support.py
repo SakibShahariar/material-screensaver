@@ -4,8 +4,12 @@ import glob
 import importlib.util
 import os
 import re
+import sys
 
 REPO_ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
+_BIN_DIR = os.path.join(REPO_ROOT, "bin")
+if _BIN_DIR not in sys.path:
+    sys.path.insert(0, _BIN_DIR)
 DEFAULT_SAVERS = os.path.join(REPO_ROOT, "screensavers")
 
 

@@ -14,7 +14,7 @@ from gi.repository import Gtk, Adw, GLib, Gio, Gdk
 import os
 import sys
 import json
-import glob
+import material_screensaver_config as config_store
 import random
 import subprocess
 import tempfile
@@ -47,121 +47,18 @@ def get_keybinding_settings(create=False):
     return child
 
 DEFAULT_MATUGEN_COLORS_PATH = os.path.expanduser("~/.config/matugen/matugen-colors.css")
-DEFAULT_CONFIG = {"active": None, "idle_seconds": 300, "clock_format": "24h", "random": False, "lock_after_seconds": 300, "matugen_colors_path": DEFAULT_MATUGEN_COLORS_PATH}
-
-
-def _valid_int(value, minimum, maximum):
-    if isinstance(value, bool):
-        return None
-    if isinstance(value, float) and not value.is_integer():
-        return None
-    try:
-        value = int(value)
-    except (TypeError, ValueError, OverflowError):
-        return None
-    return value if minimum <= value <= maximum else None
-
-
-def normalize_config(data):
-    """Return a complete, safe configuration from user-editable JSON."""
-    cfg = dict(DEFAULT_CONFIG)
-    if not isinstance(data, dict):
-        return cfg
-    active = data.get("active")
-    if active is None or isinstance(active, str):
-        cfg["active"] = active
-    for key in ("random",):
-        if isinstance(data.get(key), bool):
-            cfg[key] = data[key]
-    idle = _valid_int(data.get("idle_seconds"), 1, 86400)
-    if idle is not None:
-        cfg["idle_seconds"] = idle
-    lock = _valid_int(data.get("lock_after_seconds"), 0, 86400)
-    if lock is not None:
-        cfg["lock_after_seconds"] = lock
-    if data.get("clock_format") in ("12h", "24h"):
-        cfg["clock_format"] = data["clock_format"]
-    colors_path = data.get("matugen_colors_path", DEFAULT_MATUGEN_COLORS_PATH)
-    if isinstance(colors_path, str) and colors_path.strip():
-        colors_path = os.path.expanduser(colors_path.strip())
-        if os.path.isabs(colors_path):
-            cfg["matugen_colors_path"] = os.path.normpath(colors_path)
-    return cfg
+DEFAULT_MATUGEN_COLORS_PATH = config_store.DEFAULT_MATUGEN_COLORS_PATH
+DEFAULT_CONFIG = config_store.DEFAULT_CONFIG
+_valid_int = config_store._valid_int
+normalize_config = config_store.normalize_config
 
 
 def load_config():
-    if not os.path.exists(CONFIG_PATH):
-        return dict(DEFAULT_CONFIG)
-    try:
-        with open(CONFIG_PATH, encoding="utf-8") as f:
-            return normalize_config(json.load(f))
-    except (json.JSONDecodeError, OSError, TypeError, ValueError):
-        return dict(DEFAULT_CONFIG)
+    return config_store.load_config(CONFIG_PATH)
 
 
 def save_config(**updates):
-    cfg = load_config()
-    cfg.update(updates)
-    # Always write a normalized config so bad values (e.g. fractional
-    # idle from a hand-edited JSON) cannot persist across restarts.
-    cfg = normalize_config(cfg)
-    config_dir = os.path.dirname(CONFIG_PATH)
-    os.makedirs(config_dir, exist_ok=True)
-    fd, tmp = tempfile.mkstemp(prefix=".material-screensaver-", suffix=".tmp", dir=config_dir)
-    try:
-        handle = os.fdopen(fd, "w", encoding="utf-8")
-        fd = None
-        with handle as f:
-            json.dump(cfg, f, indent=2)
-            f.flush()
-            os.fsync(f.fileno())
-        os.replace(tmp, CONFIG_PATH)
-    except Exception:
-        if fd is not None:
-            try:
-                os.close(fd)
-            except OSError:
-                pass
-        try:
-            os.unlink(tmp)
-        except OSError:
-            pass
-        raise
-
-
-def sync_matugen_colors_link(cfg=None):
-    """Update the scene-local stylesheet symlink to the configured Matugen file."""
-    cfg = cfg if isinstance(cfg, dict) else load_config()
-    target = cfg.get("matugen_colors_path", DEFAULT_MATUGEN_COLORS_PATH)
-    if not isinstance(target, str) or not os.path.isabs(target):
-        target = DEFAULT_MATUGEN_COLORS_PATH
-    link = os.path.join(SCREENSAVER_DIR, "matugen-colors.css")
-    if not os.path.isdir(SCREENSAVER_DIR):
-        return False
-    tmp = None
-    try:
-        if os.path.islink(link) and os.readlink(link) == target:
-            return True
-        # Do not overwrite a regular file a user deliberately placed here.
-        if os.path.lexists(link) and not os.path.islink(link):
-            print(f"Not replacing non-symlink Matugen stylesheet: {link}", file=sys.stderr)
-            return False
-        fd, tmp = tempfile.mkstemp(prefix=".matugen-colors-", dir=SCREENSAVER_DIR)
-        os.close(fd)
-        os.unlink(tmp)
-        os.symlink(target, tmp)
-        os.replace(tmp, link)
-        tmp = None
-        return True
-    except OSError as exc:
-        print(f"Could not update Matugen stylesheet link: {exc}", file=sys.stderr)
-        return False
-    finally:
-        if tmp is not None:
-            try:
-                os.unlink(tmp)
-            except OSError:
-                pass
+    return config_store.save_config(CONFIG_PATH, **updates)
 
 
 def display_name(filename):
@@ -186,8 +83,7 @@ def display_name(filename):
 
 
 def list_screensavers():
-    paths = sorted(glob.glob(os.path.join(SCREENSAVER_DIR, "*.html")))
-    return [os.path.basename(p) for p in paths]
+    return [os.path.basename(path) for path in config_store.list_screensavers(SCREENSAVER_DIR)]
 
 
 class ScreensaverWindow(Adw.ApplicationWindow):

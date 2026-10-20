@@ -21,7 +21,7 @@ viewer.
 import os
 import sys
 import json
-import glob
+import material_screensaver_config as config_store
 import random
 import subprocess
 import atexit
@@ -31,87 +31,21 @@ from urllib.parse import urlencode
 
 SCREENSAVER_DIR = os.path.expanduser("~/.local/share/material-screensaver/screensavers")
 CONFIG_PATH = os.path.expanduser("~/.config/material-screensaver/config.json")
-DEFAULT_MATUGEN_COLORS_PATH = os.path.expanduser("~/.config/matugen/matugen-colors.css")
-DEFAULT_CONFIG = {"active": None, "idle_seconds": 300, "clock_format": "24h", "random": False, "lock_after_seconds": 300, "matugen_colors_path": DEFAULT_MATUGEN_COLORS_PATH}
+DEFAULT_MATUGEN_COLORS_PATH = config_store.DEFAULT_MATUGEN_COLORS_PATH
+DEFAULT_CONFIG = config_store.DEFAULT_CONFIG
+_valid_int = config_store._valid_int
+normalize_config = config_store.normalize_config
 
-# D-Bus service for daemon delegation (PID file gone)
-SERVICE_NAME = "io.github.sakib.MaterialScreensaver"
-OBJECT_PATH = "/io/github/sakib/MaterialScreensaver"
-INTERFACE_NAME = "io.github.sakib.MaterialScreensaver"
-
-# Viewer state (daemon or standalone)
-_viewer_windows = []  # list[Gtk.Window]
-_viewer_inhibit_cookie = None
-_viewer_inhibit_proxy = None
-_daemon_app = None  # Gtk.Application for daemon (Wayland fullscreen needs ApplicationWindow)
-_idle_proxy = None  # Gio.DBusProxy for org.gnome.Mutter.IdleMonitor (daemon only)
-_idle_watch_ids = {"idle": None, "active": None}
-_lock_timeout_id = None  # GLib source id for lock after screensaver
-_session_locked = False  # suppress idle-triggered shows during a GNOME lock
-_login1_session_proxy = None  # retain logind session proxy for lock notifications
-_saved_overlay_key = None  # saved org.gnome.mutter overlay-key while Super+Q is exclusive
-_saved_shell_toggle = None  # saved shell toggle-overview
-_is_showing = False  # guard double-Show TOCTOU
-_pending_sources = []  # GLib source ids for fullscreen retry / gc to cancel on Hide
-_viewer_process = None  # subprocess.Popen for isolated viewer (daemon only, keeps daemon 30M flat)
-_viewer_child_watch_id = None  # GLib child-watch source; removed before synchronous Hide/reap
-_ephemeral_ctx = None  # single ephemeral WebContext reused across Shows (fixes per-Show leak)
-_is_viewer_mode = False  # True in viewer subprocess (isolated WebKit, daemon stays lean)
-_viewer_loop = None  # GLib.MainLoop for viewer subprocess
-
-def _valid_int(value, minimum, maximum):
-    """Return an integer in range. Rejects bools and fractional floats (lossy
-    coercion would silently truncate user-edited config)."""
-    if isinstance(value, bool):
-        return None
-    if isinstance(value, float) and not value.is_integer():
-        return None
-    try:
-        value = int(value)
-    except (TypeError, ValueError, OverflowError):
-        return None
-    return value if minimum <= value <= maximum else None
-
-def normalize_config(data):
-    """Return a safe, complete configuration from untrusted JSON data."""
-    cfg = dict(DEFAULT_CONFIG)
-    if not isinstance(data, dict):
-        return cfg
-
-    active = data.get("active")
-    if active is None or isinstance(active, str):
-        cfg["active"] = active
-    for key in ("random",):
-        if isinstance(data.get(key), bool):
-            cfg[key] = data[key]
-    idle = _valid_int(data.get("idle_seconds"), 1, 86400)
-    if idle is not None:
-        cfg["idle_seconds"] = idle
-    lock = _valid_int(data.get("lock_after_seconds"), 0, 86400)
-    if lock is not None:
-        cfg["lock_after_seconds"] = lock
-    if data.get("clock_format") in ("12h", "24h"):
-        cfg["clock_format"] = data["clock_format"]
-    colors_path = data.get("matugen_colors_path", DEFAULT_MATUGEN_COLORS_PATH)
-    if isinstance(colors_path, str) and colors_path.strip():
-        colors_path = os.path.expanduser(colors_path.strip())
-        if os.path.isabs(colors_path):
-            cfg["matugen_colors_path"] = os.path.normpath(colors_path)
-    return cfg
 
 def load_config():
-    if not os.path.exists(CONFIG_PATH):
-        return dict(DEFAULT_CONFIG)
-    try:
-        with open(CONFIG_PATH, encoding="utf-8") as f:
-            return normalize_config(json.load(f))
-    except (json.JSONDecodeError, OSError, TypeError, ValueError):
-        return dict(DEFAULT_CONFIG)
+    return config_store.load_config(CONFIG_PATH)
 
 def list_screensavers():
-    """Returns {filename: full_path} for every .html file in the screensavers dir."""
-    paths = sorted(glob.glob(os.path.join(SCREENSAVER_DIR, "*.html")))
-    return {os.path.basename(p): p for p in paths}
+    """Return {filename: full_path} for every .html screensaver."""
+    return {
+        os.path.basename(path): path
+        for path in config_store.list_screensavers(SCREENSAVER_DIR)
+    }
 
 def sync_matugen_colors_link(cfg=None):
     """Update the scene-local stylesheet symlink to the configured Matugen file."""
