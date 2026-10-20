@@ -364,10 +364,10 @@ def _create_viewer_windows(html_path, clock_format="24h"):
             web = WebKit.WebView()
         settings = web.get_settings()
         try:
-            # Scenes need sibling file:// resources (shared helpers and the
-            # Matugen stylesheet symlink), but must not receive universal access
-            # from file URLs to arbitrary origins.
-            settings.set_allow_file_access_from_file_urls(True)
+            # Keep file:// pages under the normal same-origin policy. Relative
+            # scripts/styles (including the Matugen stylesheet symlink) should
+            # still load, but scene JavaScript must not read unrelated local files.
+            settings.set_allow_file_access_from_file_urls(False)
             settings.set_allow_universal_access_from_file_urls(False)
             settings.set_enable_write_console_messages_to_stdout(False)
             settings.set_enable_javascript(True)
