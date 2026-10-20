@@ -51,7 +51,7 @@ class TestHtmlBasics(unittest.TestCase):
 
     def test_ctl_does_not_silently_swallow_broad_exceptions(self):
         source = _read(os.path.join(support.REPO_ROOT, "bin", "material-screensaver-ctl.py"))
-        silent_catches = re.findall(r"except Exception:\\s*\\n\\s*pass\\b", source)
+        silent_catches = re.findall(r"except Exception:\s*\n\s*pass\b", source)
         # The debug logger itself must remain best-effort to avoid recursive logging.
         self.assertLessEqual(len(silent_catches), 1, "unexpected silent broad exception handlers")
 
