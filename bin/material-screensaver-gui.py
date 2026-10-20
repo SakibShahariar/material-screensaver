@@ -11,6 +11,7 @@ except Exception:
     HAS_WEBKIT = False
 from gi.repository import Gtk, Adw, GLib, Gio, Gdk
 
+import argparse
 import os
 import sys
 import json
@@ -26,6 +27,7 @@ SCREENSAVER_DIR = os.path.expanduser("~/.local/share/material-screensaver/screen
 CONFIG_PATH = os.path.expanduser("~/.config/material-screensaver/config.json")
 CTL_SCRIPT = os.path.expanduser("~/.local/bin/material-screensaver-ctl.py")
 SERVICE_NAME = "material-screensaver.service"
+REQUESTED_PREVIEW = None
 
 KEYBINDING_PATH = "/org/gnome/settings-daemon/plugins/media-keys/custom-keybindings/material-screensaver/"
 KEYBINDING_PARENT_SCHEMA = "org.gnome.settings-daemon.plugins.media-keys"
@@ -95,6 +97,7 @@ def list_screensavers():
 class ScreensaverWindow(Adw.ApplicationWindow):
     def __init__(self, app):
         super().__init__(application=app, title="Screensaver")
+        self._preview_override = REQUESTED_PREVIEW
         self.set_default_size(480, 600)
 
         toolbar_view = Adw.ToolbarView()
@@ -266,12 +269,12 @@ class ScreensaverWindow(Adw.ApplicationWindow):
     def load_state(self):
         cfg = load_config()
 
-        is_random = cfg.get("random", False)
+        is_random = cfg.get("random", False) and self._preview_override is None
         self.random_switch.set_active(is_random)
         self.combo_row.set_sensitive(bool(self.screensaver_files) and not is_random)
 
         if self.screensaver_files:
-            active = cfg.get("active")
+            active = self._preview_override or cfg.get("active")
             idx = self.screensaver_files.index(active) if active in self.screensaver_files else 0
             self.combo_row.set_selected(idx)
 
@@ -335,7 +338,9 @@ class ScreensaverWindow(Adw.ApplicationWindow):
             pass
         cfg = load_config()
         sync_matugen_colors_link(cfg)
-        if cfg.get("random", False):
+        if self._preview_override in self.screensaver_files:
+            idx = self.screensaver_files.index(self._preview_override)
+        elif cfg.get("random", False):
             # Random mode previews a random style each refresh.
             idx = random.randrange(len(self.screensaver_files)) if self.screensaver_files else -1
         else:
@@ -439,12 +444,14 @@ class ScreensaverWindow(Adw.ApplicationWindow):
         dialog.present()
 
     def on_random_toggled(self, switch, _pspec):
+        self._preview_override = None
         is_random = switch.get_active()
         self._save_config(random=is_random)
         self.combo_row.set_sensitive(bool(self.screensaver_files) and not is_random)
         self._update_preview()
 
     def on_screensaver_changed(self, row, _pspec):
+        self._preview_override = None
         idx = row.get_selected()
         if 0 <= idx < len(self.screensaver_files):
             self._save_config(active=self.screensaver_files[idx])
@@ -514,5 +521,40 @@ class ScreensaverApp(Adw.Application):
         win.present()
 
 
+def main(argv=None):
+    global REQUESTED_PREVIEW
+    parser = argparse.ArgumentParser(
+        description="Open Material Screensaver settings or a specific live scene preview."
+    )
+    parser.add_argument(
+        "--settings", action="store_true",
+        help="open settings (the default action)",
+    )
+    parser.add_argument(
+        "--preview", metavar="SCENE.html",
+        help="open settings with the named scene selected in the live preview",
+    )
+    parser.add_argument(
+        "--list-screensavers", action="store_true",
+        help="print available scene filenames and exit",
+    )
+    args = parser.parse_args(argv)
+    scenes = list_screensavers()
+    if args.list_screensavers:
+        if args.preview:
+            parser.error("--list-screensavers cannot be combined with --preview")
+        print("\n".join(scenes))
+        return 0
+    if args.preview:
+        if os.path.basename(args.preview) != args.preview or args.preview not in scenes:
+            print(f"Unknown screensaver scene: {args.preview}", file=sys.stderr)
+            return 2
+        if not HAS_WEBKIT:
+            print("Live preview requires WebKitGTK 6.0", file=sys.stderr)
+            return 2
+        REQUESTED_PREVIEW = args.preview
+    return ScreensaverApp().run([])
+
+
 if __name__ == "__main__":
-    sys.exit(ScreensaverApp().run(sys.argv))
+    sys.exit(main(sys.argv[1:]))

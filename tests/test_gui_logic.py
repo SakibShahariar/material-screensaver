@@ -197,6 +197,28 @@ class TestGuiLogic(unittest.TestCase):
         ))
         self.assertEqual(os.readlink(link), second)
 
+    def test_cli_lists_scenes_without_opening_gui(self):
+        import contextlib
+        import io
+
+        output = io.StringIO()
+        with contextlib.redirect_stdout(output):
+            result = self.gui.main(["--list-screensavers"])
+        self.assertEqual(result, 0)
+        self.assertEqual(output.getvalue().splitlines(), [])
+
+    def test_cli_rejects_unknown_or_traversal_preview(self):
+        import contextlib
+        import io
+
+        for scene in ("missing.html", "../blob.html", "/tmp/blob.html"):
+            with self.subTest(scene=scene):
+                error = io.StringIO()
+                with contextlib.redirect_stderr(error):
+                    result = self.gui.main(["--preview", scene])
+                self.assertEqual(result, 2)
+                self.assertIn("Unknown screensaver scene", error.getvalue())
+
     def test_matugen_path_setting_is_present_and_applied(self):
         with open(os.path.join(support.REPO_ROOT, "bin", "material-screensaver-gui.py"),
                   encoding="utf-8") as f:

@@ -63,6 +63,16 @@ Open **Material Screensaver Settings** from Activities, or run:
 ~/.local/bin/material-screensaver-gui.py
 ```
 
+The settings app also has command-line hooks for suite integrations that should launch the GTK app rather than embed WebKit in a Shell popup:
+
+```sh
+~/.local/bin/material-screensaver-gui.py --settings
+~/.local/bin/material-screensaver-gui.py --list-screensavers
+~/.local/bin/material-screensaver-gui.py --preview blob.html
+```
+
+`--preview` opens Settings with the requested scene selected in the live preview without changing the saved global selection. Scene names can be queried with `--list-screensavers`; unknown names and path traversal are rejected.
+
 The settings app lets you:
 
 - choose a specific screensaver or enable **Random each time**;
