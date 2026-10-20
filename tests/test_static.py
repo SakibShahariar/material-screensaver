@@ -54,11 +54,10 @@ class TestHtmlBasics(unittest.TestCase):
             text = _read(path)
             name = os.path.basename(path)
             match = re.search(
-                r'<meta\s+http-equiv=["\']Content-Security-Policy["\']\s+content=["\']([^"\']+)["\']',
+                r'<meta\s+http-equiv="Content-Security-Policy"\s+content="([^"]+)"',
                 text,
                 re.I,
-            )
-            with self.subTest(file=name):
+            )            with self.subTest(file=name):
                 self.assertIsNotNone(match, f"{name}: missing Content Security Policy")
                 policy = match.group(1)
                 for directive in (
