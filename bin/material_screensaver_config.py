@@ -29,6 +29,7 @@ DEFAULT_CONFIG = {
     "lock_hook": [],
     "unlock_hook": [],
     "screensaver_options": {},
+    "lock_message": "",
 }
 
 
@@ -100,6 +101,11 @@ def normalize_config(data):
             name for name in favorites
             if isinstance(name, str) and name.endswith(".html") and os.path.basename(name) == name
         ))
+    message = data.get("lock_message", "")
+    if isinstance(message, str):
+        cfg["lock_message"] = "".join(
+            char for char in message.strip() if char.isprintable()
+        )[:160]
     cfg["lock_hook"] = _normalize_hook(data.get("lock_hook", []))
     cfg["unlock_hook"] = _normalize_hook(data.get("unlock_hook", []))
     options = data.get("screensaver_options", {})

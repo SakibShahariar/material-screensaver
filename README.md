@@ -12,6 +12,15 @@ Solar System, Starfield, N-Body Galaxies, Cymatics, Kaleidoscope, Magnetic Field
 
 The scenes use a Matugen-generated stylesheet so their colors follow your wallpaper-derived Material You palette. The default stylesheet path is `~/.config/matugen/matugen-colors.css`; change it in Settings under **Matugen → Colors stylesheet**. The path is saved in `~/.config/material-screensaver/config.json` and retained when reinstalling. If Matugen is not configured or the file is absent, scenes retain their built-in fallback colors.
 
+An optional plain-text message can be shown over the animated screensaver, configured in Settings or with the control script. It is off by default and is **not** a secure lock-screen notice; anyone looking at the display can read it. Messages are limited to 160 printable characters and are rendered as text, not HTML:
+
+```sh
+material-screensaver-ctl.py message set "Back at 15:00"
+material-screensaver-ctl.py message clear
+```
+
+The message appears the next time the animated screensaver starts.
+
 Optional lock/unlock hooks can be configured in `~/.config/material-screensaver/config.json`. They are **off by default** and use argument arrays, not shell command strings:
 
 ```json

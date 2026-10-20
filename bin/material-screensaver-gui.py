@@ -331,6 +331,25 @@ class ScreensaverWindow(Adw.ApplicationWindow):
         matugen_row.add_suffix(self.matugen_path_apply)
         matugen_group.add(matugen_row)
 
+        # --- Optional lock message ---
+        message_group = Adw.PreferencesGroup(title="Lock message")
+        page.add(message_group)
+        message_row = Adw.ActionRow(
+            title="Message shown over the screensaver",
+            subtitle="Optional plain text, up to 160 characters; visible to anyone nearby",
+        )
+        self.lock_message_entry = Gtk.Entry(hexpand=True)
+        self.lock_message_entry.set_width_chars(24)
+        self.lock_message_entry.set_placeholder_text("Back at 15:00")
+        message_row.add_suffix(self.lock_message_entry)
+        self.lock_message_apply = Gtk.Button(label="Save", valign=Gtk.Align.CENTER)
+        self.lock_message_apply.connect("clicked", self.on_lock_message_apply)
+        message_row.add_suffix(self.lock_message_apply)
+        self.lock_message_clear = Gtk.Button(label="Clear", valign=Gtk.Align.CENTER)
+        self.lock_message_clear.connect("clicked", self.on_lock_message_clear)
+        message_row.add_suffix(self.lock_message_clear)
+        message_group.add(message_row)
+
         # --- Automatic ---
         auto_group = Adw.PreferencesGroup(title="Automatic")
         page.add(auto_group)
@@ -405,6 +424,7 @@ class ScreensaverWindow(Adw.ApplicationWindow):
 
         self.ampm_switch.set_active(cfg.get("clock_format", "24h") == "12h")
         self.matugen_path_entry.set_text(cfg.get("matugen_colors_path", DEFAULT_MATUGEN_COLORS_PATH))
+        self.lock_message_entry.set_text(cfg.get("lock_message", ""))
 
         # Query systemd asynchronously so opening Settings never blocks GTK.
         self.autostart_switch.set_sensitive(False)
@@ -557,6 +577,20 @@ class ScreensaverWindow(Adw.ApplicationWindow):
                 Adw.Toast.new(f"Settings could not be saved: {exc}")
             )
             return False
+
+    def on_lock_message_apply(self, _button):
+        message = self.lock_message_entry.get_text().strip()
+        if len(message) > 160:
+            self.toast_overlay.add_toast(Adw.Toast.new("Lock message must be 160 characters or fewer"))
+            return
+        if not self._save_config(lock_message=message):
+            return
+        self.toast_overlay.add_toast(Adw.Toast.new("Lock message saved; it appears on the next screensaver launch"))
+
+    def on_lock_message_clear(self, _button):
+        self.lock_message_entry.set_text("")
+        if self._save_config(lock_message=""):
+            self.toast_overlay.add_toast(Adw.Toast.new("Lock message cleared"))
 
     def on_matugen_path_apply(self, _button):
         path = os.path.expanduser(self.matugen_path_entry.get_text().strip())

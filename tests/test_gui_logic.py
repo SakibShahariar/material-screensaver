@@ -255,6 +255,16 @@ class TestGuiLogic(unittest.TestCase):
                 self.assertEqual(result, 2)
                 self.assertIn("Unknown screensaver scene", error.getvalue())
 
+    def test_lock_message_setting_is_optional_and_safe(self):
+        with open(os.path.join(support.REPO_ROOT, "bin", "material-screensaver-gui.py"),
+                  encoding="utf-8") as f:
+            src = f.read()
+        self.assertIn('title="Lock message"', src)
+        self.assertIn("self.on_lock_message_apply", src)
+        self.assertIn("self.on_lock_message_clear", src)
+        self.assertIn("self._save_config(lock_message=message)", src)
+        self.assertIn("node.textContent = " + '" + json.dumps(message) + "', src)
+
     def test_matugen_path_setting_is_present_and_applied(self):
         with open(os.path.join(support.REPO_ROOT, "bin", "material-screensaver-gui.py"),
                   encoding="utf-8") as f:

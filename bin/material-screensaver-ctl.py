@@ -68,6 +68,16 @@ normalize_config = config_store.normalize_config
 def load_config():
     return config_store.load_config(CONFIG_PATH)
 
+
+def update_lock_message(message):
+    """Persist a short, plain-text viewer message; empty text clears it."""
+    if not isinstance(message, str):
+        raise ValueError("lock message must be text")
+    message = "".join(char for char in message.strip() if char.isprintable())[:160]
+    config_store.save_config(CONFIG_PATH, lock_message=message)
+    return message
+
+
 def list_screensavers():
     """Return {filename: full_path} for every .html screensaver."""
     return {
@@ -389,6 +399,40 @@ def _create_viewer_windows(html_path, clock_format="24h", scene_options=None):
                 _dbg(f"Suppressed non-fatal exception in _create_viewer_windows: {exc}")
         except Exception as exc:
             _dbg(f"Suppressed non-fatal exception in _create_viewer_windows: {exc}")
+        # Optional plain-text message overlay. JSON serialization and textContent
+        # prevent the configured message from becoming executable HTML or JS.
+        try:
+            message = load_config().get("lock_message", "")
+            if message:
+                script = (
+                    "(() => { const add = () => { if (!document.body || "
+                    "document.getElementById('material-screensaver-lock-message')) return; "
+                    "const node = document.createElement('div'); "
+                    "node.id = 'material-screensaver-lock-message'; "
+                    "node.textContent = " + json.dumps(message) + "; "
+                    "node.setAttribute('role', 'note'); "
+                    "node.style.cssText = 'position:fixed;left:3vw;bottom:3vh;z-index:2147483647;"
+                    "max-width:70vw;padding:10px 16px;border-radius:12px;"
+                    "background:rgba(20,20,24,.72);color:#fff;font:500 18px sans-serif;"
+                    "line-height:1.35;pointer-events:none;white-space:pre-wrap;"
+                    "overflow-wrap:anywhere;box-shadow:0 2px 14px rgba(0,0,0,.25)'; "
+                    "document.body.appendChild(node); }; "
+                    "if (document.readyState === 'loading') "
+                    "document.addEventListener('DOMContentLoaded', add, {once:true}); "
+                    "else add(); })();"
+                )
+                ucm = web.get_user_content_manager()
+                message_script = WebKit.UserScript.new(
+                    script,
+                    WebKit.UserContentInjectedFrames.TOP_FRAME,
+                    WebKit.UserScriptInjectionTime.END,
+                    None,
+                    None,
+                )
+                ucm.add_script(message_script)
+        except Exception as exc:
+            _dbg(f"Could not install lock message overlay: {exc}")
+
         # Hide cursor inside web content from the first paint — WebKit's CSS cursor
         # overrides the widget's Gdk cursor, so Gdk blank alone still shows default
         # arrow over the page until first motion. Inject a blanket cursor:none
@@ -2223,6 +2267,21 @@ if __name__ == "__main__":
         stop()
     elif action == "daemon":
         run_daemon()
+    elif action == "message":
+        if len(sys.argv) == 3 and sys.argv[2] == "clear":
+            update_lock_message("")
+            print("Lock message cleared.")
+        elif len(sys.argv) >= 4 and sys.argv[2] == "set":
+            try:
+                message = update_lock_message(" ".join(sys.argv[3:]))
+            except ValueError as exc:
+                print(str(exc), file=sys.stderr)
+                sys.exit(2)
+            print("Lock message cleared." if not message else "Lock message saved.")
+        else:
+            print("Usage: material-screensaver-ctl.py message set <text> | message clear",
+                  file=sys.stderr)
+            sys.exit(2)
     elif action == "viewer":
         # isolated viewer subprocess: viewer <html_path> [clock_format]
         hp = sys.argv[2] if len(sys.argv) > 2 else None

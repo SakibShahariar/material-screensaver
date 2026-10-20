@@ -163,6 +163,24 @@ class TestNormalizeConfig(CtlTestCase):
             {"starfield.html": {"speed": 1.6}},
         )
 
+    def test_lock_message_is_plain_text_bounded_and_defaults_empty(self):
+        self.assertEqual(self.ctl.normalize_config({})["lock_message"], "")
+        raw = "  Back at 15:00" + chr(10) + "<script>alert(1)</script>  " + ("x" * 200)
+        cfg = self.ctl.normalize_config({"lock_message": raw})
+        self.assertEqual(len(cfg["lock_message"]), 160)
+        self.assertNotIn(chr(10), cfg["lock_message"])
+        self.assertEqual(self.ctl.normalize_config({"lock_message": 123})["lock_message"], "")
+
+    def test_lock_message_set_and_clear_persist(self):
+        self.assertEqual(self.ctl.update_lock_message("  Back at 15:00  "), "Back at 15:00")
+        self.assertEqual(self.ctl.load_config()["lock_message"], "Back at 15:00")
+        self.assertEqual(self.ctl.update_lock_message(""), "")
+        self.assertEqual(self.ctl.load_config()["lock_message"], "")
+
+    def test_lock_message_rejects_non_text(self):
+        with self.assertRaises(ValueError):
+            self.ctl.update_lock_message(None)
+
     def test_favorites_accept_unique_safe_html_filenames_only(self):
         self.assertEqual(self.ctl.normalize_config({})["favorites"], [])
         cfg = self.ctl.normalize_config({
