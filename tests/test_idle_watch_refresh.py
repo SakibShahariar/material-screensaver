@@ -36,10 +36,11 @@ class TestIdleWatchRefresh(unittest.TestCase):
         path = os.path.join(support.REPO_ROOT, "bin", "material-screensaver-ctl.py")
         with open(path, encoding="utf-8") as handle:
             source = handle.read()
-        self.assertIn(
-            '_idle_watch_needs_refresh(current, last_idle_seconds[0], _idle_watch_ids.get("idle"))',
-            source,
-        )
+        self.assertIn("def check_idle_config():", source)
+        self.assertIn("_idle_watch_needs_refresh(", source)
+        self.assertIn("viewer_active=is_viewer_active()", source)
+        self.assertIn("session_locked=_session_locked", source)
+        self.assertIn("GLib.timeout_add_seconds(2, check_idle_config)", source)
 
 
 if __name__ == "__main__":
