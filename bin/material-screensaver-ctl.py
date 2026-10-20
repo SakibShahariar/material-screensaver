@@ -221,7 +221,7 @@ def _kill_orphan_webkit():
             ppid = int(tail[1])
             with open(f"/proc/{pid}/cmdline", "rb") as stream:
                 raw_cmd = stream.read()
-            cmd = raw_cmd.replace(b"\\0", b" ").decode(errors="replace").strip()
+            cmd = raw_cmd.replace(b"\0", b" ").decode(errors="replace").strip()
             return ppid, cmd
         except (OSError, ValueError, IndexError):
             return None
