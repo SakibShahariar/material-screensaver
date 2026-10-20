@@ -50,9 +50,9 @@ cp "$SCRIPT_DIR"/applications/material-screensaver-settings.desktop ~/.local/sha
 # normal desktop gestures are untouched. The shell must be restarted/re-logged
 # once for a newly installed extension to be discovered; afterwards it loads.
 EXT_UUID="material-screensaver-gestures@io.github.sakib"
-EXT_BASE=~/.local/share/gnome-shell/extensions
+EXT_BASE="$HOME/.local/share/gnome-shell/extensions"
 mkdir -p "$EXT_BASE"
-rm -rf "$EXT_BASE/$EXT_UUID"
+rm -rf -- "${EXT_BASE:?}/$EXT_UUID"
 cp -a "$SCRIPT_DIR/extensions/$EXT_UUID" "$EXT_BASE/"
 python3 - "$EXT_UUID" <<'PY'
 import ast, subprocess, sys
