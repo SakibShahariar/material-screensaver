@@ -91,5 +91,11 @@ jobs:
           /usr/bin/python3 -m unittest discover -s tests -v
 
       - name: WebKit CSP resource-policy integration test
+        env:
+          # The hosted runner forbids the network namespaces WebKit's bwrap sandbox needs.
+          # Disable that sandbox only for this isolated CSP test; the WebKit file-access
+          # settings and Content-Security-Policy behavior remain under test.
+          WEBKIT_DISABLE_SANDBOX_THIS_IS_DANGEROUS: "1"
+          GTK_A11Y: "none"
         run: |
           xvfb-run -a /usr/bin/python3 -m unittest discover -s tests -p test_webkit_csp.py -v
