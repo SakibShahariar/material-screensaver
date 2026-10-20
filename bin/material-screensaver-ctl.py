@@ -1158,6 +1158,9 @@ def run_viewer(html_path, clock_format="24h"):
 def show_viewer():
     """Show screensaver viewer — daemon spawns isolated viewer subprocess (keeps daemon lean)."""
     global _viewer_windows, _is_showing, _viewer_process
+    if _session_locked:
+        _dbg("refused to show viewer while session is locked")
+        return False
     # Stronger TOCTOU guard: claim the showing state and keep the flag set
     # until hide_viewer() or the child-watch cleanup clears it. The previous
     # finally-always-clear only protected the short spawn window and allowed
