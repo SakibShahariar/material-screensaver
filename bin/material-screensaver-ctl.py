@@ -1224,7 +1224,7 @@ def show_viewer():
             _viewer_process = subprocess.Popen(
                 [sys.executable, os.path.abspath(__file__), "viewer", html_path, clock_format],
                 stdout=subprocess.DEVNULL, stderr=None,
-                preexec_fn=os.setsid if hasattr(os, "setsid") else None)
+                start_new_session=True)
         except Exception as e:
             print(f"Failed to spawn viewer subprocess: {e}", file=sys.stderr)
             # fallback to in-process (old path) if spawn fails
