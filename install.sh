@@ -49,9 +49,31 @@ chmod +x ~/.local/bin/material-screensaver-ctl.py ~/.local/bin/material-screensa
 
 TMP_DIR="$(mktemp -d "$DATA_DIR/.screensavers.new.XXXXXX")"
 cp -a "$SCRIPT_DIR"/screensavers/. "$TMP_DIR"/
-# Pages use this local name. Keep it linked to the installing user's Matugen
-# output; a missing target is harmless because pages have built-in fallbacks.
-ln -sfn "$HOME/.config/matugen/matugen-colors.css" "$TMP_DIR/matugen-colors.css"
+# Preserve the configured Matugen output across reinstalls; built-in fallback
+# colors work if the target is missing.
+MATUGEN_COLORS_PATH="$HOME/.config/matugen/matugen-colors.css"
+if [[ -f "$HOME/.config/material-screensaver/config.json" ]]; then
+  configured_path="$(python3 - "$HOME/.config/material-screensaver/config.json" <<'PY'
+import json
+import os
+import sys
+
+try:
+    with open(sys.argv[1], encoding="utf-8") as handle:
+        value = json.load(handle).get("matugen_colors_path", "")
+    if isinstance(value, str) and value.strip():
+        value = os.path.expanduser(value.strip())
+        if os.path.isabs(value):
+            print(os.path.normpath(value))
+except (OSError, TypeError, ValueError):
+    pass
+PY
+)"
+  if [[ -n "$configured_path" ]]; then
+    MATUGEN_COLORS_PATH="$configured_path"
+  fi
+fi
+ln -sfn "$MATUGEN_COLORS_PATH" "$TMP_DIR/matugen-colors.css"
 # only chmod regular files (ignore any future subdirs)
 find "$TMP_DIR" -type f -exec chmod 644 {} + 2>/dev/null || true
 
