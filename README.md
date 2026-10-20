@@ -110,4 +110,4 @@ Run the test suite from the repository root:
 python3 -m unittest discover -s tests -v
 ```
 
-The suite includes Python configuration and scheduling tests, installer/desktop-entry checks, HTML structure and theme-link checks, and JavaScript syntax checks. It does not fully test live interaction with a running GNOME session, including Mutter idle-watch registration, SessionManager inhibition, or locking a real session.
+The suite includes Python configuration and scheduling tests, installer/desktop-entry checks, HTML structure and theme-link checks, and JavaScript syntax checks. It does not fully test live interaction with a running GNOME session, including Mutter idle-watch registration, SessionManager inhibition, or locking a real session. For the repeatable live-session test matrix, see [GNOME Wayland integration test plan](docs/gnome-integration-test-plan.md).
