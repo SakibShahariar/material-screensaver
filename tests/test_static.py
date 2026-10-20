@@ -179,7 +179,9 @@ class TestJsSyntax(unittest.TestCase):
         source = _read(os.path.join(support.REPO_ROOT, "bin", "material-screensaver-ctl.py"))
         self.assertIn("def check_idle_config()", source)
         self.assertIn("GLib.timeout_add_seconds(2, check_idle_config)", source)
-        self.assertIn("current != last_idle_seconds[0] and not is_viewer_active()", source)
+        self.assertIn("def _idle_watch_needs_refresh(current_idle_seconds, last_idle_seconds, watch_id):", source)
+        self.assertIn("return current_idle_seconds != last_idle_seconds or watch_id is None", source)
+        self.assertIn("_idle_watch_needs_refresh(current, last_idle_seconds[0], _idle_watch_ids.get(\"idle\")) and not is_viewer_active()", source)
         self.assertIn('print(f"Failed to refresh idle timeout: {exc}"', source)
 
     def test_viewer_disables_cross_origin_file_url_access(self):
