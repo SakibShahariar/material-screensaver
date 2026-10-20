@@ -54,7 +54,7 @@ class TestHtmlBasics(unittest.TestCase):
             text = _read(path)
             name = os.path.basename(path)
             match = re.search(
-                r'<meta\\s+http-equiv=["\']Content-Security-Policy["\']\\s+content=["\']([^"\']+)["\']',
+                r'<meta\s+http-equiv=["\']Content-Security-Policy["\']\s+content=["\']([^"\']+)["\']',
                 text,
                 re.I,
             )
