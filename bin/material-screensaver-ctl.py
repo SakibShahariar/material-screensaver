@@ -200,73 +200,106 @@ def _get_shared_context():
     return _shared_web_context
 
 def _kill_orphan_webkit():
-    """Kill any lingering bwrap/WebKit children (and grandchildren) of this
-    process (ghost btop entries after Hide). Returns count killed."""
-    try:
-        import os, signal, subprocess, time
-        my_pid = os.getpid()
-        # Collect direct children + one level of grandchildren so WebKit
-        # NetworkProcess / WebProcess that reparented under bwrap are still seen.
-        candidates = []
-        for ppid in (my_pid,):
-            try:
-                out = subprocess.run(
-                    ["ps", "--ppid", str(ppid), "-o", "pid=,args="],
-                    capture_output=True, text=True, timeout=2)
-            except Exception:
-                continue
-            for line in out.stdout.splitlines():
-                line = line.strip()
-                if not line:
-                    continue
-                parts = line.split(None, 1)
-                try:
-                    pid = int(parts[0])
-                except Exception:
-                    continue
-                cmd = parts[1] if len(parts) > 1 else ""
-                candidates.append((pid, cmd))
-                # also scan this child's children
-                try:
-                    out2 = subprocess.run(
-                        ["ps", "--ppid", str(pid), "-o", "pid=,args="],
-                        capture_output=True, text=True, timeout=1)
-                    for line2 in out2.stdout.splitlines():
-                        line2 = line2.strip()
-                        if not line2:
-                            continue
-                        p2 = line2.split(None, 1)
-                        try:
-                            candidates.append((int(p2[0]), p2[1] if len(p2) > 1 else ""))
-                        except Exception:
-                            pass
-                except Exception:
-                    pass
+    """Terminate lingering WebKit descendants without blocking the GLib loop.
 
-        killed = 0
-        to_reap = []
-        for pid, cmd in candidates:
-            if ("WebKitNetworkProcess" in cmd or "WebKitWebProcess" in cmd
-                    or ("bwrap" in cmd and "xdg-dbus-proxy" in cmd)
-                    or "WebKitGTK" in cmd):
-                try:
-                    os.kill(pid, signal.SIGTERM)
-                    to_reap.append(pid)
-                    killed += 1
-                except Exception:
-                    pass
-        # Give them a moment, then SIGKILL any that linger
-        if to_reap:
-            time.sleep(0.15)
-            for pid in to_reap:
-                try:
-                    os.kill(pid, 0)  # still alive?
-                    os.kill(pid, signal.SIGKILL)
-                except Exception:
-                    pass
-        return killed
-    except Exception:
+    Linux /proc avoids spawning synchronous `ps` subprocesses. Matching
+    processes receive SIGTERM first; a GLib timeout sends SIGKILL only if the
+    same PID still has a matching command line, avoiding a blind delayed kill
+    if the PID has already been reused.
+    """
+    import os
+    import signal
+
+    def _read_process(pid):
+        try:
+            with open(f"/proc/{pid}/stat", encoding="utf-8") as stream:
+                stat = stream.read()
+            # comm is parenthesized and may itself contain spaces or ')'.
+            tail = stat[stat.rfind(")") + 2:].split()
+            if len(tail) < 2:
+                return None
+            ppid = int(tail[1])
+            with open(f"/proc/{pid}/cmdline", "rb") as stream:
+                raw_cmd = stream.read()
+            cmd = raw_cmd.replace(b"\\0", b" ").decode(errors="replace").strip()
+            return ppid, cmd
+        except (OSError, ValueError, IndexError):
+            return None
+
+    try:
+        process_entries = os.listdir("/proc")
+    except OSError:
         return 0
+
+    process_info = {}
+    for entry in process_entries:
+        if not entry.isdigit():
+            continue
+        pid = int(entry)
+        info = _read_process(pid)
+        if info is not None:
+            process_info[pid] = info
+
+    # Walk all descendants, not just children and grandchildren: WebKit's
+    # sandbox helpers can add another process layer on some distributions.
+    children = {}
+    for pid, (ppid, _cmd) in process_info.items():
+        children.setdefault(ppid, []).append(pid)
+    descendants = []
+    pending = list(children.get(os.getpid(), ()))
+    seen = set()
+    while pending:
+        pid = pending.pop()
+        if pid in seen:
+            continue
+        seen.add(pid)
+        descendants.append(pid)
+        pending.extend(children.get(pid, ()))
+
+    def _is_webkit_helper(cmd):
+        return ("WebKitNetworkProcess" in cmd
+                or "WebKitWebProcess" in cmd
+                or ("bwrap" in cmd and "xdg-dbus-proxy" in cmd)
+                or "WebKitGTK" in cmd)
+
+    to_reap = []
+    for pid in descendants:
+        cmd = process_info[pid][1]
+        if not _is_webkit_helper(cmd):
+            continue
+        try:
+            os.kill(pid, signal.SIGTERM)
+            to_reap.append((pid, cmd))
+        except (ProcessLookupError, PermissionError, OSError):
+            continue
+
+    if to_reap:
+        try:
+            import gi
+            gi.require_version("GLib", "2.0")
+            from gi.repository import GLib
+
+            def _force_kill():
+                for pid, original_cmd in to_reap:
+                    current = _read_process(pid)
+                    if current is None or not _is_webkit_helper(current[1]):
+                        continue
+                    # Require a matching process identity, not just a reused PID.
+                    if current[1] != original_cmd:
+                        continue
+                    try:
+                        os.kill(pid, signal.SIGKILL)
+                    except (ProcessLookupError, PermissionError, OSError):
+                        pass
+                return GLib.SOURCE_REMOVE
+
+            GLib.timeout_add(150, _force_kill)
+        except Exception:
+            # If GLib is unavailable, leave SIGTERM to complete naturally rather
+            # than block this caller with sleep() or immediately escalate.
+            pass
+
+    return len(to_reap)
 
 def _create_viewer_windows(html_path, clock_format="24h"):
     """Create one fullscreen Gtk.Window per monitor with WebKit WebView."""
