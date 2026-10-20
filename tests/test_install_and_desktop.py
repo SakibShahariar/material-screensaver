@@ -57,7 +57,7 @@ class TestScriptsAndUnits(unittest.TestCase):
         self.assertIn("Gio.Subprocess.new([\"systemctl\", \"--user\", *args]", gui)
         self.assertIn("proc.communicate_utf8_async(None, None, completed)", gui)
         self.assertIn('self._run_systemctl_async(["is-active", SERVICE_NAME], on_active_checked)', gui)
-        self.assertIn('self.autostart_row.set_subtitle("Launch when idle (service running)")', gui)
+        self.assertIn('subtitle = "Launch when idle (service running)"', gui)
         self.assertIn("switch.set_active(previous)", gui)
         self.assertIn("self.toast_overlay.add_toast(Adw.Toast.new(detail))", gui)
         self.assertNotIn('subprocess.run(["systemctl", "--user", action, "--now", SERVICE_NAME])', gui)
