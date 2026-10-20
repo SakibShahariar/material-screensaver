@@ -115,6 +115,22 @@ class TestNormalizeConfig(CtlTestCase):
             out = self.ctl.normalize_config({"idle_seconds": bad})
             self.assertEqual(out["idle_seconds"], 300, f"accepted idle_seconds={bad!r}")
 
+    def test_blank_display_timeout_defaults_and_validates(self):
+        self.assertEqual(self.ctl.normalize_config({})["blank_display_after_minutes"], 0)
+        for good in (0, 1, 30, 1440):
+            self.assertEqual(
+                self.ctl.normalize_config({"blank_display_after_minutes": good})["blank_display_after_minutes"],
+                good,
+            )
+        for bad in (-1, 1441, True, 1.5, "30", None):
+            self.assertEqual(
+                self.ctl.normalize_config({"blank_display_after_minutes": bad})["blank_display_after_minutes"],
+                0,
+                f"accepted blank_display_after_minutes={bad!r}",
+            )
+        self.ctl.config_store.save_config(self.cfg_path, blank_display_after_minutes=15)
+        self.assertEqual(self.ctl.load_config()["blank_display_after_minutes"], 15)
+
     def test_fps_limit_defaults_and_validates(self):
         self.assertEqual(self.ctl.normalize_config({})["fps_limit"], 30)
         for good in (10, 30, 60, "45"):

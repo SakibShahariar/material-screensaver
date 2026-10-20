@@ -22,6 +22,7 @@ DEFAULT_CONFIG = {
     "active": None,
     "idle_seconds": 300,
     "fps_limit": 30,
+    "blank_display_after_minutes": 0,
     "clock_format": "24h",
     "clock_overlay": False,
     "clock_overlay_position": "bottom-right",
@@ -125,6 +126,9 @@ def normalize_config(data):
     fps_limit = _valid_int(data.get("fps_limit"), 10, 60)
     if fps_limit is not None:
         cfg["fps_limit"] = fps_limit
+    blank_after = _valid_int(data.get("blank_display_after_minutes"), 0, 1440)
+    if blank_after is not None:
+        cfg["blank_display_after_minutes"] = blank_after
     lock = _valid_int(data.get("lock_after_seconds"), 0, 86400)
     if lock is not None:
         cfg["lock_after_seconds"] = lock

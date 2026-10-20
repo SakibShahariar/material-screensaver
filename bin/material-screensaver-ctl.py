@@ -437,6 +437,32 @@ window.requestAnimationFrame = callback => nativeRAF(timestamp => {
         except Exception as exc:
             _dbg(f"Could not install animation frame cap: {exc}")
 
+        # Blank the display after the configured interval. Replacing the document
+        # stops scene scripts rather than merely covering their animation with CSS.
+        try:
+            cfg = load_config()
+            blank_minutes = cfg.get("blank_display_after_minutes", 0)
+            if blank_minutes > 0:
+                blank_script = """(() => {
+const delay = __BLANK_DELAY_MS__;
+window.setTimeout(() => {
+  document.open();
+  document.write('<!doctype html><html><head><meta name="color-scheme" content="dark"><style>html,body{margin:0;width:100%;height:100%;background:#000;overflow:hidden}</style></head><body></body></html>');
+  document.close();
+}, delay);
+})();""".replace("__BLANK_DELAY_MS__", str(blank_minutes * 60 * 1000))
+                blank_manager = web.get_user_content_manager()
+                blank_user_script = WebKit.UserScript.new(
+                    blank_script,
+                    WebKit.UserContentInjectedFrames.TOP_FRAME,
+                    WebKit.UserScriptInjectionTime.END,
+                    None,
+                    None,
+                )
+                blank_manager.add_script(blank_user_script)
+        except Exception as exc:
+            _dbg(f"Could not install display-blanking timer: {exc}")
+
         # Optional shared clock/date overlay. Built-in scenes use clock-shared.js,
         # so never layer a second clock over their canvas-rendered clocks.
         try:
