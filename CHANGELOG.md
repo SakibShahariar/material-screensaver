@@ -59,7 +59,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [2.2.2] - 2026-08-30
 ### Fixed
-- Desktop file `Exec=` now uses `%h/.local/bin/...` + `TryExec` so the settings app launches reliably even when `~/.local/bin` is not in `$PATH`.
+- Desktop launcher currently uses `sh -c` to expand `$HOME` in `Exec=`; it does not define `TryExec`.
 - Icon install places the PNG under the hicolor theme (`48x48/apps`) and runs a proper `gtk-update-icon-cache`.
 - Removed dead `_show_cursor_temporarily` body and its call sites (cursor is permanently hidden for non-interactive styles; solar-system manages its own).
 - Dropped leftover `"browser": "auto"` config key (Chromium backend removed in v2.0).
