@@ -17,6 +17,8 @@ import json
 import glob
 import random
 import subprocess
+import re
+import html as html_lib
 from urllib.parse import urlencode
 
 SCREENSAVER_DIR = os.path.expanduser("~/.local/share/material-screensaver/screensavers")
@@ -116,7 +118,23 @@ def save_config(**updates):
 
 
 def display_name(filename):
+    """Prefer the scene's own title; retain a filename fallback for user scenes."""
     stem = os.path.splitext(filename)[0]
+    scene_path = os.path.join(SCREENSAVER_DIR, filename)
+    try:
+        with open(scene_path, encoding="utf-8") as f:
+            source = f.read()
+        match = re.search(r"<title\\b[^>]*>(.*?)</title\\s*>", source, re.IGNORECASE | re.DOTALL)
+        if match:
+            title = html_lib.unescape(re.sub(r"<[^>]*>", "", match.group(1))).strip()
+            prefix = "Material Screensaver — "
+            if title.lower().startswith(prefix.lower()):
+                title = title[len(prefix):].strip()
+            # Some older scenes use the filename itself as their HTML title.
+            if title and title.casefold() != stem.casefold():
+                return title
+    except (OSError, UnicodeError):
+        pass
     return stem.replace("-", " ").replace("_", " ").title()
 
 

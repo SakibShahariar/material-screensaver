@@ -56,6 +56,12 @@ class TestGuiLogic(unittest.TestCase):
         for fname, want in cases.items():
             self.assertEqual(self.gui.display_name(fname), want, fname)
 
+    def test_display_name_reads_scene_title(self):
+        path = os.path.join(self.gui.SCREENSAVER_DIR, "gameoflife.html")
+        with open(path, "w", encoding="utf-8") as f:
+            f.write("<html><head><title>Material Screensaver — Game of Life</title></head></html>")
+        self.assertEqual(self.gui.display_name("gameoflife.html"), "Game of Life")
+
     def test_display_name_multidot(self):
         # glob never emits dotfiles, but multi-dot stems are real (e.g. "koi.pond")
         self.assertEqual(self.gui.display_name("foo.bar.html"), "Foo.Bar")
