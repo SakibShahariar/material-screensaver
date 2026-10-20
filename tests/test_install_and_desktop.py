@@ -52,6 +52,15 @@ class TestScriptsAndUnits(unittest.TestCase):
         self.assertIn("self._save_config(idle_seconds=int(row.get_value()))", gui)
         self.assertIn("self._save_config(lock_after_seconds=int(row.get_value()))", gui)
 
+    def test_preview_uses_ephemeral_restricted_webkit_and_suspends(self):
+        gui = self._read("bin/material-screensaver-gui.py")
+        self.assertIn("WebKit.WebContext.new_ephemeral()", gui)
+        self.assertIn("WebKit.WebView.new_with_context(self.preview_context)", gui)
+        self.assertIn("settings.set_allow_file_access_from_file_urls(False)", gui)
+        self.assertIn("settings.set_allow_universal_access_from_file_urls(False)", gui)
+        self.assertIn('self.preview_web.load_uri("about:blank")', gui)
+        self.assertIn('self.connect("notify::is-active", self.on_preview_activity_changed)', gui)
+
     def test_daemon_suppresses_idle_activation_while_locked(self):
         ctl = self._read("bin/material-screensaver-ctl.py")
         self.assertIn("_session_locked = False", ctl)
