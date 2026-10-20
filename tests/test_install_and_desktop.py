@@ -43,6 +43,15 @@ class TestScriptsAndUnits(unittest.TestCase):
         self.assertEqual(m.group(1).strip() if m else "", "material-screensaver",
                          "desktop Icon= must match installer's icon target basename")
 
+    def test_timing_settings_match_config_seconds(self):
+        gui = self._read("bin/material-screensaver-gui.py")
+        self.assertIn("Adw.SpinRow.new_with_range(1, 86400, 1)", gui)
+        self.assertIn("Adw.SpinRow.new_with_range(0, 86400, 1)", gui)
+        self.assertIn('self.idle_row.set_value(cfg.get("idle_seconds", 300))', gui)
+        self.assertIn('self.lock_row.set_value(cfg.get("lock_after_seconds", 300))', gui)
+        self.assertIn("self._save_config(idle_seconds=int(row.get_value()))", gui)
+        self.assertIn("self._save_config(lock_after_seconds=int(row.get_value()))", gui)
+
     def test_systemd_unit_launches_daemon(self):
         text = self._read("systemd/material-screensaver.service")
         self.assertIn("ExecStart=%h/.local/bin/material-screensaver-ctl.py daemon", text)
