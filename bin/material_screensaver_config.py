@@ -23,6 +23,7 @@ DEFAULT_CONFIG = {
     "idle_seconds": 300,
     "fps_limit": 30,
     "blank_display_after_minutes": 0,
+    "reduce_fps_on_battery": True,
     "clock_format": "24h",
     "clock_overlay": False,
     "clock_overlay_position": "bottom-right",
@@ -129,6 +130,8 @@ def normalize_config(data):
     blank_raw = data.get("blank_display_after_minutes", 0)
     if isinstance(blank_raw, int) and not isinstance(blank_raw, bool) and 0 <= blank_raw <= 1440:
         cfg["blank_display_after_minutes"] = blank_raw
+    if isinstance(data.get("reduce_fps_on_battery"), bool):
+        cfg["reduce_fps_on_battery"] = data["reduce_fps_on_battery"]
     lock = _valid_int(data.get("lock_after_seconds"), 0, 86400)
     if lock is not None:
         cfg["lock_after_seconds"] = lock

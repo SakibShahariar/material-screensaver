@@ -265,6 +265,13 @@ class TestJsSyntax(unittest.TestCase):
         self.assertIn("session_locked=_session_locked", source)
         self.assertIn('print(f"Failed to refresh idle timeout: {exc}"', source)
 
+    def test_battery_fps_saver_uses_upower_and_respects_setting(self):
+        source = open(os.path.join(support.REPO_ROOT, "bin", "material-screensaver-ctl.py"), encoding="utf-8").read()
+        self.assertIn("def _battery_is_discharging():", source)
+        self.assertIn('["upower", "-i", "/org/freedesktop/UPower/devices/DisplayDevice"]', source)
+        self.assertIn("min(fps_limit, 15)", source)
+        self.assertIn('viewer_cfg.get("reduce_fps_on_battery", True)', source)
+
     def test_viewer_disables_cross_origin_file_url_access(self):
         source = _read(os.path.join(support.REPO_ROOT, "bin", "material-screensaver-ctl.py"))
         self.assertIn("set_allow_universal_access_from_file_urls(False)", source)

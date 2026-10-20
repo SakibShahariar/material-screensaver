@@ -115,6 +115,11 @@ class TestNormalizeConfig(CtlTestCase):
             out = self.ctl.normalize_config({"idle_seconds": bad})
             self.assertEqual(out["idle_seconds"], 300, f"accepted idle_seconds={bad!r}")
 
+    def test_battery_fps_saving_defaults_to_enabled_and_validates(self):
+        self.assertTrue(self.ctl.normalize_config({})["reduce_fps_on_battery"])
+        self.assertFalse(self.ctl.normalize_config({"reduce_fps_on_battery": False})["reduce_fps_on_battery"])
+        self.assertTrue(self.ctl.normalize_config({"reduce_fps_on_battery": "false"})["reduce_fps_on_battery"])
+
     def test_blank_display_timeout_defaults_and_validates(self):
         self.assertEqual(self.ctl.normalize_config({})["blank_display_after_minutes"], 0)
         for good in (0, 1, 30, 1440):

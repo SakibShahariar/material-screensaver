@@ -287,6 +287,27 @@ def _kill_orphan_webkit():
 
     return len(to_reap)
 
+def _battery_is_discharging():
+    """Return True/False from UPower, or None when battery state is unknown."""
+    try:
+        result = subprocess.run(
+            ["upower", "-i", "/org/freedesktop/UPower/devices/DisplayDevice"],
+            capture_output=True, text=True, timeout=1, check=False,
+        )
+        if result.returncode == 0:
+            for line in result.stdout.splitlines():
+                key, sep, value = line.strip().partition(":")
+                if sep and key.strip() == "state":
+                    state = value.strip().lower()
+                    if state == "discharging":
+                        return True
+                    if state in ("charging", "fully-charged", "pending-charge", "pending-discharge"):
+                        return False
+    except (OSError, subprocess.SubprocessError) as exc:
+        _dbg(f"Could not query UPower battery state: {exc}")
+    return None
+
+
 def _create_viewer_windows(html_path, clock_format="24h", scene_options=None):
     """Create one fullscreen Gtk.Window per monitor with WebKit WebView."""
     import gi
@@ -332,6 +353,11 @@ def _create_viewer_windows(html_path, clock_format="24h", scene_options=None):
     # Assignments are keyed by connector where available; new displays use the global scene.
     viewer_cfg = load_config()
     monitor_assignments = viewer_cfg.get("monitor_screensavers", {})
+    battery_saving = (
+        viewer_cfg.get("reduce_fps_on_battery", True) and _battery_is_discharging() is True
+    )
+    if battery_saving:
+        _dbg("UPower reports discharging; reducing requestAnimationFrame cap to 15 FPS")
     available_scenes = list_screensavers()
     windows = []
     global _ephemeral_ctx
@@ -411,6 +437,8 @@ def _create_viewer_windows(html_path, clock_format="24h", scene_options=None):
         try:
             cfg = load_config()
             fps_limit = cfg.get("fps_limit", 30)
+            if battery_saving:
+                fps_limit = min(fps_limit, 15)
             fps_script = """(() => {
 const limit = __FPS_LIMIT__;
 const nativeRAF = window.requestAnimationFrame.bind(window);
