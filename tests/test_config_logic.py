@@ -157,6 +157,37 @@ class TestNormalizeConfig(CtlTestCase):
             self.assertEqual(self.ctl.normalize_config({"clock_format": bad})["clock_format"], "24h",
                              f"accepted clock_format={bad!r}")
 
+    def test_monitor_assignments_are_sanitized_and_resolve_with_fallback(self):
+        cfg = self.ctl.normalize_config({
+            "monitor_screensavers": {
+                "connector:HDMI-1": "starfield.html",
+                "connector:DP-1": "../outside.html",
+                "": "blob.html",
+                "x" * 201: "blob.html",
+                "connector:DP-2": 42,
+            }
+        })
+        self.assertEqual(cfg["monitor_screensavers"], {"connector:HDMI-1": "starfield.html"})
+        available = {"starfield.html": "/scenes/starfield.html", "blob.html": "/scenes/blob.html"}
+        self.assertEqual(
+            self.ctl.config_store.resolve_monitor_scene(
+                "connector:HDMI-1", cfg["monitor_screensavers"], available, "blob.html"
+            ),
+            "starfield.html",
+        )
+        self.assertEqual(
+            self.ctl.config_store.resolve_monitor_scene(
+                "connector:DP-1", cfg["monitor_screensavers"], available, "blob.html"
+            ),
+            "blob.html",
+        )
+        self.assertEqual(
+            self.ctl.config_store.resolve_monitor_scene(
+                "connector:HDMI-1", cfg["monitor_screensavers"], {"blob.html": "/scenes/blob.html"}, "blob.html"
+            ),
+            "blob.html",
+        )
+
     def test_per_scene_options_default_validate_and_persist(self):
         self.assertEqual(
             self.ctl.config_store.get_scene_options({}, "starfield.html"),

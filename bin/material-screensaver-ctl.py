@@ -329,13 +329,10 @@ def _create_viewer_windows(html_path, clock_format="24h", scene_options=None):
     if not monitors:
         monitors = [None]
 
-    # Build a real file URI so user-added names containing spaces, #, ?, or
-    # non-ASCII characters are not misinterpreted as URL syntax.
-    uri = Gio.File.new_for_path(html_path).get_uri()
-    params = {"format": clock_format}
-    if isinstance(scene_options, dict):
-        params.update(scene_options)
-    uri = f"{uri}?{urlencode(params)}"
+    # Assignments are keyed by connector where available; new displays use the global scene.
+    viewer_cfg = load_config()
+    monitor_assignments = viewer_cfg.get("monitor_screensavers", {})
+    available_scenes = list_screensavers()
     windows = []
     global _ephemeral_ctx
     if _ephemeral_ctx is None:
@@ -348,8 +345,18 @@ def _create_viewer_windows(html_path, clock_format="24h", scene_options=None):
         except Exception:
             _ephemeral_ctx = _get_shared_context()
     ctx = _ephemeral_ctx
-    for mon in monitors:
+    for monitor_index, mon in enumerate(monitors):
         try:
+            monitor_key = config_store.monitor_identifier(mon, monitor_index)
+            assigned_scene = config_store.resolve_monitor_scene(
+                monitor_key, monitor_assignments, available_scenes, os.path.basename(html_path)
+            )
+            monitor_html_path = available_scenes.get(assigned_scene, html_path)
+            monitor_scene_options = config_store.get_scene_options(viewer_cfg, os.path.basename(monitor_html_path))
+            uri = Gio.File.new_for_path(monitor_html_path).get_uri()
+            params = {"format": clock_format}
+            params.update(monitor_scene_options)
+            uri = f"{uri}?{urlencode(params)}"
             if _daemon_app is not None:
                 win = Gtk.ApplicationWindow(application=_daemon_app, title="Material Screensaver")
             else:
@@ -520,7 +527,7 @@ if (document.readyState === 'loading') document.addEventListener('DOMContentLoad
         # overrides the widget's Gdk cursor, so Gdk blank alone still shows default
         # arrow over the page until first motion. Inject a blanket cursor:none
         # except for interactive screensavers (solar-system manages its own cursor).
-        is_interactive = "solar-system" in os.path.basename(html_path)
+        is_interactive = "solar-system" in os.path.basename(monitor_html_path)
         if not is_interactive:
             try:
                 ucm = web.get_user_content_manager()

@@ -219,6 +219,10 @@ class ScreensaverWindow(Adw.ApplicationWindow):
             self.combo_row.set_sensitive(False)
         sv_group.add(self.combo_row)
 
+        self.monitor_assignment_group = Adw.PreferencesGroup(title="Per-monitor screensavers")
+        page.add(self.monitor_assignment_group)
+        self.monitor_assignment_rows = {}
+
         note = Adw.ActionRow(
             title="Add more later",
             subtitle=f"Drop .html files into {SCREENSAVER_DIR}",
@@ -437,6 +441,7 @@ class ScreensaverWindow(Adw.ApplicationWindow):
             self.screensaver_files[0] if self.screensaver_files else None
         )
         self._rebuild_screensaver_picker(self.selected_scene)
+        self._build_monitor_assignment_rows(cfg)
         for (scene_name, option_name), row in self.scene_option_rows.items():
             row.set_value(
                 config_store.get_scene_options(cfg, scene_name).get(
@@ -487,6 +492,59 @@ class ScreensaverWindow(Adw.ApplicationWindow):
 
         self._run_systemctl_async(["is-active", SERVICE_NAME], on_active_checked)
         self.refresh_shortcut_label()
+
+    def _build_monitor_assignment_rows(self, cfg):
+        """Create selectors for monitors connected to this session."""
+        display = Gdk.Display.get_default()
+        monitors = []
+        if display is not None:
+            try:
+                model = display.get_monitors()
+                for index in range(model.get_n_items()):
+                    monitor = model.get_item(index)
+                    if monitor is None:
+                        continue
+                    key = config_store.monitor_identifier(monitor, index)
+                    try:
+                        connector = monitor.get_connector()
+                    except Exception:
+                        connector = None
+                    try:
+                        model_name = monitor.get_model()
+                    except Exception:
+                        model_name = None
+                    label = connector or model_name or ("Display " + str(index + 1))
+                    monitors.append((key, str(label)))
+            except Exception as exc:
+                print("Could not enumerate monitors for settings: " + str(exc), file=sys.stderr)
+        if not monitors:
+            self.monitor_assignment_group.add(Adw.ActionRow(
+                title="No connected monitors detected",
+                subtitle="Assignments appear when a display is available",
+            ))
+            return
+        scenes = list(self.screensaver_files)
+        options = ["Use global default"] + [display_name(scene) for scene in scenes]
+        assignments = cfg.get("monitor_screensavers", {})
+        for key, label in monitors:
+            row = Adw.ComboRow(title=label, subtitle=key)
+            row.set_model(Gtk.StringList.new(options))
+            selected = assignments.get(key)
+            row.set_selected(scenes.index(selected) + 1 if selected in scenes else 0)
+            row.connect("notify::selected", self.on_monitor_assignment_changed, key)
+            self.monitor_assignment_group.add(row)
+            self.monitor_assignment_rows[key] = row
+
+    def on_monitor_assignment_changed(self, row, _pspec, monitor_key):
+        index = row.get_selected()
+        cfg = load_config()
+        assignments = dict(cfg.get("monitor_screensavers", {}))
+        if index == 0:
+            assignments.pop(monitor_key, None)
+        elif 0 < index <= len(self.screensaver_files):
+            assignments[monitor_key] = self.screensaver_files[index - 1]
+        if self._save_config(monitor_screensavers=assignments):
+            self.toast_overlay.add_toast(Adw.Toast.new("Monitor assignment saved"))
 
     def _rebuild_screensaver_picker(self, preserve_scene=None):
         cfg = load_config()

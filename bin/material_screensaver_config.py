@@ -33,6 +33,7 @@ DEFAULT_CONFIG = {
     "lock_hook": [],
     "unlock_hook": [],
     "screensaver_options": {},
+    "monitor_screensavers": {},
     "lock_message": "",
 }
 
@@ -74,6 +75,38 @@ def _valid_option_value(value, spec):
     if not math.isfinite(number) or not spec["min"] <= number <= spec["max"]:
         return None
     return round(number, 1)
+
+
+def monitor_identifier(monitor, index=None):
+    """Build a monitor key shared by Settings and the viewer."""
+    if monitor is None:
+        return "display:" + str(index if index is not None else 0)
+    try:
+        connector = monitor.get_connector()
+        if isinstance(connector, str) and connector.strip():
+            return ("connector:" + connector.strip())[:200]
+    except Exception:
+        pass
+    try:
+        model = monitor.get_model()
+    except Exception:
+        model = ""
+    try:
+        geometry = monitor.get_geometry()
+        bounds = "%s,%s,%s,%s" % (geometry.x, geometry.y, geometry.width, geometry.height)
+    except Exception:
+        bounds = str(index if index is not None else 0)
+    if isinstance(model, str) and model.strip():
+        return ("model:" + model.strip() + "|geometry:" + bounds)[:200]
+    return ("display:" + str(index if index is not None else 0) + "|geometry:" + bounds)[:200]
+
+
+def resolve_monitor_scene(monitor_key, assignments, available_scenes, fallback_scene):
+    """Resolve a saved assignment, falling back when it is absent or stale."""
+    if not isinstance(assignments, dict) or not isinstance(available_scenes, dict):
+        return fallback_scene
+    assigned = assignments.get(monitor_key)
+    return assigned if isinstance(assigned, str) and assigned in available_scenes else fallback_scene
 
 
 def normalize_config(data):
@@ -122,6 +155,14 @@ def normalize_config(data):
         )[:160]
     cfg["lock_hook"] = _normalize_hook(data.get("lock_hook", []))
     cfg["unlock_hook"] = _normalize_hook(data.get("unlock_hook", []))
+    monitor_screensavers = data.get("monitor_screensavers", {})
+    if isinstance(monitor_screensavers, dict):
+        cfg["monitor_screensavers"] = {
+            key: scene for key, scene in monitor_screensavers.items()
+            if isinstance(key, str) and 0 < len(key) <= 200
+            and isinstance(scene, str) and scene.endswith(".html")
+            and os.path.basename(scene) == scene and chr(0) not in key
+        }
     options = data.get("screensaver_options", {})
     clean_options = {}
     if isinstance(options, dict):
