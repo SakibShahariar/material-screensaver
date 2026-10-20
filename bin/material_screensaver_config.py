@@ -37,7 +37,7 @@ def _normalize_hook(value):
     if not isinstance(value, list) or not value or len(value) > 32:
         return []
     if any(
-        not isinstance(arg, str) or not arg or "\\0" in arg or len(arg) > 4096
+        not isinstance(arg, str) or not arg or "\0" in arg or len(arg) > 4096
         for arg in value
     ):
         return []

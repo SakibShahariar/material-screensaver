@@ -315,7 +315,7 @@ class TestSessionLockTransitions(CtlTestCase):
         })
         self.assertEqual(cfg["lock_hook"], ["/usr/bin/playerctl", "pause"])
         self.assertEqual(cfg["unlock_hook"], [])
-        for bad in (["playerctl", 3], ["", "pause"], ["playerctl", "pause\\0x"], ["playerctl"] * 33):
+        for bad in (["playerctl", 3], ["", "pause"], ["playerctl", "pause\0x"], ["playerctl"] * 33):
             self.assertEqual(self.ctl.normalize_config({"lock_hook": bad})["lock_hook"], [])
 
     def test_hooks_run_once_per_lock_state_transition(self):
