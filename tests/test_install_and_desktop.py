@@ -3,6 +3,7 @@ import json
 import os
 import re
 import subprocess
+import tempfile
 import unittest
 
 import support
@@ -151,6 +152,45 @@ class TestShellExtension(unittest.TestCase):
         self.assertIn('if [[ "$status" -ne 0 && -d "$SCREENSAVERS_DIR" ]]', sh)
         self.assertIn('systemctl --user start material-screensaver.service', sh)
         self.assertNotIn('rm -rf ~/.local/share/material-screensaver/screensavers', sh)
+
+    def test_installer_cleanup_restores_previous_screensavers_after_failed_replacement(self):
+        sh = self._read_sh()
+        match = re.search(r"(?ms)^cleanup_screensaver_stage\\(\\) \\{\\n.*?^\\}", sh)
+        self.assertIsNotNone(match, "installer cleanup trap function missing")
+
+        with tempfile.TemporaryDirectory() as root:
+            data_dir = os.path.join(root, "data")
+            screensavers_dir = os.path.join(data_dir, "screensavers")
+            tmp_dir = os.path.join(data_dir, ".screensavers.new.test")
+            backup_dir = os.path.join(data_dir, ".screensavers.backup.test")
+            os.makedirs(os.path.join(backup_dir, "previous"))
+            os.makedirs(tmp_dir)
+            with open(os.path.join(backup_dir, "previous", "known-good.html"), "w", encoding="utf-8") as f:
+                f.write("previous installation")
+            with open(os.path.join(tmp_dir, "replacement.html"), "w", encoding="utf-8") as f:
+                f.write("staged replacement")
+            log_path = os.path.join(root, "systemctl.log")
+            script = "\\n".join([
+                "systemctl() { printf '%s\\n' \\"$*\\" >> \\"$SYSTEMCTL_LOG\\"; }",
+                match.group(0),
+                f'DATA_DIR="{data_dir}"',
+                f'SCREENSAVERS_DIR="{screensavers_dir}"',
+                f'TMP_DIR="{tmp_dir}"',
+                f'BACKUP_DIR="{backup_dir}"',
+                "false",
+                "cleanup_screensaver_stage",
+            ])
+            env = dict(os.environ, SYSTEMCTL_LOG=log_path)
+            subprocess.run(["bash", "-c", script], env=env, capture_output=True, text=True)
+
+            restored = os.path.join(screensavers_dir, "known-good.html")
+            self.assertTrue(os.path.isfile(restored), "previous installation was not restored")
+            with open(restored, encoding="utf-8") as f:
+                self.assertEqual(f.read(), "previous installation")
+            self.assertFalse(os.path.exists(tmp_dir), "staged replacement should be cleaned up")
+            self.assertFalse(os.path.exists(backup_dir), "temporary backup container should be cleaned up")
+            with open(log_path, encoding="utf-8") as f:
+                self.assertIn("--user start material-screensaver.service", f.read())
 
     def test_uninstall_script_removes_only_project_files(self):
         path = os.path.join(support.REPO_ROOT, "uninstall.sh")
