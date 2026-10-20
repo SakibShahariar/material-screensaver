@@ -26,11 +26,13 @@ import random
 import subprocess
 import atexit
 import signal
+import tempfile
 from urllib.parse import urlencode
 
 SCREENSAVER_DIR = os.path.expanduser("~/.local/share/material-screensaver/screensavers")
 CONFIG_PATH = os.path.expanduser("~/.config/material-screensaver/config.json")
-DEFAULT_CONFIG = {"active": None, "idle_seconds": 300, "clock_format": "24h", "random": False, "lock_after_seconds": 300}
+DEFAULT_MATUGEN_COLORS_PATH = os.path.expanduser("~/.config/matugen/matugen-colors.css")
+DEFAULT_CONFIG = {"active": None, "idle_seconds": 300, "clock_format": "24h", "random": False, "lock_after_seconds": 300, "matugen_colors_path": DEFAULT_MATUGEN_COLORS_PATH}
 
 # D-Bus service for daemon delegation (PID file gone)
 SERVICE_NAME = "io.github.sakib.MaterialScreensaver"
@@ -89,6 +91,11 @@ def normalize_config(data):
         cfg["lock_after_seconds"] = lock
     if data.get("clock_format") in ("12h", "24h"):
         cfg["clock_format"] = data["clock_format"]
+    colors_path = data.get("matugen_colors_path", DEFAULT_MATUGEN_COLORS_PATH)
+    if isinstance(colors_path, str) and colors_path.strip():
+        colors_path = os.path.expanduser(colors_path.strip())
+        if os.path.isabs(colors_path):
+            cfg["matugen_colors_path"] = os.path.normpath(colors_path)
     return cfg
 
 def load_config():
@@ -105,7 +112,42 @@ def list_screensavers():
     paths = sorted(glob.glob(os.path.join(SCREENSAVER_DIR, "*.html")))
     return {os.path.basename(p): p for p in paths}
 
+def sync_matugen_colors_link(cfg=None):
+    """Update the scene-local stylesheet symlink to the configured Matugen file."""
+    cfg = cfg if isinstance(cfg, dict) else load_config()
+    target = cfg.get("matugen_colors_path", DEFAULT_MATUGEN_COLORS_PATH)
+    if not isinstance(target, str) or not os.path.isabs(target):
+        target = DEFAULT_MATUGEN_COLORS_PATH
+    link = os.path.join(SCREENSAVER_DIR, "matugen-colors.css")
+    if not os.path.isdir(SCREENSAVER_DIR):
+        return False
+    tmp = None
+    try:
+        if os.path.islink(link) and os.readlink(link) == target:
+            return True
+        # Do not overwrite a regular file a user deliberately placed here.
+        if os.path.lexists(link) and not os.path.islink(link):
+            print(f"Not replacing non-symlink Matugen stylesheet: {link}", file=sys.stderr)
+            return False
+        fd, tmp = tempfile.mkstemp(prefix=".matugen-colors-", dir=SCREENSAVER_DIR)
+        os.close(fd)
+        os.unlink(tmp)
+        os.symlink(target, tmp)
+        os.replace(tmp, link)
+        tmp = None
+        return True
+    except OSError as exc:
+        print(f"Could not update Matugen stylesheet link: {exc}", file=sys.stderr)
+        return False
+    finally:
+        if tmp is not None:
+            try:
+                os.unlink(tmp)
+            except OSError:
+                pass
+
 def get_active_html_path(cfg):
+    sync_matugen_colors_link(cfg)
     screensavers = list_screensavers()
     if not screensavers:
         print(f"No screensaver .html files found in {SCREENSAVER_DIR}", file=sys.stderr)
