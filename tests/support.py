@@ -57,7 +57,7 @@ def html_files():
 
 def shared_helpers():
     base = screensavers_dir()
-    return [os.path.join(base, n) for n in ("clock-shared.js", "theme-shared.js")]
+    return [os.path.join(base, "clock-shared.js")]
 
 
 def extract_scripts(text):
