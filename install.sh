@@ -60,7 +60,8 @@ import sys
 
 try:
     with open(sys.argv[1], encoding="utf-8") as handle:
-        value = json.load(handle).get("matugen_colors_path", "")
+        config = json.load(handle)
+    value = config.get("matugen_colors_path", "") if isinstance(config, dict) else ""
     if isinstance(value, str) and value.strip():
         value = os.path.expanduser(value.strip())
         if os.path.isabs(value):
