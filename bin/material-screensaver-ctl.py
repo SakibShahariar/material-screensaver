@@ -1857,6 +1857,9 @@ def run_daemon():
                 _idle_watch_ids[kind] = None
 
         def add_idle_watch():
+            # Idle and active watches are mutually exclusive: otherwise a stale
+            # active watch can fire after unlock and race the newly armed idle watch.
+            remove_watch("active")
             remove_watch("idle")
             if _session_locked:
                 _dbg("idle watch not armed while session is locked")
