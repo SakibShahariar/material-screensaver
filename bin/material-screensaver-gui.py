@@ -486,7 +486,7 @@ class ScreensaverWindow(Adw.ApplicationWindow):
             fn = self._preview_override
         elif cfg.get("random", False):
             # Random mode previews a random style each refresh.
-            fn = random.choice(self.screensaver_files) if self.screensaver_files else None
+            fn = self.screensaver_files[random.randrange(len(self.screensaver_files))] if self.screensaver_files else None
         else:
             fn = self.selected_scene
         if fn in self.screensaver_files:
