@@ -139,7 +139,7 @@ class TestNormalizeConfig(CtlTestCase):
 
     def test_favorites_roundtrip_through_config_file(self):
         self.ctl.CONFIG_PATH = self.cfg_path
-        self.ctl.save_config(favorites=["blob.html", "sakura.html"])
+        self.ctl.config_store.save_config(self.cfg_path, favorites=["blob.html", "sakura.html"])
         self.assertEqual(self.ctl.load_config()["favorites"], ["blob.html", "sakura.html"])
 
     def test_matugen_path_requires_absolute_nonempty_string(self):

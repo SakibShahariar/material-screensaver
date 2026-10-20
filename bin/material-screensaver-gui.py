@@ -137,6 +137,7 @@ def filter_screensavers(filenames, query="", category="All categories",
                         favorites=(), favorites_only=False):
     """Filter scene filenames without changing selection or persisted config."""
     query = (query or "").strip().casefold()
+    favorites = favorites if isinstance(favorites, (list, tuple, set)) else ()
     favorite_names = {
         name for name in favorites if isinstance(name, str)
     }
