@@ -87,6 +87,17 @@ material-screensaver-ctl.py daemon   # run the idle watcher (normally started by
 
 The viewer is dismissed with **Super+Q**. The configured keyboard shortcut can toggle it, and `stop` can also hide it from the command line. If the daemon is running, control commands delegate to it; otherwise, they start a standalone viewer.
 
+### Integration with other suite components
+
+Use the installed control script or its user-session D-Bus service when a component wants to **show or dismiss the animated screensaver**:
+
+- `material-screensaver-ctl.py toggle` — toggle the viewer.
+- `material-screensaver-ctl.py start` / `stop` — show / dismiss the viewer.
+
+A **Lock** action must use GNOME's normal session-lock mechanism, not launch a second lock-screen UI. For example, `material-system-actions` uses `loginctl lock-session`; panels and control-center integrations should use the same standard lock entry point. The configured **Lock after** timer also tries the session's `org.gnome.ScreenSaver.Lock` method first, then `loginctl lock-session`, with `xdg-screensaver lock` as a fallback. When GNOME reports that the session is locked, Material Screensaver dismisses its viewer so it does not remain over the lock screen after unlock.
+
+These are intentionally separate operations: showing the animated screensaver is not a security lock, and a lock request should be handled by GNOME.
+
 ## Uninstall
 
 To stop and remove the user service, scripts, scenes, icons, desktop entry, and
