@@ -155,7 +155,7 @@ class TestShellExtension(unittest.TestCase):
 
     def test_installer_cleanup_restores_previous_screensavers_after_failed_replacement(self):
         sh = self._read_sh()
-        match = re.search(r"(?ms)^cleanup_screensaver_stage\\(\\) \\{\\n.*?^\\}", sh)
+        match = re.search(r"(?ms)^cleanup_screensaver_stage\(\) \{\n.*?^\}", sh)
         self.assertIsNotNone(match, "installer cleanup trap function missing")
 
         with tempfile.TemporaryDirectory() as root:
@@ -170,8 +170,8 @@ class TestShellExtension(unittest.TestCase):
             with open(os.path.join(tmp_dir, "replacement.html"), "w", encoding="utf-8") as f:
                 f.write("staged replacement")
             log_path = os.path.join(root, "systemctl.log")
-            script = "\\n".join([
-                "systemctl() { printf '%s\\n' \\"$*\\" >> \\"$SYSTEMCTL_LOG\\"; }",
+            script = "\n".join([
+                'systemctl() { printf "%s\n" "$*" >> "$SYSTEMCTL_LOG"; }',
                 match.group(0),
                 f'DATA_DIR="{data_dir}"',
                 f'SCREENSAVERS_DIR="{screensavers_dir}"',
