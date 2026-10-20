@@ -258,12 +258,17 @@ class TestGuiLogic(unittest.TestCase):
     def test_lock_message_setting_is_optional_and_safe(self):
         with open(os.path.join(support.REPO_ROOT, "bin", "material-screensaver-gui.py"),
                   encoding="utf-8") as f:
-            src = f.read()
-        self.assertIn('title="Lock message"', src)
-        self.assertIn("self.on_lock_message_apply", src)
-        self.assertIn("self.on_lock_message_clear", src)
-        self.assertIn("self._save_config(lock_message=message)", src)
-        self.assertIn("node.textContent = " + '" + json.dumps(message) + "', src)
+            gui_src = f.read()
+        with open(os.path.join(support.REPO_ROOT, "bin", "material-screensaver-ctl.py"),
+                  encoding="utf-8") as f:
+            ctl_src = f.read()
+        self.assertIn('title="Lock message"', gui_src)
+        self.assertIn("self.on_lock_message_apply", gui_src)
+        self.assertIn("self.on_lock_message_clear", gui_src)
+        self.assertIn("self._save_config(lock_message=message)", gui_src)
+        self.assertIn("node.textContent", ctl_src)
+        self.assertIn("json.dumps(message)", ctl_src)
+        self.assertIn("WebKit.UserScript.new(", ctl_src)
 
     def test_matugen_path_setting_is_present_and_applied(self):
         with open(os.path.join(support.REPO_ROOT, "bin", "material-screensaver-gui.py"),
