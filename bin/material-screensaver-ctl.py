@@ -719,6 +719,11 @@ def _lock_screen():
     print("Unable to lock the session: all lock commands failed; keeping screensaver visible.", file=sys.stderr)
     return False
 
+def _idle_watch_needs_refresh(current_idle_seconds, last_idle_seconds, watch_id):
+    """Refresh when the timeout changes or registration is missing."""
+    return current_idle_seconds != last_idle_seconds or watch_id is None
+
+
 def _handle_viewer_exit(returncode):
     """Fail closed if the viewer crashes while a lock timeout is configured."""
     if returncode == 0:
@@ -1888,7 +1893,7 @@ def run_daemon():
         def check_idle_config():
             try:
                 current = current_idle_seconds()
-                if current != last_idle_seconds[0] and not is_viewer_active():
+                if _idle_watch_needs_refresh(current, last_idle_seconds[0], _idle_watch_ids.get("idle")) and not is_viewer_active():
                     if add_idle_watch():
                         last_idle_seconds[0] = current
             except Exception as exc:
