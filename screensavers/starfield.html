@@ -101,7 +101,12 @@ const STAR_COUNT = 900;
 const DUST_COUNT = 120;
 const MAX_Z = 1400;
 const reduceMotion = matchMedia("(prefers-reduced-motion: reduce)").matches;
-const speedMul = reduceMotion ? 0.3 : 1;
+const speedParam = new URLSearchParams(window.location.search).get("speed");
+const requestedSpeed = speedParam === null ? 1 : Number(speedParam);
+const sceneSpeed = Number.isFinite(requestedSpeed)
+  ? Math.min(2, Math.max(0.5, requestedSpeed))
+  : 1;
+const speedMul = (reduceMotion ? 0.3 : 1) * sceneSpeed;
 
 function readRGB(name, fb) {
   const r = getComputedStyle(document.documentElement).getPropertyValue(name).trim();

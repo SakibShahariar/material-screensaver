@@ -197,6 +197,15 @@ class TestGuiLogic(unittest.TestCase):
         ))
         self.assertEqual(os.readlink(link), second)
 
+    def test_scene_customization_is_persisted_and_sent_to_preview(self):
+        with open(os.path.join(support.REPO_ROOT, "bin", "material-screensaver-gui.py"),
+                  encoding="utf-8") as f:
+            src = f.read()
+        self.assertIn("config_store.SCENE_OPTION_SCHEMA.items()", src)
+        self.assertIn("self.on_scene_option_changed(scene, option, changed_row.get_value())", src)
+        self.assertIn("config_store.get_scene_options(cfg, fn)", src)
+        self.assertIn("screensaver_options=all_options", src)
+
     def test_filter_screensavers_search_category_and_favorites(self):
         files = ["blob.html", "starfield.html", "sakura.html", "voronoi.html"]
         self.assertEqual(self.gui.filter_screensavers(files, query="STAR"), ["starfield.html"])

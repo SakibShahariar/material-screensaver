@@ -130,6 +130,39 @@ class TestNormalizeConfig(CtlTestCase):
             self.assertEqual(self.ctl.normalize_config({"clock_format": bad})["clock_format"], "24h",
                              f"accepted clock_format={bad!r}")
 
+    def test_per_scene_options_default_validate_and_persist(self):
+        self.assertEqual(
+            self.ctl.config_store.get_scene_options({}, "starfield.html"),
+            {"speed": 1.0},
+        )
+        normalized = self.ctl.normalize_config({
+            "screensaver_options": {
+                "starfield.html": {"speed": 1.7},
+                "blob.html": {"speed": 1.8},
+                "../starfield.html": {"speed": 1.5},
+            }
+        })
+        self.assertEqual(
+            normalized["screensaver_options"], {"starfield.html": {"speed": 1.7}}
+        )
+        for bad in (True, "fast", 0.1, 5.0, float("nan")):
+            cfg = self.ctl.normalize_config({
+                "screensaver_options": {"starfield.html": {"speed": bad}}
+            })
+            self.assertEqual(cfg["screensaver_options"], {})
+            self.assertEqual(
+                self.ctl.config_store.get_scene_options(cfg, "starfield.html"),
+                {"speed": 1.0},
+            )
+        self.ctl.config_store.save_config(
+            self.cfg_path,
+            screensaver_options={"starfield.html": {"speed": 1.6}},
+        )
+        self.assertEqual(
+            self.ctl.load_config()["screensaver_options"],
+            {"starfield.html": {"speed": 1.6}},
+        )
+
     def test_favorites_accept_unique_safe_html_filenames_only(self):
         self.assertEqual(self.ctl.normalize_config({})["favorites"], [])
         cfg = self.ctl.normalize_config({

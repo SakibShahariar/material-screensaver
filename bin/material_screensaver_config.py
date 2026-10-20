@@ -1,11 +1,23 @@
 """Shared configuration and screensaver discovery for GUI and viewer."""
 import glob
 import json
+import math
 import os
 import sys
 import tempfile
 
 DEFAULT_MATUGEN_COLORS_PATH = os.path.expanduser("~/.config/matugen/matugen-colors.css")
+SCENE_OPTION_SCHEMA = {
+    "starfield.html": {
+        "speed": {
+            "label": "Animation speed",
+            "min": 0.5,
+            "max": 2.0,
+            "step": 0.1,
+            "default": 1.0,
+        }
+    }
+}
 DEFAULT_CONFIG = {
     "active": None,
     "idle_seconds": 300,
@@ -16,6 +28,7 @@ DEFAULT_CONFIG = {
     "favorites": [],
     "lock_hook": [],
     "unlock_hook": [],
+    "screensaver_options": {},
 }
 
 
@@ -77,6 +90,24 @@ def normalize_config(data):
         ))
     cfg["lock_hook"] = _normalize_hook(data.get("lock_hook", []))
     cfg["unlock_hook"] = _normalize_hook(data.get("unlock_hook", []))
+    options = data.get("screensaver_options", {})
+    clean_options = {}
+    if isinstance(options, dict):
+        for scene, schema in SCENE_OPTION_SCHEMA.items():
+            raw_scene = options.get(scene)
+            if not isinstance(raw_scene, dict):
+                continue
+            clean_scene = {}
+            for key, spec in schema.items():
+                value = raw_scene.get(key)
+                if isinstance(value, bool) or not isinstance(value, (int, float)):
+                    continue
+                if not math.isfinite(float(value)) or not spec["min"] <= value <= spec["max"]:
+                    continue
+                clean_scene[key] = round(float(value), 1)
+            if clean_scene:
+                clean_options[scene] = clean_scene
+    cfg["screensaver_options"] = clean_options
     return cfg
 
 
@@ -125,6 +156,27 @@ def save_config(config_path, **updates):
 def list_screensavers(screensaver_dir):
     """Return sorted full paths for HTML screensavers in the given directory."""
     return sorted(glob.glob(os.path.join(screensaver_dir, "*.html")))
+
+
+def get_scene_options(config, scene):
+    """Return validated option values for a scene, using schema defaults safely."""
+    schema = SCENE_OPTION_SCHEMA.get(scene, {})
+    all_options = config.get("screensaver_options", {}) if isinstance(config, dict) else {}
+    raw = all_options.get(scene, {}) if isinstance(all_options, dict) else {}
+    if not isinstance(raw, dict):
+        raw = {}
+    result = {}
+    for key, spec in schema.items():
+        value = raw.get(key, spec["default"])
+        if (
+            isinstance(value, bool)
+            or not isinstance(value, (int, float))
+            or not math.isfinite(float(value))
+            or not spec["min"] <= value <= spec["max"]
+        ):
+            value = spec["default"]
+        result[key] = round(float(value), 1)
+    return result
 
 
 def sync_matugen_colors_link(screensaver_dir, cfg):

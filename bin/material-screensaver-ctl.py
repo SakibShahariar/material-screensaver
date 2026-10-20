@@ -277,7 +277,7 @@ def _kill_orphan_webkit():
 
     return len(to_reap)
 
-def _create_viewer_windows(html_path, clock_format="24h"):
+def _create_viewer_windows(html_path, clock_format="24h", scene_options=None):
     """Create one fullscreen Gtk.Window per monitor with WebKit WebView."""
     import gi
     gi.require_version("Gtk", "4.0")
@@ -322,7 +322,10 @@ def _create_viewer_windows(html_path, clock_format="24h"):
     # Build a real file URI so user-added names containing spaces, #, ?, or
     # non-ASCII characters are not misinterpreted as URL syntax.
     uri = Gio.File.new_for_path(html_path).get_uri()
-    uri = f"{uri}?{urlencode({'format': clock_format})}"
+    params = {"format": clock_format}
+    if isinstance(scene_options, dict):
+        params.update(scene_options)
+    uri = f"{uri}?{urlencode(params)}"
     windows = []
     global _ephemeral_ctx
     if _ephemeral_ctx is None:
@@ -1232,7 +1235,7 @@ def _daemon_switch_to_idle_watch():
     except Exception:
         pass
 
-def run_viewer(html_path, clock_format="24h"):
+def run_viewer(html_path, clock_format="24h", scene_options=None):
     """Viewer subprocess entry point — isolated WebKit, daemon stays 30M flat."""
     global _is_viewer_mode, _viewer_loop, _viewer_windows
     if not has_graphical_session():
@@ -1245,7 +1248,11 @@ def run_viewer(html_path, clock_format="24h"):
         gi.require_version("Gtk", "4.0")
         gi.require_version("WebKit", "6.0")
         from gi.repository import Gtk, GLib
-        _viewer_windows = _create_viewer_windows(html_path, clock_format)
+        scene_name = os.path.basename(html_path)
+        scene_options = config_store.get_scene_options(
+            {"screensaver_options": {scene_name: scene_options or {}}}, scene_name
+        )
+        _viewer_windows = _create_viewer_windows(html_path, clock_format, scene_options)
         loop = GLib.MainLoop()
         _viewer_loop = loop
         def _viewer_sig(*_a):
@@ -1344,6 +1351,7 @@ def show_viewer():
         _is_showing = False
         return False
     clock_format = cfg.get("clock_format", "24h")
+    scene_options = config_store.get_scene_options(cfg, os.path.basename(html_path))
     # If viewer subprocess already alive, treat as active
     if _viewer_process is not None:
         try:
@@ -1362,13 +1370,13 @@ def show_viewer():
         # Spawn isolated viewer — daemon stays 30M, WebKit ~400M lives in child and is reaped on Hide
         try:
             _viewer_process = subprocess.Popen(
-                [sys.executable, os.path.abspath(__file__), "viewer", html_path, clock_format],
+                [sys.executable, os.path.abspath(__file__), "viewer", html_path, clock_format, json.dumps(scene_options)],
                 stdout=subprocess.DEVNULL, stderr=None,
                 start_new_session=True)
         except Exception as e:
             print(f"Failed to spawn viewer subprocess: {e}", file=sys.stderr)
             # fallback to in-process (old path) if spawn fails
-            _viewer_windows = _create_viewer_windows(html_path, clock_format)
+            _viewer_windows = _create_viewer_windows(html_path, clock_format, scene_options)
             _viewer_process = None
         _daemon_switch_to_active_watch()
         _schedule_lock()
@@ -1836,7 +1844,10 @@ def start():
         _is_showing = True
         _inhibit()
         _inhibit_overview()
-        _viewer_windows = _create_viewer_windows(html_path, clock_format)
+        _viewer_windows = _create_viewer_windows(
+            html_path, clock_format,
+            config_store.get_scene_options(cfg, os.path.basename(html_path)),
+        )
         _schedule_lock()
         # For standalone, run main loop until windows closed
         loop = GLib.MainLoop()
@@ -2216,10 +2227,16 @@ if __name__ == "__main__":
         # isolated viewer subprocess: viewer <html_path> [clock_format]
         hp = sys.argv[2] if len(sys.argv) > 2 else None
         cf = sys.argv[3] if len(sys.argv) > 3 else "24h"
+        try:
+            scene_options = json.loads(sys.argv[4]) if len(sys.argv) > 4 else {}
+        except (json.JSONDecodeError, TypeError, ValueError):
+            scene_options = {}
+        if not isinstance(scene_options, dict):
+            scene_options = {}
         if hp is None:
             print("viewer requires html_path", file=sys.stderr)
             sys.exit(1)
-        if run_viewer(hp, cf) is False:
+        if run_viewer(hp, cf, scene_options) is False:
             sys.exit(1)
     else:
         sys.exit(__doc__)

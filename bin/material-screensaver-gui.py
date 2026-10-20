@@ -226,6 +226,21 @@ class ScreensaverWindow(Adw.ApplicationWindow):
         note.add_css_class("dim-label")
         sv_group.add(note)
 
+        # --- Per-scene customization ---
+        self.customization_group = Adw.PreferencesGroup(title="Customize selected scene")
+        page.add(self.customization_group)
+        self.scene_option_rows = {}
+        self.scene_option_specs = {}
+        for scene_name, option_specs in config_store.SCENE_OPTION_SCHEMA.items():
+            for option_name, spec in option_specs.items():
+                row = Adw.SpinRow.new_with_range(spec["min"], spec["max"], spec["step"])
+                row.set_digits(1 if spec["step"] < 1 else 0)
+                row.set_title(spec["label"])
+                row.set_subtitle(f"Default: {spec['default']}")
+                self.customization_group.add(row)
+                self.scene_option_rows[(scene_name, option_name)] = row
+                self.scene_option_specs[(scene_name, option_name)] = spec
+
         # --- Live Preview (WebKit thumbnail) ---
         if HAS_WEBKIT and self.screensaver_files:
             preview_group_live = Adw.PreferencesGroup(title="Live Preview")
@@ -359,6 +374,12 @@ class ScreensaverWindow(Adw.ApplicationWindow):
         self.category_row.connect("notify::selected", self.on_picker_filter_changed)
         self.favorites_only_switch.connect("notify::active", self.on_picker_filter_changed)
         self.favorite_button.connect("clicked", self.on_toggle_favorite)
+        for (scene_name, option_name), row in self.scene_option_rows.items():
+            row.connect(
+                "notify::value",
+                lambda changed_row, _pspec, scene=scene_name, option=option_name:
+                    self.on_scene_option_changed(scene, option, changed_row.get_value()),
+            )
         self.autostart_switch.connect("notify::active", self.on_autostart_toggled)
 
     def load_state(self):
@@ -371,6 +392,13 @@ class ScreensaverWindow(Adw.ApplicationWindow):
             self.screensaver_files[0] if self.screensaver_files else None
         )
         self._rebuild_screensaver_picker(self.selected_scene)
+        for (scene_name, option_name), row in self.scene_option_rows.items():
+            row.set_value(
+                config_store.get_scene_options(cfg, scene_name).get(
+                    option_name, self.scene_option_specs[(scene_name, option_name)]["default"]
+                )
+            )
+        self._update_customization_controls()
 
         self.idle_row.set_value(cfg.get("idle_seconds", 300))
         self.lock_row.set_value(cfg.get("lock_after_seconds", 300))
@@ -438,6 +466,24 @@ class ScreensaverWindow(Adw.ApplicationWindow):
             self._picker_updating = False
         self._refresh_favorite_button()
 
+    def _update_customization_controls(self):
+        self.customization_group.set_visible(
+            self.selected_scene in config_store.SCENE_OPTION_SCHEMA
+        )
+        for (scene_name, _option_name), row in self.scene_option_rows.items():
+            row.set_visible(scene_name == self.selected_scene)
+
+    def on_scene_option_changed(self, scene_name, option_name, value):
+        if self._picker_updating or scene_name != self.selected_scene:
+            return
+        cfg = load_config()
+        all_options = dict(cfg.get("screensaver_options", {}))
+        scene_options = dict(all_options.get(scene_name, {}))
+        scene_options[option_name] = value
+        all_options[scene_name] = scene_options
+        if self._save_config(screensaver_options=all_options):
+            self._update_preview()
+
     def on_picker_filter_changed(self, *_args):
         self._rebuild_screensaver_picker(self.selected_scene)
 
@@ -492,8 +538,10 @@ class ScreensaverWindow(Adw.ApplicationWindow):
         if fn in self.screensaver_files:
             path = os.path.join(SCREENSAVER_DIR, fn)
             fmt = cfg.get("clock_format", "24h")
+            params = {"format": fmt}
+            params.update(config_store.get_scene_options(cfg, fn))
             uri = Gio.File.new_for_path(path).get_uri()
-            uri = f"{uri}?{urlencode({'format': fmt})}"
+            uri = f"{uri}?{urlencode(params)}"
             try:
                 self.preview_web.load_uri(uri)
             except Exception:
@@ -607,6 +655,7 @@ class ScreensaverWindow(Adw.ApplicationWindow):
             updates["random"] = False
         self._save_config(**updates)
         self._refresh_favorite_button()
+        self._update_customization_controls()
         self._update_preview()
 
     def on_idle_changed(self, row, _pspec):

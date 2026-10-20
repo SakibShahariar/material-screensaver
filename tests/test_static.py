@@ -119,6 +119,12 @@ class TestThemeConsistency(unittest.TestCase):
         self.assertIn("sync_matugen_colors_link(cfg)", gui)
         self.assertIn("sync_matugen_colors_link(cfg)", ctl)
 
+    def test_starfield_speed_query_parameter_is_bounded(self):
+        text = _read(os.path.join(support.REPO_ROOT, "screensavers", "starfield.html"))
+        self.assertIn('new URLSearchParams(window.location.search).get("speed")', text)
+        self.assertIn("Math.min(2, Math.max(0.5, requestedSpeed))", text)
+        self.assertIn("320 * speedMul", text)
+
     def test_missing_matugen_file_has_inline_palette_fallback(self):
         # Each scene ships default CSS variables, so an absent or broken
         # matugen-colors.css symlink does not leave the page unthemed.
