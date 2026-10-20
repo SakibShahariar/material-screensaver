@@ -1847,8 +1847,10 @@ def run_daemon():
             try:
                 result = _idle_proxy.call_sync("AddIdleWatch", GLib.Variant("(t)", (current_idle_seconds() * 1000,)), Gio.DBusCallFlags.NONE, -1, None)
                 _idle_watch_ids["idle"] = result.unpack()[0]
+                return True
             except Exception as e:
                 print(f"AddIdleWatch failed: {e}", file=sys.stderr)
+                return False
 
         def add_active_watch():
             remove_watch("active")
@@ -1887,8 +1889,8 @@ def run_daemon():
             try:
                 current = current_idle_seconds()
                 if current != last_idle_seconds[0] and not is_viewer_active():
-                    add_idle_watch()
-                    last_idle_seconds[0] = current
+                    if add_idle_watch():
+                        last_idle_seconds[0] = current
             except Exception as exc:
                 print(f"Failed to refresh idle timeout: {exc}", file=sys.stderr)
             return GLib.SOURCE_CONTINUE
