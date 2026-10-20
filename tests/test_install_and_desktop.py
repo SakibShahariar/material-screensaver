@@ -72,6 +72,8 @@ class TestShellExtension(unittest.TestCase):
             meta = json.load(f)
         self.assertEqual(meta["uuid"], EXT_UUID)
         self.assertIsInstance(meta["shell-version"], list)
+        self.assertIn("51", meta["shell-version"],
+                        "gesture guard must declare compatibility with GNOME Shell 51")
         self.assertGreaterEqual(meta["shell-version"][0], "45",
                                 "Eval is disabled on GNOME 45+, guard must use extension API")
 
