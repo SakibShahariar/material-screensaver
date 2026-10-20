@@ -229,7 +229,7 @@ class TestGuiLogic(unittest.TestCase):
                   encoding="utf-8") as f:
             src = f.read()
         start = src.index("    def _rebuild_screensaver_picker(self, preserve_scene=None):")
-        end = src.index("    def on_picker_filter_changed(", start)
+        end = src.index("    def _update_customization_controls(", start)
         self.assertNotIn("_save_config", src[start:end])
         self.assertIn("self.selected_scene = self.filtered_screensaver_files[idx]", src)
 
