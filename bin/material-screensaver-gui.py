@@ -227,13 +227,18 @@ class ScreensaverWindow(Adw.ApplicationWindow):
         # --- Timing ---
         timing_group = Adw.PreferencesGroup(title="Timing")
         page.add(timing_group)
-        self.idle_row = Adw.SpinRow.new_with_range(1, 120, 1)
+        # Config stores seconds (idle: 1 second–24 hours; lock: 0–24 hours).
+        # Use seconds in the UI so valid hand-edited values are not rounded or
+        # clamped when the Settings window is opened and saved again.
+        self.idle_row = Adw.SpinRow.new_with_range(1, 86400, 1)
+        self.idle_row.set_digits(0)
         self.idle_row.set_title("Idle timeout")
-        self.idle_row.set_subtitle("Minutes before auto-launch")
+        self.idle_row.set_subtitle("Seconds before auto-launch (1–86,400)")
         timing_group.add(self.idle_row)
-        self.lock_row = Adw.SpinRow.new_with_range(0, 60, 1)
+        self.lock_row = Adw.SpinRow.new_with_range(0, 86400, 1)
+        self.lock_row.set_digits(0)
         self.lock_row.set_title("Lock after")
-        self.lock_row.set_subtitle("Minutes on screensaver before lock (0 = never)")
+        self.lock_row.set_subtitle("Seconds on screensaver before lock (0 = never; max 86,400)")
         timing_group.add(self.lock_row)
 
         # --- Clock format ---
@@ -296,8 +301,8 @@ class ScreensaverWindow(Adw.ApplicationWindow):
             idx = self.screensaver_files.index(active) if active in self.screensaver_files else 0
             self.combo_row.set_selected(idx)
 
-        self.idle_row.set_value(cfg.get("idle_seconds", 300) / 60)
-        self.lock_row.set_value(cfg.get("lock_after_seconds", 300) / 60)
+        self.idle_row.set_value(cfg.get("idle_seconds", 300))
+        self.lock_row.set_value(cfg.get("lock_after_seconds", 300))
 
         self.ampm_switch.set_active(cfg.get("clock_format", "24h") == "12h")
 
@@ -412,10 +417,10 @@ class ScreensaverWindow(Adw.ApplicationWindow):
         self._update_preview()
 
     def on_idle_changed(self, row, _pspec):
-        self._save_config(idle_seconds=int(row.get_value() * 60))
+        self._save_config(idle_seconds=int(row.get_value()))
 
     def on_lock_changed(self, row, _pspec):
-        self._save_config(lock_after_seconds=int(row.get_value() * 60))
+        self._save_config(lock_after_seconds=int(row.get_value()))
 
     def on_ampm_toggled(self, switch, _pspec):
         self._save_config(clock_format="12h" if switch.get_active() else "24h")
