@@ -16,11 +16,16 @@ jobs:
         run: |
           sudo apt-get update -qq
           sudo apt-get install -y -qq shellcheck desktop-file-utils
+          python3 -m pip install --user ruff
 
       - name: Bash syntax + shellcheck
         run: |
           bash -n install.sh uninstall.sh
           shellcheck -x install.sh uninstall.sh
+
+      - name: Python lint (Ruff)
+        run: |
+          "$HOME/.local/bin/ruff" check --select E9,F63,F7,F82 bin/*.py tests/*.py
 
       - name: Desktop file validation
         run: |
