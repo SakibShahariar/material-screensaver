@@ -175,6 +175,12 @@ class TestJsSyntax(unittest.TestCase):
             except OSError:
                 pass
 
+    def test_viewer_disables_universal_file_url_access(self):
+        source = _read(os.path.join(support.REPO_ROOT, "bin", "material-screensaver-ctl.py"))
+        self.assertIn("set_allow_universal_access_from_file_urls(False)", source)
+        self.assertNotIn("set_allow_universal_access_from_file_urls(True)", source)
+        self.assertIn("set_allow_file_access_from_file_urls(True)", source)
+
     def test_shared_clock_uses_runtime_locale_for_date(self):
         text = _read(os.path.join(support.REPO_ROOT, "screensavers", "clock-shared.js"))
         self.assertIn("new Intl.DateTimeFormat(undefined", text)

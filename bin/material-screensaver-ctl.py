@@ -364,12 +364,11 @@ def _create_viewer_windows(html_path, clock_format="24h"):
             web = WebKit.WebView()
         settings = web.get_settings()
         try:
-            # Every screensaver loads matugen-colors.css (and ASCII-art helpers)
-            # via plain <link>/<script> relative hrefs, so file:// same-origin and
-            # cross-origin reads must stay enabled. Pages are our own trusted HTML
-            # with no network dependency; this grant is required, not accidental.
+            # Scenes need sibling file:// resources (shared helpers and the
+            # Matugen stylesheet symlink), but must not receive universal access
+            # from file URLs to arbitrary origins.
             settings.set_allow_file_access_from_file_urls(True)
-            settings.set_allow_universal_access_from_file_urls(True)
+            settings.set_allow_universal_access_from_file_urls(False)
             settings.set_enable_write_console_messages_to_stdout(False)
             settings.set_enable_javascript(True)
             # Prevent WebKit throttling when window is not focused (ghost 0.1% vs 87% fix)
