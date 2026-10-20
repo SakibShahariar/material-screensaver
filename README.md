@@ -12,6 +12,18 @@ Solar System, Starfield, N-Body Galaxies, Cymatics, Kaleidoscope, Magnetic Field
 
 The scenes use a Matugen-generated stylesheet so their colors follow your wallpaper-derived Material You palette. The default stylesheet path is `~/.config/matugen/matugen-colors.css`; change it in Settings under **Matugen → Colors stylesheet**. The path is saved in `~/.config/material-screensaver/config.json` and retained when reinstalling. If Matugen is not configured or the file is absent, scenes retain their built-in fallback colors.
 
+Optional lock/unlock hooks can be configured in `~/.config/material-screensaver/config.json`. They are **off by default** and use argument arrays, not shell command strings:
+
+```json
+{
+  "lock_hook": ["/usr/bin/playerctl", "pause"],
+  "unlock_hook": []
+}
+```
+
+Merge these keys into the existing JSON file rather than replacing the rest of your settings. Each hook is started asynchronously on a lock-state transition; no shell expansion is performed, repeated lock signals do not run the hook twice, and launch/non-zero-exit failures are written to the user service journal without blocking lock or unlock. Use only commands you trust.
+
+
 Shared helpers are available for new styles:
 - `screensavers/clock-shared.js` — clock utilities.
 

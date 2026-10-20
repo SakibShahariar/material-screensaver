@@ -305,6 +305,45 @@ class TestSessionLockTransitions(CtlTestCase):
             ctl.hide_viewer = old_hide
             ctl._daemon_switch_to_idle_watch = old_switch
 
+    def test_hooks_are_off_by_default_and_accept_argv_arrays_only(self):
+        cfg = self.ctl.normalize_config({})
+        self.assertEqual(cfg["lock_hook"], [])
+        self.assertEqual(cfg["unlock_hook"], [])
+        cfg = self.ctl.normalize_config({
+            "lock_hook": ["/usr/bin/playerctl", "pause"],
+            "unlock_hook": "playerctl play",
+        })
+        self.assertEqual(cfg["lock_hook"], ["/usr/bin/playerctl", "pause"])
+        self.assertEqual(cfg["unlock_hook"], [])
+        for bad in (["playerctl", 3], ["", "pause"], ["playerctl", "pause\\0x"], ["playerctl"] * 33):
+            self.assertEqual(self.ctl.normalize_config({"lock_hook": bad})["lock_hook"], [])
+
+    def test_hooks_run_once_per_lock_state_transition(self):
+        ctl = self.ctl
+        old_locked = ctl._session_locked
+        old_run_hook = ctl._run_user_hook
+        old_switch = ctl._daemon_switch_to_idle_watch
+        old_is_active = ctl.is_viewer_active
+        old_showing = ctl._is_showing
+        events = []
+        try:
+            ctl._session_locked = False
+            ctl._run_user_hook = lambda event: events.append(event)
+            ctl._daemon_switch_to_idle_watch = lambda: None
+            ctl.is_viewer_active = lambda: False
+            ctl._is_showing = False
+            ctl._on_screen_saver_active_changed(True)
+            ctl._on_screen_saver_active_changed(True)
+            ctl._on_screen_saver_active_changed(False)
+            ctl._on_screen_saver_active_changed(False)
+            self.assertEqual(events, ["lock", "unlock"])
+        finally:
+            ctl._session_locked = old_locked
+            ctl._run_user_hook = old_run_hook
+            ctl._daemon_switch_to_idle_watch = old_switch
+            ctl.is_viewer_active = old_is_active
+            ctl._is_showing = old_showing
+
     def test_unlock_rearms_idle_watch(self):
         ctl = self.ctl
         old_locked = ctl._session_locked

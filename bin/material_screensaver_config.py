@@ -14,6 +14,8 @@ DEFAULT_CONFIG = {
     "lock_after_seconds": 300,
     "matugen_colors_path": DEFAULT_MATUGEN_COLORS_PATH,
     "favorites": [],
+    "lock_hook": [],
+    "unlock_hook": [],
 }
 
 
@@ -28,6 +30,20 @@ def _valid_int(value, minimum, maximum):
     except (TypeError, ValueError, OverflowError):
         return None
     return value if minimum <= value <= maximum else None
+
+
+def _normalize_hook(value):
+    """Accept an argv list only; never interpret hook settings through a shell."""
+    if not isinstance(value, list) or not value or len(value) > 32:
+        return []
+    if any(
+        not isinstance(arg, str) or not arg or "\\0" in arg or len(arg) > 4096
+        for arg in value
+    ):
+        return []
+    if not value[0].strip():
+        return []
+    return list(value)
 
 
 def normalize_config(data):
@@ -59,6 +75,8 @@ def normalize_config(data):
             name for name in favorites
             if isinstance(name, str) and name.endswith(".html") and os.path.basename(name) == name
         ))
+    cfg["lock_hook"] = _normalize_hook(data.get("lock_hook", []))
+    cfg["unlock_hook"] = _normalize_hook(data.get("unlock_hook", []))
     return cfg
 
 

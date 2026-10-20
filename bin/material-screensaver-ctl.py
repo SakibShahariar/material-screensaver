@@ -50,6 +50,7 @@ _idle_watch_ids = {"idle": None, "active": None}
 _lock_timeout_id = None  # GLib source id for lock after screensaver
 _session_locked = False  # suppress idle-triggered shows during a GNOME lock
 _login1_session_proxy = None  # retain logind session proxy for lock notifications
+_user_hook_processes = {}  # retain asynchronous Gio.Subprocess objects until exit
 _saved_overlay_key = None  # saved org.gnome.mutter overlay-key while Super+Q is exclusive
 _saved_shell_toggle = None  # saved shell toggle-overview
 _is_showing = False  # guard double-Show TOCTOU
@@ -800,10 +801,42 @@ def _handle_viewer_exit(returncode):
     _lock_screen_async(on_locked)
 
 
+def _run_user_hook(event):
+    """Run a configured lock/unlock argv asynchronously; never block the session."""
+    if event not in ("lock", "unlock"):
+        return
+    command = load_config().get(f"{event}_hook", [])
+    if not command:
+        return
+    process = None
+    try:
+        from gi.repository import Gio
+        process = Gio.Subprocess.new(command, Gio.SubprocessFlags.NONE)
+        process_key = id(process)
+        _user_hook_processes[process_key] = process
+
+        def completed(proc, result):
+            try:
+                proc.wait_check_finish(result)
+            except Exception as exc:
+                print(f"Configured {event} hook failed: {exc}", file=sys.stderr)
+            finally:
+                _user_hook_processes.pop(process_key, None)
+
+        process.wait_check_async(None, completed)
+    except Exception as exc:
+        if process is not None:
+            _user_hook_processes.pop(id(process), None)
+        print(f"Could not start configured {event} hook: {exc}", file=sys.stderr)
+
+
 def _on_screen_saver_active_changed(active):
     """Track GNOME lock state and keep idle callbacks from reopening the viewer."""
     global _session_locked
+    was_locked = _session_locked
     _session_locked = bool(active)
+    if was_locked != _session_locked:
+        _run_user_hook("lock" if _session_locked else "unlock")
     if _session_locked:
         _dbg("session lock detected; hiding viewer and suspending idle watch")
         if is_viewer_active() or _is_showing:
@@ -820,7 +853,7 @@ def _on_screen_saver_active_changed(active):
 
 def _monitor_login1_session_lock():
     """Use logind LockedHint as a fallback to GNOME's optional ScreenSaver signal."""
-    global _login1_session_proxy
+    global _login1_session_proxy, _session_locked
     try:
         from gi.repository import Gio, GLib
         bus = Gio.bus_get_sync(Gio.BusType.SYSTEM, None)
@@ -859,7 +892,14 @@ def _monitor_login1_session_lock():
         proxy.connect("g-properties-changed", on_properties_changed)
         locked = proxy.get_cached_property("LockedHint")
         if locked is not None:
-            _on_screen_saver_active_changed(locked.get_boolean())
+            # This is an initial snapshot, not a transition; do not run hooks
+            # merely because the daemon started while the session was locked.
+            _session_locked = locked.get_boolean()
+            if not _session_locked:
+                try:
+                    _daemon_switch_to_idle_watch()
+                except Exception as exc:
+                    print(f"Failed to arm idle watch from initial logind state: {exc}", file=sys.stderr)
         _dbg("subscribed to systemd-logind LockedHint")
         return True
     except Exception as exc:
