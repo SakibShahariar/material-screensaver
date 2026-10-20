@@ -43,7 +43,7 @@ jobs:
       - name: Systemd unit validation
         run: |
           mkdir -p "$HOME/.local/bin"
-          ln -sf "$PWD/bin/material-screensaver-ctl.py" "$HOME/.local/bin/material-screensaver-ctl.py"
+          install -D -m 755 bin/material-screensaver-ctl.py "$HOME/.local/bin/material-screensaver-ctl.py"
           systemd-analyze --user verify systemd/material-screensaver.service
 
   tests:
