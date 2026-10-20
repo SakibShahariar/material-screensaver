@@ -132,19 +132,19 @@ class TestAbnormalViewerExit(unittest.TestCase):
 
     def test_abnormal_exit_locks_when_timeout_enabled(self):
         self.ctl.load_config = lambda: {"lock_after_seconds": 300}
-        self.ctl._lock_screen = self._lock
+        self.ctl._lock_screen_async = self._lock_async
         self.ctl._handle_viewer_exit(1)
         self.assertEqual(self.lock_calls, 1)
 
     def test_signal_exit_locks_when_timeout_enabled(self):
         self.ctl.load_config = lambda: {"lock_after_seconds": 300}
-        self.ctl._lock_screen = self._lock
+        self.ctl._lock_screen_async = self._lock_async
         self.ctl._handle_viewer_exit(-9)
         self.assertEqual(self.lock_calls, 1)
 
     def test_abnormal_exit_does_not_lock_when_disabled(self):
         self.ctl.load_config = lambda: {"lock_after_seconds": 0}
-        self.ctl._lock_screen = self._lock
+        self.ctl._lock_screen_async = self._lock_async
         self.ctl._handle_viewer_exit(1)
         self.assertEqual(self.lock_calls, 0)
 
