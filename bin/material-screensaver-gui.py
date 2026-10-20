@@ -517,8 +517,12 @@ class ScreensaverWindow(Adw.ApplicationWindow):
 
 
 class ScreensaverApp(Adw.Application):
-    def __init__(self):
-        super().__init__(application_id="io.github.sakib.MaterialScreensaverSettings")
+    def __init__(self, non_unique=False):
+        flags = Gio.ApplicationFlags.NON_UNIQUE if non_unique else Gio.ApplicationFlags.FLAGS_NONE
+        super().__init__(
+            application_id="io.github.sakib.MaterialScreensaverSettings",
+            flags=flags,
+        )
 
     def do_activate(self):
         win = self.props.active_window or ScreensaverWindow(self)
@@ -558,7 +562,10 @@ def main(argv=None):
             print("Live preview requires WebKitGTK 6.0", file=sys.stderr)
             return 2
         REQUESTED_PREVIEW = args.preview
-    return ScreensaverApp().run([])
+    # A preview deep-link must open a fresh window even if Settings is already
+    # running; otherwise the existing app instance would ignore this process's
+    # requested scene. Ordinary Settings launches keep single-instance behavior.
+    return ScreensaverApp(non_unique=bool(args.preview)).run([])
 
 
 if __name__ == "__main__":
