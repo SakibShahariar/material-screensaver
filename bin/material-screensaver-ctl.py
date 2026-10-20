@@ -21,6 +21,7 @@ viewer.
 import os
 import sys
 import json
+import glob
 import material_screensaver_config as config_store
 import random
 import subprocess
