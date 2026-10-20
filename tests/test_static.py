@@ -80,6 +80,33 @@ class TestThemeConsistency(unittest.TestCase):
     """The screensaver's whole point is live matugen theming — verity every
     style can actually resolve the palette it claims to use."""
 
+    def test_preview_and_viewer_share_restricted_local_file_policy(self):
+        gui = _read(os.path.join(support.REPO_ROOT, "bin", "material-screensaver-gui.py"))
+        ctl = _read(os.path.join(support.REPO_ROOT, "bin", "material-screensaver-ctl.py"))
+        for flag in ("set_allow_file_access_from_file_urls", "set_allow_universal_access_from_file_urls"):
+            with self.subTest(flag=flag):
+                self.assertIn(f"{flag}(False)", gui)
+                self.assertIn(f"{flag}(False)", ctl)
+                self.assertNotIn(f"{flag}(True)", gui)
+                self.assertNotIn(f"{flag}(True)", ctl)
+        self.assertIn("sync_matugen_colors_link(cfg)", gui)
+        self.assertIn("sync_matugen_colors_link(cfg)", ctl)
+
+    def test_missing_matugen_file_has_inline_palette_fallback(self):
+        # Each scene ships default CSS variables, so an absent or broken
+        # matugen-colors.css symlink does not leave the page unthemed.
+        for path in support.html_files():
+            text = _read(path)
+            name = os.path.basename(path)
+            root = re.search(r":root\\s*\\{([^}]*)\\}", text, re.I | re.S)
+            with self.subTest(file=name):
+                self.assertIsNotNone(root, f"{name}: no inline :root palette fallback")
+                self.assertRegex(
+                    root.group(1),
+                    r"--[\\w-]+\\s*:\\s*(?:#[0-9a-f]{3,8}\\b|rgb|rgba|[0-9])",
+                    f"{name}: no concrete inline CSS variable fallback",
+                )
+
     def test_clock_shared_referenced(self):
         # Every style renders a clock; each must at least reference the helper
         # (loaded dynamically at runtime, so check the string reference).
