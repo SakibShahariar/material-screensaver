@@ -145,7 +145,7 @@ class TestNormalizeConfig(CtlTestCase):
         self.assertEqual(
             normalized["screensaver_options"], {"starfield.html": {"speed": 1.7}}
         )
-        for bad in (True, "fast", 0.1, 5.0, float("nan")):
+        for bad in (True, "fast", 0.1, 5.0, float("nan"), 10 ** 400):
             cfg = self.ctl.normalize_config({
                 "screensaver_options": {"starfield.html": {"speed": bad}}
             })

@@ -59,6 +59,18 @@ def _normalize_hook(value):
     return list(value)
 
 
+def _valid_option_value(value, spec):
+    if isinstance(value, bool) or not isinstance(value, (int, float)):
+        return None
+    try:
+        number = float(value)
+    except (OverflowError, TypeError, ValueError):
+        return None
+    if not math.isfinite(number) or not spec["min"] <= number <= spec["max"]:
+        return None
+    return round(number, 1)
+
+
 def normalize_config(data):
     """Return a safe, complete configuration from untrusted JSON data."""
     cfg = dict(DEFAULT_CONFIG)
@@ -99,12 +111,9 @@ def normalize_config(data):
                 continue
             clean_scene = {}
             for key, spec in schema.items():
-                value = raw_scene.get(key)
-                if isinstance(value, bool) or not isinstance(value, (int, float)):
-                    continue
-                if not math.isfinite(float(value)) or not spec["min"] <= value <= spec["max"]:
-                    continue
-                clean_scene[key] = round(float(value), 1)
+                value = _valid_option_value(raw_scene.get(key), spec)
+                if value is not None:
+                    clean_scene[key] = value
             if clean_scene:
                 clean_options[scene] = clean_scene
     cfg["screensaver_options"] = clean_options
@@ -167,15 +176,8 @@ def get_scene_options(config, scene):
         raw = {}
     result = {}
     for key, spec in schema.items():
-        value = raw.get(key, spec["default"])
-        if (
-            isinstance(value, bool)
-            or not isinstance(value, (int, float))
-            or not math.isfinite(float(value))
-            or not spec["min"] <= value <= spec["max"]
-        ):
-            value = spec["default"]
-        result[key] = round(float(value), 1)
+        value = _valid_option_value(raw.get(key, spec["default"]), spec)
+        result[key] = spec["default"] if value is None else value
     return result
 
 
