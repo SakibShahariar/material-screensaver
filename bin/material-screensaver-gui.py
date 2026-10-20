@@ -46,7 +46,8 @@ def get_keybinding_settings(create=False):
         child.set_string("command", f"{CTL_SCRIPT} toggle")
     return child
 
-DEFAULT_CONFIG = {"active": None, "idle_seconds": 300, "clock_format": "24h", "random": False, "lock_after_seconds": 300}
+DEFAULT_MATUGEN_COLORS_PATH = os.path.expanduser("~/.config/matugen/matugen-colors.css")
+DEFAULT_CONFIG = {"active": None, "idle_seconds": 300, "clock_format": "24h", "random": False, "lock_after_seconds": 300, "matugen_colors_path": DEFAULT_MATUGEN_COLORS_PATH}
 
 
 def _valid_int(value, minimum, maximum):
@@ -80,6 +81,11 @@ def normalize_config(data):
         cfg["lock_after_seconds"] = lock
     if data.get("clock_format") in ("12h", "24h"):
         cfg["clock_format"] = data["clock_format"]
+    colors_path = data.get("matugen_colors_path", DEFAULT_MATUGEN_COLORS_PATH)
+    if isinstance(colors_path, str) and colors_path.strip():
+        colors_path = os.path.expanduser(colors_path.strip())
+        if os.path.isabs(colors_path):
+            cfg["matugen_colors_path"] = os.path.normpath(colors_path)
     return cfg
 
 
@@ -121,6 +127,41 @@ def save_config(**updates):
         except OSError:
             pass
         raise
+
+
+def sync_matugen_colors_link(cfg=None):
+    """Update the scene-local stylesheet symlink to the configured Matugen file."""
+    cfg = cfg if isinstance(cfg, dict) else load_config()
+    target = cfg.get("matugen_colors_path", DEFAULT_MATUGEN_COLORS_PATH)
+    if not isinstance(target, str) or not os.path.isabs(target):
+        target = DEFAULT_MATUGEN_COLORS_PATH
+    link = os.path.join(SCREENSAVER_DIR, "matugen-colors.css")
+    if not os.path.isdir(SCREENSAVER_DIR):
+        return False
+    tmp = None
+    try:
+        if os.path.islink(link) and os.readlink(link) == target:
+            return True
+        # Do not overwrite a regular file a user deliberately placed here.
+        if os.path.lexists(link) and not os.path.islink(link):
+            print(f"Not replacing non-symlink Matugen stylesheet: {link}", file=sys.stderr)
+            return False
+        fd, tmp = tempfile.mkstemp(prefix=".matugen-colors-", dir=SCREENSAVER_DIR)
+        os.close(fd)
+        os.unlink(tmp)
+        os.symlink(target, tmp)
+        os.replace(tmp, link)
+        tmp = None
+        return True
+    except OSError as exc:
+        print(f"Could not update Matugen stylesheet link: {exc}", file=sys.stderr)
+        return False
+    finally:
+        if tmp is not None:
+            try:
+                os.unlink(tmp)
+            except OSError:
+                pass
 
 
 def display_name(filename):
@@ -263,6 +304,22 @@ class ScreensaverWindow(Adw.ApplicationWindow):
         ampm_row.set_activatable_widget(self.ampm_switch)
         clock_group.add(ampm_row)
 
+        # --- Matugen palette ---
+        matugen_group = Adw.PreferencesGroup(title="Matugen")
+        page.add(matugen_group)
+        matugen_row = Adw.ActionRow(
+            title="Colors stylesheet",
+            subtitle="Absolute path to Matugen's generated CSS file",
+        )
+        self.matugen_path_entry = Gtk.Entry(hexpand=True)
+        self.matugen_path_entry.set_width_chars(24)
+        self.matugen_path_entry.set_placeholder_text(DEFAULT_MATUGEN_COLORS_PATH)
+        matugen_row.add_suffix(self.matugen_path_entry)
+        self.matugen_path_apply = Gtk.Button(label="Apply", valign=Gtk.Align.CENTER)
+        self.matugen_path_apply.connect("clicked", self.on_matugen_path_apply)
+        matugen_row.add_suffix(self.matugen_path_apply)
+        matugen_group.add(matugen_row)
+
         # --- Automatic ---
         auto_group = Adw.PreferencesGroup(title="Automatic")
         page.add(auto_group)
@@ -320,6 +377,7 @@ class ScreensaverWindow(Adw.ApplicationWindow):
         self.lock_row.set_value(cfg.get("lock_after_seconds", 300))
 
         self.ampm_switch.set_active(cfg.get("clock_format", "24h") == "12h")
+        self.matugen_path_entry.set_text(cfg.get("matugen_colors_path", DEFAULT_MATUGEN_COLORS_PATH))
 
         # Query systemd asynchronously so opening Settings never blocks GTK.
         self.autostart_switch.set_sensitive(False)
@@ -374,6 +432,7 @@ class ScreensaverWindow(Adw.ApplicationWindow):
         except Exception:
             pass
         cfg = load_config()
+        sync_matugen_colors_link(cfg)
         if cfg.get("random", False):
             # Random mode previews a random style each refresh.
             idx = random.randrange(len(self.screensaver_files)) if self.screensaver_files else -1
@@ -393,11 +452,28 @@ class ScreensaverWindow(Adw.ApplicationWindow):
     def _save_config(self, **updates):
         try:
             save_config(**updates)
+            return True
         except Exception as exc:
             print(f"Failed to save Material Screensaver settings: {exc}", file=sys.stderr)
             self.toast_overlay.add_toast(
                 Adw.Toast.new(f"Settings could not be saved: {exc}")
             )
+            return False
+
+    def on_matugen_path_apply(self, _button):
+        path = os.path.expanduser(self.matugen_path_entry.get_text().strip())
+        if not path:
+            path = DEFAULT_MATUGEN_COLORS_PATH
+        if not os.path.isabs(path):
+            self.toast_overlay.add_toast(Adw.Toast.new("Enter an absolute file path"))
+            return
+        path = os.path.normpath(path)
+        if not self._save_config(matugen_colors_path=path):
+            return
+        cfg = load_config()
+        sync_matugen_colors_link(cfg)
+        self._update_preview()
+        self.toast_overlay.add_toast(Adw.Toast.new("Matugen colors path saved"))
 
     def refresh_shortcut_label(self):
         try:
