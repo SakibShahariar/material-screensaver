@@ -52,6 +52,14 @@ class TestScriptsAndUnits(unittest.TestCase):
         self.assertIn("self._save_config(idle_seconds=int(row.get_value()))", gui)
         self.assertIn("self._save_config(lock_after_seconds=int(row.get_value()))", gui)
 
+    def test_daemon_suppresses_idle_activation_while_locked(self):
+        ctl = self._read("bin/material-screensaver-ctl.py")
+        self.assertIn("_session_locked = False", ctl)
+        self.assertIn("if _session_locked:\n                _dbg(\"idle watch not armed while session is locked\")", ctl)
+        self.assertIn("ignored idle WatchFired while session is locked", ctl)
+        self.assertIn("session unlocked; re-arming idle watch", ctl)
+        self.assertIn("Unable to monitor GNOME session lock state", ctl)
+
     def test_systemd_unit_launches_daemon(self):
         text = self._read("systemd/material-screensaver.service")
         self.assertIn("ExecStart=%h/.local/bin/material-screensaver-ctl.py daemon", text)
