@@ -70,4 +70,6 @@ jobs:
 
       - name: Run test suite (static, theme, JS syntax, config edge cases)
         run: |
-          python3 -m unittest discover -s tests -v
+          # Use Ubuntu's system Python so apt-installed PyGObject is importable;
+          # otherwise GUI logic tests silently skip under setup-python.
+          /usr/bin/python3 -m unittest discover -s tests -v
