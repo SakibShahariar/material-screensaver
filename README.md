@@ -10,7 +10,7 @@ Since GNOME no longer provides a native animated-screensaver framework, Material
 
 Solar System, Starfield, N-Body Galaxies, Cymatics, Kaleidoscope, Magnetic Field Lines, Strange Attractor Flow, Soft-Body Creatures, Blob, Flow, Bounce, Game of Life, Wave-Function Collapse, Circuit Board, Glitch, Constellation, Voronoi, Origami, Paper Cranes, Sakura, Lanterns, Rain, Bubbles, City, Autumn Leaves, Fireworks, Typewriter, Quantum Interference (GLSL/WebGL), Organic Harmonic Field (GLSL/WebGL), Metaphysical Horizon, and Rain on a Window — **31 styles**.
 
-The scenes use a Matugen-generated stylesheet so their colors follow your wallpaper-derived Material You palette. The default stylesheet path is `~/.config/matugen/matugen-colors.css`; if Matugen is not configured or the file is absent, scenes retain their built-in fallback colors.
+The scenes use a Matugen-generated stylesheet so their colors follow your wallpaper-derived Material You palette. The default stylesheet path is `~/.config/matugen/matugen-colors.css`; change it in Settings under **Matugen → Colors stylesheet**. The path is saved in `~/.config/material-screensaver/config.json` and retained when reinstalling. If Matugen is not configured or the file is absent, scenes retain their built-in fallback colors.
 
 Shared helpers are available for new styles:
 - `screensavers/clock-shared.js` — clock utilities.
@@ -69,6 +69,7 @@ The settings app lets you:
 - set the idle timeout (default: 5 minutes);
 - set **Lock after**, the time the screensaver remains visible before locking the GNOME session (default: 5 minutes; set to 0 to disable);
 - choose a 12-hour or 24-hour clock;
+- configure the absolute path to Matugen's generated CSS stylesheet;
 - set a keyboard shortcut to show or hide the viewer;
 - enable or disable automatic idle-triggered launching.
 
