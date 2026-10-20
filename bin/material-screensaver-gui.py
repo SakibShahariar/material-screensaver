@@ -320,11 +320,23 @@ class ScreensaverWindow(Adw.ApplicationWindow):
 
         self.ampm_switch.set_active(cfg.get("clock_format", "24h") == "12h")
 
-        result = subprocess.run(
-            ["systemctl", "--user", "is-enabled", SERVICE_NAME],
-            capture_output=True, text=True,
-        )
-        self.autostart_switch.set_active(result.stdout.strip() == "enabled")
+        # Query systemd asynchronously so opening Settings never blocks GTK.
+        self.autostart_switch.set_sensitive(False)
+
+        def on_enabled_checked(success, stdout, stderr):
+            enabled = stdout.strip() == "enabled"
+            self._autostart_enabled = enabled
+            self._autostart_updating = True
+            self.autostart_switch.set_active(enabled)
+            self._autostart_updating = False
+            self.autostart_switch.set_sensitive(True)
+            if not success and stdout.strip() not in ("disabled", "static", "masked", "not-found"):
+                detail = stderr.strip() or "systemctl --user is-enabled failed"
+                self.toast_overlay.add_toast(Adw.Toast.new(detail))
+
+        self._autostart_enabled = False
+        self._autostart_updating = False
+        self._run_systemctl_async(["is-enabled", SERVICE_NAME], on_enabled_checked)
 
         self.refresh_shortcut_label()
 
@@ -458,9 +470,45 @@ class ScreensaverWindow(Adw.ApplicationWindow):
         self._save_config(clock_format="12h" if switch.get_active() else "24h")
         self._update_preview()
 
+    def _run_systemctl_async(self, args, on_finished):
+        """Run a user-systemd command off the GTK main loop."""
+        try:
+            flags = Gio.SubprocessFlags.STDOUT_PIPE | Gio.SubprocessFlags.STDERR_PIPE
+            proc = Gio.Subprocess.new(["systemctl", "--user", *args], flags)
+        except Exception as exc:
+            on_finished(False, "", str(exc))
+            return
+
+        def completed(process, result):
+            try:
+                stdout, stderr = process.communicate_utf8_finish(result)
+                on_finished(process.get_successful(), stdout or "", stderr or "")
+            except Exception as exc:
+                on_finished(False, "", str(exc))
+
+        proc.communicate_utf8_async(None, None, completed)
+
     def on_autostart_toggled(self, switch, _pspec):
-        action = "enable" if switch.get_active() else "disable"
-        subprocess.run(["systemctl", "--user", action, "--now", SERVICE_NAME])
+        if getattr(self, "_autostart_updating", False):
+            return
+        desired = switch.get_active()
+        previous = getattr(self, "_autostart_enabled", not desired)
+        action = "enable" if desired else "disable"
+        switch.set_sensitive(False)
+
+        def on_finished(success, _stdout, stderr):
+            switch.set_sensitive(True)
+            if success:
+                self._autostart_enabled = desired
+                return
+            # Keep the UI honest when systemd rejects the change.
+            self._autostart_updating = True
+            switch.set_active(previous)
+            self._autostart_updating = False
+            detail = stderr.strip() or f"systemctl --user {action} failed"
+            self.toast_overlay.add_toast(Adw.Toast.new(detail))
+
+        self._run_systemctl_async([action, "--now", SERVICE_NAME], on_finished)
 
 
 class ScreensaverApp(Adw.Application):
