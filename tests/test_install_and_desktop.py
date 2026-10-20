@@ -98,6 +98,13 @@ class TestShellExtension(unittest.TestCase):
         self.assertIn("win.get_title() === VIEWER_TITLE", js)
         self.assertIn("win.is_fullscreen()", js)
 
+    def test_install_stages_and_can_restore_previous_screensavers(self):
+        sh = self._read_sh()
+        self.assertIn('mktemp -d "$DATA_DIR/.screensavers.new.XXXXXX"', sh)
+        self.assertIn('mv -- "$SCREENSAVERS_DIR" "$BACKUP_DIR"', sh)
+        self.assertIn('mv -- "$BACKUP_DIR" "$SCREENSAVERS_DIR"', sh)
+        self.assertNotIn('rm -rf ~/.local/share/material-screensaver/screensavers', sh)
+
     def test_install_sh_copies_and_enables_extension(self):
         text = subprocess.run(["bash", "-n", os.path.join(support.REPO_ROOT, "install.sh")],
                               capture_output=True, text=True)

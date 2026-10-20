@@ -6,7 +6,7 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 echo "Installing Material Screensaver..."
 
 mkdir -p ~/.local/bin \
-         ~/.local/share/material-screensaver/screensavers \
+         ~/.local/share/material-screensaver \
          ~/.local/share/icons/hicolor/48x48/apps \
          ~/.local/share/icons/hicolor/scalable/apps \
          ~/.config/systemd/user \
@@ -18,21 +18,48 @@ systemctl --user stop material-screensaver.service 2>/dev/null || true
 cp "$SCRIPT_DIR"/bin/*.py ~/.local/bin/
 chmod +x ~/.local/bin/material-screensaver-ctl.py ~/.local/bin/material-screensaver-gui.py
 
-# atomic screensaver install: avoid empty-dir window (rm→mv race)
-TMP_DIR="$(mktemp -d)"
+# Stage on the same filesystem as the destination so the final rename is atomic.
+DATA_DIR="$HOME/.local/share/material-screensaver"
+SCREENSAVERS_DIR="$DATA_DIR/screensavers"
+TMP_DIR="$(mktemp -d "$DATA_DIR/.screensavers.new.XXXXXX")"
+BACKUP_DIR="$DATA_DIR/.screensavers.backup.$"
+
+cleanup_screensaver_stage() {
+  local status=$?
+  if [[ -n "${TMP_DIR:-}" && -d "$TMP_DIR" ]]; then
+    rm -rf -- "$TMP_DIR"
+  fi
+  # If interrupted between moving the old directory aside and installing the
+  # staged replacement, restore the last known-good version.
+  if [[ -n "${BACKUP_DIR:-}" && -d "$BACKUP_DIR" && ! -e "$SCREENSAVERS_DIR" ]]; then
+    mv -- "$BACKUP_DIR" "$SCREENSAVERS_DIR" || \
+      echo "WARNING: failed to restore previous screensavers from $BACKUP_DIR" >&2
+  fi
+  return "$status"
+}
+trap cleanup_screensaver_stage EXIT
+
 cp -a "$SCRIPT_DIR"/screensavers/. "$TMP_DIR"/
-# Pages use this local name.  Keep it linked to the installing user's
-# Matugen output so palette updates apply without embedding a username or
-# requiring another screensaver install.  A missing target is harmless: the
-# pages retain their built-in fallback colours until Matugen creates it.
+# Pages use this local name. Keep it linked to the installing user's Matugen
+# output; a missing target is harmless because pages have built-in fallbacks.
 ln -sfn "$HOME/.config/matugen/matugen-colors.css" "$TMP_DIR/matugen-colors.css"
 # only chmod regular files (ignore any future subdirs)
 find "$TMP_DIR" -type f -exec chmod 644 {} + 2>/dev/null || true
-mkdir -p ~/.local/share/material-screensaver
-rm -rf ~/.local/share/material-screensaver/screensavers.tmp
-mv "$TMP_DIR" ~/.local/share/material-screensaver/screensavers.tmp
-rm -rf ~/.local/share/material-screensaver/screensavers
-mv ~/.local/share/material-screensaver/screensavers.tmp ~/.local/share/material-screensaver/screensavers
+
+if [[ -e "$SCREENSAVERS_DIR" ]]; then
+  mv -- "$SCREENSAVERS_DIR" "$BACKUP_DIR"
+fi
+if ! mv -- "$TMP_DIR" "$SCREENSAVERS_DIR"; then
+  echo "Failed to install screensavers; attempting to restore the previous version." >&2
+  if [[ -d "$BACKUP_DIR" ]]; then
+    mv -- "$BACKUP_DIR" "$SCREENSAVERS_DIR" || true
+  fi
+  exit 1
+fi
+TMP_DIR=""
+if [[ -d "$BACKUP_DIR" ]]; then
+  rm -rf -- "$BACKUP_DIR"
+fi
 
 # Proper hicolor icon placement (plus legacy fallback location)
 cp "$SCRIPT_DIR"/icons/material-screensaver-icon.png \
