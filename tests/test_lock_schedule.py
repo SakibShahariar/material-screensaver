@@ -77,6 +77,16 @@ class TestScheduleLock(unittest.TestCase):
         self.assertLess(self.calls.index("lock"), self.calls.index("hide"),
                         "must lock before hiding the viewer")
 
+    def test_failed_lock_keeps_viewer_visible(self):
+        def failed_lock():
+            self.calls.append("lock")
+            return False
+        self.ctl._lock_screen = failed_lock
+        self.ctl._schedule_lock()
+        self.run_for(2500)
+        self.assertIn("lock", self.calls, "lock command was not attempted")
+        self.assertNotIn("hide", self.calls, "viewer must remain visible when locking fails")
+
     def test_zero_disables_lock(self):
         self.cfg["lock_after_seconds"] = 0
         self.ctl._schedule_lock()
