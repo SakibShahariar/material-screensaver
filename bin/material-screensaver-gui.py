@@ -267,10 +267,11 @@ class ScreensaverWindow(Adw.ApplicationWindow):
         auto_group = Adw.PreferencesGroup(title="Automatic")
         page.add(auto_group)
         self.autostart_switch = Gtk.Switch(valign=Gtk.Align.CENTER)
-        autostart_row = Adw.ActionRow(
+        self.autostart_row = Adw.ActionRow(
             title="Run automatically",
-            subtitle="Launch when idle (systemd service)",
+            subtitle="Launch when idle (checking service state…)",
         )
+        autostart_row = self.autostart_row
         autostart_row.add_suffix(self.autostart_switch)
         autostart_row.set_activatable_widget(self.autostart_switch)
         auto_group.add(autostart_row)
@@ -338,6 +339,17 @@ class ScreensaverWindow(Adw.ApplicationWindow):
         self._autostart_updating = False
         self._run_systemctl_async(["is-enabled", SERVICE_NAME], on_enabled_checked)
 
+        def on_active_checked(success, stdout, _stderr):
+            state = stdout.strip() if success else "unknown"
+            if state == "active":
+                subtitle = "Launch when idle (service running)"
+            elif state in ("inactive", "failed", "deactivating"):
+                subtitle = f"Launch when idle (service {state})"
+            else:
+                subtitle = "Launch when idle (service state unavailable)"
+            self.autostart_row.set_subtitle(subtitle)
+
+        self._run_systemctl_async(["is-active", SERVICE_NAME], on_active_checked)
         self.refresh_shortcut_label()
 
     def on_preview_activity_changed(self, _win, _pspec):
@@ -500,6 +512,10 @@ class ScreensaverWindow(Adw.ApplicationWindow):
             switch.set_sensitive(True)
             if success:
                 self._autostart_enabled = desired
+                self.autostart_row.set_subtitle(
+                    "Launch when idle (service running)" if desired
+                    else "Launch when idle (service inactive)"
+                )
                 return
             # Keep the UI honest when systemd rejects the change.
             self._autostart_updating = True
