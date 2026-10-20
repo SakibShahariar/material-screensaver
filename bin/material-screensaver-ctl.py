@@ -1226,65 +1226,54 @@ def show_viewer():
             _viewer_process = None
         _daemon_switch_to_active_watch()
         _schedule_lock()
-        # Reap child when it exits on its own (Super+Q): uninhibit/restore even without Hide
+        # GLib owns the child wait so the daemon does not poll every 500 ms.
         try:
             from gi.repository import GLib
-            def _watch_child():
-                global _is_showing, _viewer_process
-                try:
-                    if _viewer_process is not None:
-                        poll = _viewer_process.poll()
-                        if poll is not None:
-                            # A clean exit is user dismissal; a crash/signal must
-                            # trigger the configured lock policy before cleanup.
-                            _handle_viewer_exit(poll)
-                            _is_showing = False
-                            _viewer_process = None
-                            try:
-                                _uninhibit()
-                            except Exception:
-                                pass
-                            try:
-                                _restore_overview()
-                            except Exception:
-                                pass
-                            try:
-                                _cancel_lock()
-                            except Exception:
-                                pass
-                            try:
-                                _daemon_switch_to_idle_watch()
-                            except Exception:
-                                pass
-                            return False
-                        return True
-                    # Fallback / in-process case: no subprocess. If flag is stale
-                    # (no visible viewer) clear it so next Show is not blocked.
+            if _viewer_process is not None:
+                watched_pid = _viewer_process.pid
+
+                def _on_child_exit(pid, wait_status, _user_data=None):
+                    global _is_showing, _viewer_process
+                    if _viewer_process is None or _viewer_process.pid != pid:
+                        return
+                    try:
+                        returncode = os.waitstatus_to_exitcode(wait_status)
+                    except (AttributeError, ValueError):
+                        returncode = 0 if wait_status == 0 else 1
+                    # GLib has already reaped the process; populate Popen's
+                    # cached status so later poll()/wait() calls do not wait again.
+                    _viewer_process.returncode = returncode
+                    _handle_viewer_exit(returncode)
+                    _is_showing = False
+                    _viewer_process = None
+                    for cleanup in (_uninhibit, _restore_overview, _cancel_lock,
+                                    _daemon_switch_to_idle_watch):
+                        try:
+                            cleanup()
+                        except Exception as exc:
+                            print(f"Viewer-exit cleanup failed ({cleanup.__name__}): {exc}",
+                                  file=sys.stderr)
+
+                GLib.child_watch_add(GLib.PRIORITY_DEFAULT, watched_pid, _on_child_exit)
+            else:
+                # In-process fallback has no child to watch; retain a light
+                # visibility check only for that exceptional path.
+                def _watch_in_process_fallback():
+                    global _is_showing
                     if _is_showing and not is_viewer_active():
                         _is_showing = False
-                        try:
-                            _uninhibit()
-                        except Exception:
-                            pass
-                        try:
-                            _restore_overview()
-                        except Exception:
-                            pass
-                        try:
-                            _cancel_lock()
-                        except Exception:
-                            pass
-                        try:
-                            _daemon_switch_to_idle_watch()
-                        except Exception:
-                            pass
+                        for cleanup in (_uninhibit, _restore_overview, _cancel_lock,
+                                        _daemon_switch_to_idle_watch):
+                            try:
+                                cleanup()
+                            except Exception as exc:
+                                print(f"Viewer cleanup failed ({cleanup.__name__}): {exc}",
+                                      file=sys.stderr)
                         return False
                     return bool(is_viewer_active())
-                except Exception:
-                    return False
-            GLib.timeout_add(500, _watch_child)
-        except Exception:
-            pass
+                GLib.timeout_add(500, _watch_in_process_fallback)
+        except Exception as exc:
+            print(f"Unable to register viewer-exit watch: {exc}", file=sys.stderr)
         # Success: leave _is_showing True until hide / child exit
         return True
     except Exception as e:
