@@ -56,6 +56,45 @@ class TestGuiLogic(unittest.TestCase):
         for fname, want in cases.items():
             self.assertEqual(self.gui.display_name(fname), want, fname)
 
+    def test_keybinding_read_does_not_register_but_create_does(self):
+        class FakeParent:
+            def __init__(self):
+                self.paths = []
+            def get_strv(self, _key):
+                return list(self.paths)
+            def set_strv(self, _key, value):
+                self.paths = list(value)
+
+        class FakeChild:
+            def __init__(self):
+                self.values = {"command": "", "name": "", "binding": ""}
+            def get_string(self, key):
+                return self.values.get(key, "")
+            def set_string(self, key, value):
+                self.values[key] = value
+
+        parent, child = FakeParent(), FakeChild()
+        class FakeSettings:
+            @staticmethod
+            def new(_schema):
+                return parent
+            @staticmethod
+            def new_with_path(_schema, _path):
+                return child
+
+        original = self.gui.Gio.Settings
+        self.gui.Gio.Settings = FakeSettings
+        try:
+            self.assertIsNone(self.gui.get_keybinding_settings())
+            self.assertEqual(parent.paths, [])
+            settings = self.gui.get_keybinding_settings(create=True)
+            self.assertIs(settings, child)
+            self.assertEqual(parent.paths, [self.gui.KEYBINDING_PATH])
+            self.assertEqual(child.values["name"], "Material Screensaver")
+            self.assertEqual(child.values["command"], f"{self.gui.CTL_SCRIPT} toggle")
+        finally:
+            self.gui.Gio.Settings = original
+
     def test_display_name_reads_scene_title(self):
         path = os.path.join(self.gui.SCREENSAVER_DIR, "gameoflife.html")
         with open(path, "w", encoding="utf-8") as f:

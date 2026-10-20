@@ -34,6 +34,25 @@ try:
         )
 except Exception as exc:
     print(f"Warning: could not update GNOME's enabled-extensions setting: {exc}", file=sys.stderr)
+
+# Remove only this app's custom keyboard-shortcut registration.
+key_path = "/org/gnome/settings-daemon/plugins/media-keys/custom-keybindings/material-screensaver/"
+try:
+    result = subprocess.run(
+        ["gsettings", "get", "org.gnome.settings-daemon.plugins.media-keys", "custom-keybindings"],
+        check=True, capture_output=True, text=True,
+    )
+    paths = ast.literal_eval(result.stdout.strip())
+    if not isinstance(paths, list):
+        raise ValueError("custom-keybindings did not return a list")
+    if key_path in paths:
+        paths.remove(key_path)
+        subprocess.run(
+            ["gsettings", "set", "org.gnome.settings-daemon.plugins.media-keys", "custom-keybindings", repr(paths)],
+            check=True, capture_output=True, text=True,
+        )
+except Exception as exc:
+    print(f"Warning: could not remove GNOME keyboard shortcut registration: {exc}", file=sys.stderr)
 PY
 
 systemctl --user daemon-reload 2>/dev/null || true

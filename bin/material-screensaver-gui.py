@@ -31,14 +31,16 @@ KEYBINDING_PARENT_SCHEMA = "org.gnome.settings-daemon.plugins.media-keys"
 KEYBINDING_CHILD_SCHEMA = "org.gnome.settings-daemon.plugins.media-keys.custom-keybinding"
 
 
-def get_keybinding_settings():
-    """Registers our custom keybinding path with GNOME if needed, returns its Settings object."""
+def get_keybinding_settings(create=False):
+    """Read our binding without side effects; register it only when explicitly created."""
     parent = Gio.Settings.new(KEYBINDING_PARENT_SCHEMA)
     paths = parent.get_strv("custom-keybindings")
     if KEYBINDING_PATH not in paths:
+        if not create:
+            return None
         parent.set_strv("custom-keybindings", paths + [KEYBINDING_PATH])
     child = Gio.Settings.new_with_path(KEYBINDING_CHILD_SCHEMA, KEYBINDING_PATH)
-    if not child.get_string("command"):
+    if create and not child.get_string("command"):
         child.set_string("name", "Material Screensaver")
         child.set_string("command", f"{CTL_SCRIPT} toggle")
     return child
@@ -258,6 +260,9 @@ class ScreensaverWindow(Adw.ApplicationWindow):
         change_btn = Gtk.Button(label="Change…", valign=Gtk.Align.CENTER)
         change_btn.connect("clicked", self.on_change_shortcut)
         self.shortcut_row.add_suffix(change_btn)
+        self.clear_shortcut_button = Gtk.Button(label="Clear", valign=Gtk.Align.CENTER)
+        self.clear_shortcut_button.connect("clicked", self.on_clear_shortcut)
+        self.shortcut_row.add_suffix(self.clear_shortcut_button)
         shortcut_group.add(self.shortcut_row)
 
         toolbar_view.set_content(page)
@@ -320,7 +325,8 @@ class ScreensaverWindow(Adw.ApplicationWindow):
 
     def refresh_shortcut_label(self):
         try:
-            binding = get_keybinding_settings().get_string("binding")
+            settings = get_keybinding_settings()
+            binding = settings.get_string("binding") if settings is not None else ""
         except GLib.Error:
             binding = ""
         if binding:
@@ -329,6 +335,13 @@ class ScreensaverWindow(Adw.ApplicationWindow):
             self.shortcut_row.set_subtitle(label)
         else:
             self.shortcut_row.set_subtitle("Not set")
+        self.clear_shortcut_button.set_sensitive(bool(binding))
+
+    def on_clear_shortcut(self, _btn):
+        settings = get_keybinding_settings()
+        if settings is not None:
+            settings.set_string("binding", "")
+        self.refresh_shortcut_label()
 
     def on_change_shortcut(self, _btn):
         dialog = Gtk.Window(transient_for=self, modal=True, title="Set Shortcut")
@@ -362,7 +375,7 @@ class ScreensaverWindow(Adw.ApplicationWindow):
                 title.set_label("Super+Q is reserved for close")
                 hint.set_label("Choose a different shortcut — Esc to cancel")
                 return True
-            get_keybinding_settings().set_string("binding", accel)
+            get_keybinding_settings(create=True).set_string("binding", accel)
             self.refresh_shortcut_label()
             dialog.close()
             return True
