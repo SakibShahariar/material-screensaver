@@ -344,6 +344,11 @@ class ScreensaverWindow(Adw.ApplicationWindow):
     def _update_preview(self):
         if not HAS_WEBKIT or not hasattr(self, "preview_web") or self.preview_web is None:
             return
+        try:
+            if not self.get_property("is-active"):
+                return
+        except Exception:
+            pass
         cfg = load_config()
         if cfg.get("random", False):
             # Random mode previews a random style each refresh.
