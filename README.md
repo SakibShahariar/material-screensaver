@@ -14,7 +14,6 @@ The scenes use a Matugen-generated stylesheet so their colors follow your wallpa
 
 Shared helpers are available for new styles:
 - `screensavers/clock-shared.js` — clock utilities.
-- `screensavers/theme-shared.js` — theme color parsing and `rgba()` helpers.
 
 ## Screenshots
 
