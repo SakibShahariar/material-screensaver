@@ -49,6 +49,33 @@ class TestHtmlBasics(unittest.TestCase):
                     self.assertIn(marker.lower(), text.lower(),
                                   f"{name} missing {marker!r}")
 
+    def test_screensavers_have_restrictive_csp_before_resources(self):
+        for path in support.html_files():
+            text = _read(path)
+            name = os.path.basename(path)
+            match = re.search(
+                r'<meta\\s+http-equiv=["\']Content-Security-Policy["\']\\s+content=["\']([^"\']+)["\']',
+                text,
+                re.I,
+            )
+            with self.subTest(file=name):
+                self.assertIsNotNone(match, f"{name}: missing Content Security Policy")
+                policy = match.group(1)
+                for directive in (
+                    "default-src 'none'",
+                    "script-src 'self' 'unsafe-inline'",
+                    "style-src 'self' 'unsafe-inline'",
+                    "img-src 'self' data:",
+                    "font-src 'self' data:",
+                    "connect-src 'none'",
+                    "object-src 'none'",
+                    "base-uri 'none'",
+                ):
+                    self.assertIn(directive, policy, f"{name}: CSP missing {directive}")
+                self.assertNotIn("file:", policy, f"{name}: CSP allows broad file: resources")
+                self.assertLess(text.index(match.group(0)), text.index("matugen-colors.css"),
+                                f"{name}: CSP appears after stylesheet resource")
+
     def test_script_tags_balanced(self):
         for path in support.html_files():
             text = _read(path)
