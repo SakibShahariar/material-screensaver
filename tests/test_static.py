@@ -146,6 +146,15 @@ class TestThemeConsistency(unittest.TestCase):
                     f"{name}: no concrete inline CSS variable fallback",
                 )
 
+    def test_clock_overlay_is_optional_safe_and_non_interactive(self):
+        source = _read(os.path.join(support.REPO_ROOT, "bin", "material-screensaver-ctl.py"))
+        self.assertIn("material-screensaver-clock-overlay", source)
+        self.assertIn("clock_overlay_position", source)
+        self.assertIn("clock_overlay_opacity", source)
+        self.assertIn("pointer-events:none", source)
+        self.assertIn("[id*=\"clock\" i]", source)
+        self.assertIn("if (clockLike) return;", source)
+
     def test_clock_shared_referenced(self):
         # Every style renders a clock; each must at least reference the helper
         # (loaded dynamically at runtime, so check the string reference).

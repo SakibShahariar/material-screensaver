@@ -399,6 +399,53 @@ def _create_viewer_windows(html_path, clock_format="24h", scene_options=None):
                 _dbg(f"Suppressed non-fatal exception in _create_viewer_windows: {exc}")
         except Exception as exc:
             _dbg(f"Suppressed non-fatal exception in _create_viewer_windows: {exc}")
+        # Optional shared clock/date overlay. Avoid duplicating clocks already in a scene.
+        try:
+            cfg = load_config()
+            if cfg.get("clock_overlay", False):
+                overlay_config = json.dumps({
+                    "position": cfg.get("clock_overlay_position", "bottom-right"),
+                    "opacity": cfg.get("clock_overlay_opacity", 80) / 100,
+                    "format": cfg.get("clock_format", "24h"),
+                })
+                script = """(() => {
+const config = __CLOCK_OVERLAY_CONFIG__;
+const add = () => {
+  if (!document.body || document.getElementById('material-screensaver-clock-overlay')) return;
+  const clockLike = document.querySelector('time, [id*="clock" i], [class*="clock" i], [id*="date" i], [class*="date" i], [aria-label*="time" i], [aria-label*="date" i]');
+  if (clockLike) return;
+  const node = document.createElement('div');
+  node.id = 'material-screensaver-clock-overlay';
+  const time = document.createElement('div');
+  const date = document.createElement('div');
+  time.style.cssText = 'font-size:clamp(28px,4vw,64px);font-weight:600;line-height:1.1;letter-spacing:.02em';
+  date.style.cssText = 'font-size:clamp(12px,1.25vw,20px);margin-top:8px;opacity:.9';
+  node.append(time, date);
+  const vertical = config.position.startsWith('top') ? 'top:3vh;' : 'bottom:3vh;';
+  const horizontal = config.position.endsWith('left') ? 'left:3vw;' : 'right:3vw;';
+  node.style.cssText = 'position:fixed;' + vertical + horizontal + 'z-index:2147483646;max-width:40vw;padding:16px 22px;border-radius:16px;background:rgba(20,20,24,' + config.opacity + ');color:#fff;font-family:system-ui,sans-serif;text-align:left;line-height:1.35;pointer-events:none;user-select:none;box-shadow:0 2px 18px rgba(0,0,0,.25)';
+  document.body.appendChild(node);
+  const tick = () => {
+    const now = new Date();
+    time.textContent = now.toLocaleTimeString([], config.format === '12h' ? {hour:'numeric',minute:'2-digit'} : {hour:'2-digit',minute:'2-digit',hourCycle:'h23'});
+    date.textContent = now.toLocaleDateString([], {weekday:'long',month:'long',day:'numeric'});
+  };
+  tick(); window.setInterval(tick, 1000);
+};
+if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', add, {once:true}); else add();
+})();""".replace("__CLOCK_OVERLAY_CONFIG__", overlay_config)
+                ucm = web.get_user_content_manager()
+                overlay_script = WebKit.UserScript.new(
+                    script,
+                    WebKit.UserContentInjectedFrames.TOP_FRAME,
+                    WebKit.UserScriptInjectionTime.END,
+                    None,
+                    None,
+                )
+                ucm.add_script(overlay_script)
+        except Exception as exc:
+            _dbg(f"Could not install clock overlay: {exc}")
+
         # Optional plain-text message overlay. JSON serialization and textContent
         # prevent the configured message from becoming executable HTML or JS.
         try:
