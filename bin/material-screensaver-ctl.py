@@ -721,6 +721,54 @@ def _lock_screen():
     print("Unable to lock the session: all lock commands failed; keeping screensaver visible.", file=sys.stderr)
     return False
 
+def _lock_screen_async(on_complete):
+    """Try lock commands without blocking GLib's main loop.
+
+    The callback receives True only after a command exits successfully. Failed
+    candidates fall through in order, just like _lock_screen().
+    """
+    try:
+        import gi
+        gi.require_version("Gio", "2.0")
+        from gi.repository import Gio
+    except Exception as exc:
+        print(f"Cannot use asynchronous session locking: {exc}", file=sys.stderr)
+        on_complete(False)
+        return
+
+    candidates = iter(LOCK_COMMANDS)
+
+    def try_next():
+        try:
+            cmd = next(candidates)
+        except StopIteration:
+            print("Unable to lock the session: all lock commands failed; keeping screensaver visible.",
+                  file=sys.stderr)
+            on_complete(False)
+            return
+        try:
+            proc = Gio.Subprocess.new(
+                cmd, Gio.SubprocessFlags.STDOUT_SILENCE | Gio.SubprocessFlags.STDERR_SILENCE)
+        except Exception as exc:
+            print(f"Session lock command failed ({cmd[0]}): {exc}", file=sys.stderr)
+            try_next()
+            return
+
+        def on_wait(proc, result, _user_data=None):
+            try:
+                succeeded = proc.wait_check_finish(result)
+            except Exception as exc:
+                print(f"Session lock command failed ({cmd[0]}): {exc}", file=sys.stderr)
+                try_next()
+                return
+            if succeeded:
+                on_complete(True)
+            else:
+                try_next()
+
+        proc.wait_check_async(None, on_wait, None)
+
+
 def _idle_watch_needs_refresh(current_idle_seconds, last_idle_seconds, watch_id):
     """Refresh when the timeout changes or registration is missing."""
     return current_idle_seconds != last_idle_seconds or watch_id is None
@@ -740,11 +788,11 @@ def _handle_viewer_exit(returncode):
         f"Viewer exited abnormally (status {returncode}); attempting immediate session lock.",
         file=sys.stderr,
     )
-    if not _lock_screen():
-        print(
-            "Unable to lock the session after abnormal viewer exit.",
-            file=sys.stderr,
-        )
+    def on_locked(locked):
+        if not locked:
+            print("Unable to lock the session after abnormal viewer exit.",
+                  file=sys.stderr)
+    _lock_screen_async(on_locked)
 
 
 def _on_screen_saver_active_changed(active):
@@ -787,12 +835,15 @@ def _schedule_lock():
             _lock_timeout_id=None
             if is_viewer_active():
                 # Never dismiss the screensaver unless a lock command reports success.
-                # Otherwise the configured lock timeout would fail open.
-                if _lock_screen():
-                    try:
-                        hide_viewer()
-                    except Exception as exc:
-                        print(f"Failed to hide viewer after session lock: {exc}", file=sys.stderr)
+                # Async execution keeps the GTK/GLib main loop responsive.
+                def on_locked(locked):
+                    if locked:
+                        try:
+                            hide_viewer()
+                        except Exception as exc:
+                            print(f"Failed to hide viewer after session lock: {exc}",
+                                  file=sys.stderr)
+                _lock_screen_async(on_locked)
             return False
         _lock_timeout_id = GLib.timeout_add_seconds(secs, _do_lock)
     except Exception:
