@@ -49,6 +49,12 @@ class TestHtmlBasics(unittest.TestCase):
                     self.assertIn(marker.lower(), text.lower(),
                                   f"{name} missing {marker!r}")
 
+    def test_ctl_does_not_silently_swallow_broad_exceptions(self):
+        source = _read(os.path.join(support.REPO_ROOT, "bin", "material-screensaver-ctl.py"))
+        silent_catches = re.findall(r"except Exception:\\s*\\n\\s*pass\\b", source)
+        # The debug logger itself must remain best-effort to avoid recursive logging.
+        self.assertLessEqual(len(silent_catches), 1, "unexpected silent broad exception handlers")
+
     def test_screensavers_have_restrictive_csp_before_resources(self):
         for path in support.html_files():
             text = _read(path)

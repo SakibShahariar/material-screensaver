@@ -169,8 +169,8 @@ def _get_shared_context():
         # Reduce cache to avoid memory bloat across shows
         try:
             _shared_web_context.set_cache_model(WebKit.CacheModel.DOCUMENT_VIEWER)
-        except Exception:
-            pass
+        except Exception as exc:
+            _dbg(f"Suppressed non-fatal exception in _get_shared_context: {exc}")
     except Exception:
         _shared_web_context = None
     return _shared_web_context
@@ -291,8 +291,8 @@ def _create_viewer_windows(html_path, clock_format="24h", scene_options=None):
         _kill_orphan_webkit()
         if is_viewer_active():
             hide_viewer()
-    except Exception:
-        pass
+    except Exception as exc:
+        _dbg(f"Suppressed non-fatal exception in _create_viewer_windows: {exc}")
 
     display = Gdk.Display.get_default()
     if display is None:
@@ -314,8 +314,8 @@ def _create_viewer_windows(html_path, clock_format="24h", scene_options=None):
                         monitors.append(m)
                 except Exception:
                     continue
-        except Exception:
-            pass
+        except Exception as exc:
+            _dbg(f"Suppressed non-fatal exception in _create_viewer_windows: {exc}")
     if not monitors:
         monitors = [None]
 
@@ -333,8 +333,8 @@ def _create_viewer_windows(html_path, clock_format="24h", scene_options=None):
             _ephemeral_ctx = WebKit.WebContext.new_ephemeral()
             try:
                 _ephemeral_ctx.set_cache_model(WebKit.CacheModel.DOCUMENT_VIEWER)
-            except Exception:
-                pass
+            except Exception as exc:
+                _dbg(f"Suppressed non-fatal exception in _create_viewer_windows: {exc}")
         except Exception:
             _ephemeral_ctx = _get_shared_context()
     ctx = _ephemeral_ctx
@@ -349,8 +349,8 @@ def _create_viewer_windows(html_path, clock_format="24h", scene_options=None):
         win.set_decorated(False)
         try:
             win.set_modal(True)
-        except Exception:
-            pass
+        except Exception as exc:
+            _dbg(f"Suppressed non-fatal exception in _create_viewer_windows: {exc}")
         # Set size to monitor geometry early (helps Wayland compositor place correctly)
         try:
             if mon is not None:
@@ -362,8 +362,8 @@ def _create_viewer_windows(html_path, clock_format="24h", scene_options=None):
             win.set_default_size(1920, 1080)
         try:
             win.add_css_class("screensaver-window")
-        except Exception:
-            pass
+        except Exception as exc:
+            _dbg(f"Suppressed non-fatal exception in _create_viewer_windows: {exc}")
 
         # Create WebView with shared context
         try:
@@ -385,10 +385,10 @@ def _create_viewer_windows(html_path, clock_format="24h", scene_options=None):
             # Prevent WebKit throttling when window is not focused (ghost 0.1% vs 87% fix)
             try:
                 settings.set_enable_back_forward_navigation_gestures(False)
-            except Exception:
-                pass
-        except Exception:
-            pass
+            except Exception as exc:
+                _dbg(f"Suppressed non-fatal exception in _create_viewer_windows: {exc}")
+        except Exception as exc:
+            _dbg(f"Suppressed non-fatal exception in _create_viewer_windows: {exc}")
         # Hide cursor inside web content from the first paint — WebKit's CSS cursor
         # overrides the widget's Gdk cursor, so Gdk blank alone still shows default
         # arrow over the page until first motion. Inject a blanket cursor:none
@@ -403,8 +403,8 @@ def _create_viewer_windows(html_path, clock_format="24h", scene_options=None):
                     WebKit.UserStyleLevel.AUTHOR,
                     None, None)
                 ucm.add_style_sheet(sheet)
-            except Exception:
-                pass
+            except Exception as exc:
+                _dbg(f"Suppressed non-fatal exception in _create_viewer_windows: {exc}")
         web.load_uri(uri)
         win.set_child(web)
 
@@ -432,8 +432,8 @@ def _create_viewer_windows(html_path, clock_format="24h", scene_options=None):
                             return True
                         if name in ("Super_L", "Super_R", "<Super>Super_L", "<Super>Super_R"):
                             return True
-                except Exception:
-                    pass
+                except Exception as exc:
+                    _dbg(f"Suppressed non-fatal exception in on_key: {exc}")
                 return False
         def on_click(ctrl, n_press, x, y, _win=win, _web=web):
             # Clicks never dismiss — only Super+Q does. Do not consume, so
@@ -447,8 +447,8 @@ def _create_viewer_windows(html_path, clock_format="24h", scene_options=None):
         # (solar-system is interactive and manages cursor via body.show-cursor CSS)
         try:
             gi.require_version("GdkPixbuf", "2.0")
-        except Exception:
-            pass
+        except Exception as exc:
+            _dbg(f"Suppressed non-fatal exception in _create_viewer_windows: {exc}")
         def _hide_cursor(w, web=None):
             # for interactive (solar-system) let page manage cursor itself
             if is_interactive:
@@ -463,8 +463,8 @@ def _create_viewer_windows(html_path, clock_format="24h", scene_options=None):
                         c = Gdk.Cursor.new_from_texture(tex, 0, 0, None)
                         tgt.set_cursor(c)
                         continue
-                    except Exception:
-                        pass
+                    except Exception as exc:
+                        _dbg(f"Suppressed non-fatal exception in _hide_cursor: {exc}")
                     for name in ("none", "blank", "hidden", "invisible"):
                         try:
                             c = Gdk.Cursor.new_from_name(name, None)
@@ -478,20 +478,20 @@ def _create_viewer_windows(html_path, clock_format="24h", scene_options=None):
                 except Exception:
                     try:
                         tgt.set_cursor(None)
-                    except Exception:
-                        pass
+                    except Exception as exc:
+                        _dbg(f"Suppressed non-fatal exception in _hide_cursor: {exc}")
             # also hide web-content cursor via JS (WebKit CSS overrides widget cursor)
             if web is not None:
                 try:
                     web.evaluate_javascript("document.documentElement.style.cursor='none';document.body&& (document.body.style.cursor='none')", -1, None, None, None, None, None)
-                except Exception:
-                    pass
+                except Exception as exc:
+                    _dbg(f"Suppressed non-fatal exception in _hide_cursor: {exc}")
         # robust initial hide — Wayland resets cursor on map/fullscreen, so schedule after realize/map/timeouts
         def _hide_now():
             try:
                 _hide_cursor(win, web)
-            except Exception:
-                pass
+            except Exception as exc:
+                _dbg(f"Suppressed non-fatal exception in _hide_now: {exc}")
             return False
         def _schedule_hide():
             try:
@@ -502,26 +502,26 @@ def _create_viewer_windows(html_path, clock_format="24h", scene_options=None):
                     return False
                 try:
                     GLib.idle_add(_deferred_hide, priority=GLib.PRIORITY_HIGH_IDLE)
-                except Exception:
-                    pass
+                except Exception as exc:
+                    _dbg(f"Suppressed non-fatal exception in _schedule_hide: {exc}")
                 for ms in (50, 200, 600, 1200):
                     try:
                         GLib.timeout_add(ms, _deferred_hide)
-                    except Exception:
-                        pass
+                    except Exception as exc:
+                        _dbg(f"Suppressed non-fatal exception in _deferred_hide: {exc}")
                 # on realize/map — most reliable for Wayland
                 for sig in ("realize", "map"):
                     try:
                         win.connect(sig, lambda *_: _hide_now())
                         web.connect(sig, lambda *_: _hide_now())
-                    except Exception:
-                        pass
-            except Exception:
-                pass
+                    except Exception as exc:
+                        _dbg(f"Suppressed non-fatal exception in _deferred_hide: {exc}")
+            except Exception as exc:
+                _dbg(f"Suppressed non-fatal exception in _schedule_hide: {exc}")
         try:
             _schedule_hide()
-        except Exception:
-            pass
+        except Exception as exc:
+            _dbg(f"Suppressed non-fatal exception in _create_viewer_windows: {exc}")
         try:
             key_ctrl = Gtk.EventControllerKey()
             key_ctrl.set_propagation_phase(Gtk.PropagationPhase.CAPTURE)
@@ -533,8 +533,8 @@ def _create_viewer_windows(html_path, clock_format="24h", scene_options=None):
                     is_super = keyval in (Gdk.KEY_Super_L, Gdk.KEY_Super_R, Gdk.KEY_Meta_L, Gdk.KEY_Meta_R, 65515, 65516)
                     if is_super:
                         return True
-                except Exception:
-                    pass
+                except Exception as exc:
+                    _dbg(f"Suppressed non-fatal exception in on_key_release: {exc}")
                 return False
             key_ctrl.connect("key-released", on_key_release)
             win.add_controller(key_ctrl)
@@ -544,13 +544,13 @@ def _create_viewer_windows(html_path, clock_format="24h", scene_options=None):
             motion = Gtk.EventControllerMotion()
             motion.connect("motion", on_motion)
             win.add_controller(motion)
-        except Exception:
-            pass
+        except Exception as exc:
+            _dbg(f"Suppressed non-fatal exception in _create_viewer_windows: {exc}")
 
         try:
             win.set_hide_on_close(False)
-        except Exception:
-            pass
+        except Exception as exc:
+            _dbg(f"Suppressed non-fatal exception in _create_viewer_windows: {exc}")
 
         # Wayland: present must happen after app is active and surface realized.
         # Using `present()` then `fullscreen()` immediately can create ghost (dash visible, WebProcess 0.1% throttled).
@@ -558,44 +558,44 @@ def _create_viewer_windows(html_path, clock_format="24h", scene_options=None):
         def _do_fullscreen(w=win, d=display, wb=web):
             try:
                 w.fullscreen()
-            except Exception:
-                pass
+            except Exception as exc:
+                _dbg(f"Suppressed non-fatal exception in _do_fullscreen: {exc}")
             try:
                 w.set_visible(True)
-            except Exception:
-                pass
+            except Exception as exc:
+                _dbg(f"Suppressed non-fatal exception in _do_fullscreen: {exc}")
             try:
                 w.grab_focus()
-            except Exception:
-                pass
+            except Exception as exc:
+                _dbg(f"Suppressed non-fatal exception in _do_fullscreen: {exc}")
             try:
                 w.set_focus_visible(True)
-            except Exception:
-                pass
+            except Exception as exc:
+                _dbg(f"Suppressed non-fatal exception in _do_fullscreen: {exc}")
             try:
                 _hide_cursor(w, wb)
-            except Exception:
-                pass
+            except Exception as exc:
+                _dbg(f"Suppressed non-fatal exception in _do_fullscreen: {exc}")
             try:
                 w._show_time = GLib.get_monotonic_time()
-            except Exception:
-                pass
+            except Exception as exc:
+                _dbg(f"Suppressed non-fatal exception in _do_fullscreen: {exc}")
             # Seat grab after fullscreen (Wayland may fail — best effort)
             try:
                 seat = d.get_default_seat() if d else None
                 surf = w.get_surface()
                 if seat and surf:
                     seat.grab(surf, Gdk.SeatCapabilities.ALL, True, None, None, None, None)
-            except Exception:
-                pass
+            except Exception as exc:
+                _dbg(f"Suppressed non-fatal exception in _do_fullscreen: {exc}")
             # ensure cursor hidden after launch (even if compositor reset it) — retry via timeouts
             try:
                 _hide_cursor(w, wb)
                 # schedule a couple more hides to survive Wayland cursor resets after fullscreen
                 GLib.timeout_add(100, lambda: (_hide_cursor(w, wb), False)[1])
                 GLib.timeout_add(500, lambda: (_hide_cursor(w, wb), False)[1])
-            except Exception:
-                pass
+            except Exception as exc:
+                _dbg(f"Suppressed non-fatal exception in _do_fullscreen: {exc}")
             return False
 
         # Present immediately (required to create surface)
@@ -604,57 +604,57 @@ def _create_viewer_windows(html_path, clock_format="24h", scene_options=None):
         except Exception:
             try:
                 win.set_visible(True)
-            except Exception:
-                pass
+            except Exception as exc:
+                _dbg(f"Suppressed non-fatal exception in _do_fullscreen: {exc}")
         # Defer fullscreen to next idle so Wayland compositor has surface
         try:
             sid = GLib.idle_add(_do_fullscreen, priority=GLib.PRIORITY_HIGH_IDLE)
             try:
                 _pending_sources.append(sid)
-            except Exception:
-                pass
+            except Exception as exc:
+                _dbg(f"Suppressed non-fatal exception in _do_fullscreen: {exc}")
             def _retry_fs(w=win):
                 try:
                     if w.get_visible():
                         w.fullscreen()
                         w.present()
-                except Exception:
-                    pass
+                except Exception as exc:
+                    _dbg(f"Suppressed non-fatal exception in _retry_fs: {exc}")
                 return False
             sid2 = GLib.timeout_add(200, _retry_fs)
             sid3 = GLib.timeout_add(600, _retry_fs)
             try:
                 _pending_sources.extend([sid2, sid3])
-            except Exception:
-                pass
+            except Exception as exc:
+                _dbg(f"Suppressed non-fatal exception in _do_fullscreen: {exc}")
         except Exception:
             try:
                 _do_fullscreen()
-            except Exception:
-                pass
+            except Exception as exc:
+                _dbg(f"Suppressed non-fatal exception in _do_fullscreen: {exc}")
         # Also ensure fullscreen + cursor hidden on map (covers case where idle fired before map)
         try:
             def _on_map(w, _pspec=None):
                 try:
                     w.fullscreen()
                     w.present()
-                except Exception:
-                    pass
+                except Exception as exc:
+                    _dbg(f"Suppressed non-fatal exception in _on_map: {exc}")
                 try:
                     _hide_cursor(w, web)
                     GLib.timeout_add(100, lambda: (_hide_cursor(w, web), False)[1])
-                except Exception:
-                    pass
+                except Exception as exc:
+                    _dbg(f"Suppressed non-fatal exception in _on_map: {exc}")
                 return False
             win.connect("map", _on_map)
-        except Exception:
-            pass
+        except Exception as exc:
+            _dbg(f"Suppressed non-fatal exception in _create_viewer_windows: {exc}")
 
         # keep ephemeral ctx ref on window to prevent early GC
         try:
             win._ephemeral_ctx = _ephemeral_ctx
-        except Exception:
-            pass
+        except Exception as exc:
+            _dbg(f"Suppressed non-fatal exception in _create_viewer_windows: {exc}")
         windows.append(win)
 
     return windows
@@ -673,8 +673,8 @@ def is_viewer_active():
             else:
                 # clean stale reference
                 _viewer_process = None
-        except Exception:
-            pass
+        except Exception as exc:
+            _dbg(f"Suppressed non-fatal exception in is_viewer_active: {exc}")
     for w in list(_viewer_windows):
         try:
             if w.get_visible():
@@ -692,8 +692,8 @@ def is_viewer_active():
                     return True
             except Exception as e:
                 continue
-    except Exception:
-            pass
+    except Exception as exc:
+            _dbg(f"Suppressed non-fatal exception in is_viewer_active: {exc}")
     # Last resort: if any WebKit bwrap child still alive while we think hidden,
     # treat as active ghost (prevents Show from spawning duplicate that stays throttled)
     # We don't check here to avoid false positives during normal hide, but hide_viewer will clean anyway
@@ -917,8 +917,8 @@ def _schedule_lock():
             try:
                 from gi.repository import GLib
                 GLib.source_remove(_lock_timeout_id)
-            except Exception:
-                pass
+            except Exception as exc:
+                _dbg(f"Suppressed non-fatal exception in _schedule_lock: {exc}")
             _lock_timeout_id=None
         cfg=load_config()
         secs=int(cfg.get("lock_after_seconds", 300) or 0)
@@ -943,8 +943,8 @@ def _schedule_lock():
                 _lock_screen_async(on_locked)
             return False
         _lock_timeout_id = GLib.timeout_add_seconds(secs, _do_lock)
-    except Exception:
-        pass
+    except Exception as exc:
+        _dbg(f"Suppressed non-fatal exception in _schedule_lock: {exc}")
 
 def _cancel_lock():
     global _lock_timeout_id
@@ -953,11 +953,11 @@ def _cancel_lock():
             from gi.repository import GLib
             try:
                 GLib.source_remove(_lock_timeout_id)
-            except Exception:
-                pass
+            except Exception as exc:
+                _dbg(f"Suppressed non-fatal exception in _cancel_lock: {exc}")
             _lock_timeout_id=None
-    except Exception:
-        pass
+    except Exception as exc:
+        _dbg(f"Suppressed non-fatal exception in _cancel_lock: {exc}")
 
 def _inhibit_overview():
     global _saved_overlay_key, _saved_shell_toggle
@@ -974,8 +974,8 @@ def _inhibit_overview():
                                    capture_output=True, timeout=2)
                     subprocess.run(["dconf", "write", "/org/gnome/mutter/overlay-key", "''"],
                                    capture_output=True, timeout=2)
-            except Exception:
-                pass
+            except Exception as exc:
+                _dbg(f"Suppressed non-fatal exception in _inhibit_overview: {exc}")
             return
         # mutter overlay-key — main Super→overview
         out = subprocess.run(["gsettings", "get", "org.gnome.mutter", "overlay-key"],
@@ -1025,8 +1025,8 @@ def _inhibit_overview():
                 verify = f"verify_exc {e}"
             try:
                 print(f"[overview] inhibit Gio ok={gio_ok} err={gio_err} set_rc={set_rc} dconf_rc={dconf_rc} verify={verify}", file=sys.stderr)
-            except Exception:
-                pass
+            except Exception as exc:
+                _dbg(f"Suppressed non-fatal exception in _inhibit_overview: {exc}")
         # shell toggle-overview if it was bound to Super
         try:
             out2 = subprocess.run(["gsettings", "get", "org.gnome.shell.keybindings", "toggle-overview"],
@@ -1035,22 +1035,22 @@ def _inhibit_overview():
                 _saved_shell_toggle = out2.stdout.strip()
                 subprocess.run(["gsettings", "set", "org.gnome.shell.keybindings", "toggle-overview", "@as []"],
                                capture_output=True, timeout=2)
-        except Exception:
-            pass
+        except Exception as exc:
+            _dbg(f"Suppressed non-fatal exception in _inhibit_overview: {exc}")
         try:
             print(f"[overview] inhibited overlay={_saved_overlay_key} shell={_saved_shell_toggle}", file=sys.stderr)
-        except Exception:
-            pass
+        except Exception as exc:
+            _dbg(f"Suppressed non-fatal exception in _inhibit_overview: {exc}")
         # start blocker for double Super
         try:
             _start_overview_block()
-        except Exception:
-            pass
+        except Exception as exc:
+            _dbg(f"Suppressed non-fatal exception in _inhibit_overview: {exc}")
     except Exception as e:
         try:
             print(f"[overview] inhibit failed {e}", file=sys.stderr)
-        except Exception:
-            pass
+        except Exception as exc:
+            _dbg(f"Suppressed non-fatal exception in _inhibit_overview: {exc}")
 
 def _restore_overview():
     global _saved_overlay_key, _saved_shell_toggle
@@ -1074,23 +1074,23 @@ def _restore_overview():
             except Exception as e:
                 try:
                     print(f"[overview] restore Gio failed {e}", file=sys.stderr)
-                except Exception:
-                    pass
+                except Exception as exc:
+                    _dbg(f"Suppressed non-fatal exception in _restore_overview: {exc}")
             # also via subprocess/dconf for robustness
             try:
                 subprocess.run(["gsettings", "set", "org.gnome.mutter", "overlay-key", saved],
                                capture_output=True, timeout=2)
                 subprocess.run(["dconf", "write", "/org/gnome/mutter/overlay-key", saved],
                                capture_output=True, timeout=2)
-            except Exception:
-                pass
+            except Exception as exc:
+                _dbg(f"Suppressed non-fatal exception in _restore_overview: {exc}")
             # verify
             try:
                 chk = subprocess.run(["gsettings", "get", "org.gnome.mutter", "overlay-key"],
                                      capture_output=True, text=True, timeout=2)
                 print(f"[overview] restored overlay={saved} now={chk.stdout.strip() if chk.returncode==0 else chk.stderr.strip()}", file=sys.stderr)
-            except Exception:
-                pass
+            except Exception as exc:
+                _dbg(f"Suppressed non-fatal exception in _restore_overview: {exc}")
             _saved_overlay_key=None
         elif _daemon_app is not None:
             # Only daemon should auto-restore a leftover '' from a crash.
@@ -1107,15 +1107,15 @@ def _restore_overview():
                         _sr2 = _GioR2.Settings.new("org.gnome.mutter")
                         _sr2.set_string("overlay-key", "Super")
                         _GioR2.Settings.sync()
-                    except Exception:
-                        pass
+                    except Exception as exc:
+                        _dbg(f"Suppressed non-fatal exception in _restore_overview: {exc}")
                     subprocess.run(["gsettings", "set", "org.gnome.mutter", "overlay-key", "'Super'"],
                                    capture_output=True, timeout=2)
                     subprocess.run(["dconf", "write", "/org/gnome/mutter/overlay-key", "'Super'"],
                                    capture_output=True, timeout=2)
                     print("[overview] restored (no saved) -> 'Super'", file=sys.stderr)
-            except Exception:
-                pass
+            except Exception as exc:
+                _dbg(f"Suppressed non-fatal exception in _restore_overview: {exc}")
         if _saved_shell_toggle is not None:
             try:
                 subprocess.run(["gsettings", "set", "org.gnome.shell.keybindings", "toggle-overview", _saved_shell_toggle],
@@ -1124,19 +1124,19 @@ def _restore_overview():
                 try:
                     subprocess.run(["gsettings", "reset", "org.gnome.shell.keybindings", "toggle-overview"],
                                    capture_output=True, timeout=2)
-                except Exception:
-                    pass
+                except Exception as exc:
+                    _dbg(f"Suppressed non-fatal exception in _restore_overview: {exc}")
             _saved_shell_toggle=None
             try:
                 _stop_overview_block()
-            except Exception:
-                pass
-    except Exception:
-        pass
+            except Exception as exc:
+                _dbg(f"Suppressed non-fatal exception in _restore_overview: {exc}")
+    except Exception as exc:
+        _dbg(f"Suppressed non-fatal exception in _restore_overview: {exc}")
     try:
         _stop_overview_block()
-    except Exception:
-        pass
+    except Exception as exc:
+        _dbg(f"Suppressed non-fatal exception in _restore_overview: {exc}")
 _overview_block_id = None
 def _start_overview_block():
     global _overview_block_id
@@ -1158,17 +1158,17 @@ def _start_overview_block():
                         try:
                             subprocess.run(["gsettings", "set", "org.gnome.mutter", "overlay-key", "''"],
                                            capture_output=True, timeout=1)
-                        except Exception:
-                            pass
+                        except Exception as exc:
+                            _dbg(f"Suppressed non-fatal exception in _check: {exc}")
                         print("[overview] re-asserted overlay='' (was non-empty)", file=sys.stderr)
-                except Exception:
-                    pass
-            except Exception:
-                pass
+                except Exception as exc:
+                    _dbg(f"Suppressed non-fatal exception in _check: {exc}")
+            except Exception as exc:
+                _dbg(f"Suppressed non-fatal exception in _check: {exc}")
             return True
         _overview_block_id = GLib.timeout_add(180, _check)
-    except Exception:
-        pass
+    except Exception as exc:
+        _dbg(f"Suppressed non-fatal exception in _start_overview_block: {exc}")
 
 def _stop_overview_block():
     global _overview_block_id
@@ -1177,18 +1177,18 @@ def _stop_overview_block():
             from gi.repository import GLib
             try:
                 GLib.source_remove(_overview_block_id)
-            except Exception:
-                pass
+            except Exception as exc:
+                _dbg(f"Suppressed non-fatal exception in _stop_overview_block: {exc}")
             _overview_block_id = None
-    except Exception:
-        pass
+    except Exception as exc:
+        _dbg(f"Suppressed non-fatal exception in _stop_overview_block: {exc}")
 
 # Ensure overlay restored even on crash / SIGTERM
 try:
     atexit.register(_restore_overview)
     atexit.register(_stop_overview_block)
-except Exception:
-    pass
+except Exception as exc:
+    _dbg(f"Suppressed non-fatal exception in module setup: {exc}")
 
 def _daemon_switch_to_active_watch():
     """Arm Mutter's user-active watch in the daemon.
@@ -1206,10 +1206,10 @@ def _daemon_switch_to_active_watch():
             try:
                 res = _idle_proxy.call_sync("AddUserActiveWatch", None, Gio.DBusCallFlags.NONE, -1, None)
                 _idle_watch_ids["active"] = res.unpack()[0]
-            except Exception:
-                pass
-    except Exception:
-        pass
+            except Exception as exc:
+                _dbg(f"Suppressed non-fatal exception in _daemon_switch_to_active_watch: {exc}")
+    except Exception as exc:
+        _dbg(f"Suppressed non-fatal exception in _daemon_switch_to_active_watch: {exc}")
 
 def _daemon_switch_to_idle_watch():
     try:
@@ -1219,8 +1219,8 @@ def _daemon_switch_to_idle_watch():
         if _idle_watch_ids.get("active") is not None:
             try:
                 _idle_proxy.call_sync("RemoveWatch", GLib.Variant("(u)", (_idle_watch_ids["active"],)), Gio.DBusCallFlags.NONE, -1, None)
-            except Exception:
-                pass
+            except Exception as exc:
+                _dbg(f"Suppressed non-fatal exception in _daemon_switch_to_idle_watch: {exc}")
             _idle_watch_ids["active"]=None
         if _idle_watch_ids.get("idle") is None:
             try:
@@ -1230,10 +1230,10 @@ def _daemon_switch_to_idle_watch():
                 secs=int(cfg.get("idle_seconds",300))
                 res=_idle_proxy.call_sync("AddIdleWatch", GLib.Variant("(t)", (secs*1000,)), Gio.DBusCallFlags.NONE, -1, None)
                 _idle_watch_ids["idle"]=res.unpack()[0]
-            except Exception:
-                pass
-    except Exception:
-        pass
+            except Exception as exc:
+                _dbg(f"Suppressed non-fatal exception in _daemon_switch_to_idle_watch: {exc}")
+    except Exception as exc:
+        _dbg(f"Suppressed non-fatal exception in _daemon_switch_to_idle_watch: {exc}")
 
 def run_viewer(html_path, clock_format="24h", scene_options=None):
     """Viewer subprocess entry point — isolated WebKit, daemon stays 30M flat."""
@@ -1260,21 +1260,21 @@ def run_viewer(html_path, clock_format="24h", scene_options=None):
                 for w in list(_viewer_windows):
                     try:
                         w.close()
-                    except Exception:
-                        pass
-            except Exception:
-                pass
+                    except Exception as exc:
+                        _dbg(f"Suppressed non-fatal exception in _viewer_sig: {exc}")
+            except Exception as exc:
+                _dbg(f"Suppressed non-fatal exception in _viewer_sig: {exc}")
             try:
                 loop.quit()
-            except Exception:
-                pass
+            except Exception as exc:
+                _dbg(f"Suppressed non-fatal exception in _viewer_sig: {exc}")
             return False
         try:
             GLib.unix_signal_add(GLib.PRIORITY_DEFAULT, signal.SIGTERM, _viewer_sig)
             GLib.unix_signal_add(GLib.PRIORITY_DEFAULT, signal.SIGINT, _viewer_sig)
             GLib.unix_signal_add(GLib.PRIORITY_DEFAULT, signal.SIGHUP, _viewer_sig)
-        except Exception:
-            pass
+        except Exception as exc:
+            _dbg(f"Suppressed non-fatal exception in run_viewer: {exc}")
         loop.run()
     except Exception as e:
         print(f"Viewer failed: {e}", file=sys.stderr)
@@ -1289,17 +1289,17 @@ def run_viewer(html_path, clock_format="24h", scene_options=None):
                 if web is not None:
                     try:
                         web.terminate_web_process()
-                    except Exception:
-                        pass
+                    except Exception as exc:
+                        _dbg(f"Suppressed non-fatal exception in _viewer_sig: {exc}")
                     try:
                         web.run_dispose()
-                    except Exception:
-                        pass
+                    except Exception as exc:
+                        _dbg(f"Suppressed non-fatal exception in _viewer_sig: {exc}")
                 w.run_dispose()
-            except Exception:
-                pass
-    except Exception:
-        pass
+            except Exception as exc:
+                _dbg(f"Suppressed non-fatal exception in _viewer_sig: {exc}")
+    except Exception as exc:
+        _dbg(f"Suppressed non-fatal exception in run_viewer: {exc}")
     sys.exit(0)
 
 def show_viewer():
@@ -1331,18 +1331,18 @@ def show_viewer():
                     return True
             try:
                 _uninhibit()
-            except Exception:
-                pass
+            except Exception as exc:
+                _dbg(f"Suppressed non-fatal exception in show_viewer: {exc}")
             try:
                 _restore_overview()
-            except Exception:
-                pass
+            except Exception as exc:
+                _dbg(f"Suppressed non-fatal exception in show_viewer: {exc}")
             try:
                 _cancel_lock()
-            except Exception:
-                pass
-        except Exception:
-            pass
+            except Exception as exc:
+                _dbg(f"Suppressed non-fatal exception in show_viewer: {exc}")
+        except Exception as exc:
+            _dbg(f"Suppressed non-fatal exception in show_viewer: {exc}")
         _is_showing = False
     _is_showing = True
     cfg = load_config()
@@ -1450,15 +1450,15 @@ def hide_viewer():
             for w in list(_viewer_windows):
                 try:
                     w.close()
-                except Exception:
-                    pass
+                except Exception as exc:
+                    _dbg(f"Suppressed non-fatal exception in hide_viewer: {exc}")
             if _viewer_loop is not None:
                 try:
                     _viewer_loop.quit()
-                except Exception:
-                    pass
-        except Exception:
-            pass
+                except Exception as exc:
+                    _dbg(f"Suppressed non-fatal exception in hide_viewer: {exc}")
+        except Exception as exc:
+            _dbg(f"Suppressed non-fatal exception in hide_viewer: {exc}")
         # also terminate WebKit quickly
         try:
             for w in list(_viewer_windows):
@@ -1467,17 +1467,17 @@ def hide_viewer():
                     if web is not None:
                         try:
                             web.terminate_web_process()
-                        except Exception:
-                            pass
-                except Exception:
-                    pass
-        except Exception:
-            pass
+                        except Exception as exc:
+                            _dbg(f"Suppressed non-fatal exception in hide_viewer: {exc}")
+                except Exception as exc:
+                    _dbg(f"Suppressed non-fatal exception in hide_viewer: {exc}")
+        except Exception as exc:
+            _dbg(f"Suppressed non-fatal exception in hide_viewer: {exc}")
         try:
             import sys
             sys.exit(0)
-        except Exception:
-            pass
+        except Exception as exc:
+            _dbg(f"Suppressed non-fatal exception in hide_viewer: {exc}")
         return True
     # Hide reaps synchronously, so remove GLib's competing child watch first.
     if _viewer_child_watch_id is not None:
@@ -1505,10 +1505,10 @@ def hide_viewer():
                         except Exception:
                             try:
                                 _viewer_process.kill()
-                            except Exception:
-                                pass
-                except Exception:
-                    pass
+                            except Exception as exc:
+                                _dbg(f"Suppressed non-fatal exception in hide_viewer: {exc}")
+                except Exception as exc:
+                    _dbg(f"Suppressed non-fatal exception in hide_viewer: {exc}")
             _viewer_process = None
         except Exception:
             _viewer_process = None
@@ -1516,29 +1516,29 @@ def hide_viewer():
         _is_showing = False
         try:
             _uninhibit()
-        except Exception:
-            pass
+        except Exception as exc:
+            _dbg(f"Suppressed non-fatal exception in hide_viewer: {exc}")
         try:
             _restore_overview()
-        except Exception:
-            pass
+        except Exception as exc:
+            _dbg(f"Suppressed non-fatal exception in hide_viewer: {exc}")
         try:
             _cancel_lock()
-        except Exception:
-            pass
+        except Exception as exc:
+            _dbg(f"Suppressed non-fatal exception in hide_viewer: {exc}")
         try:
             _daemon_switch_to_idle_watch()
-        except Exception:
-            pass
+        except Exception as exc:
+            _dbg(f"Suppressed non-fatal exception in hide_viewer: {exc}")
         try:
             _kill_orphan_webkit()
-        except Exception:
-            pass
+        except Exception as exc:
+            _dbg(f"Suppressed non-fatal exception in hide_viewer: {exc}")
         try:
             import gc
             gc.collect()
-        except Exception:
-            pass
+        except Exception as exc:
+            _dbg(f"Suppressed non-fatal exception in hide_viewer: {exc}")
         # also clear legacy in-daemon windows if any (fallback path)
         _viewer_windows = []
         return True
@@ -1550,14 +1550,14 @@ def hide_viewer():
             try:
                 if ctx.find_source_by_id(sid) is not None:
                     GLib.source_remove(sid)
-            except Exception:
-                pass
+            except Exception as exc:
+                _dbg(f"Suppressed non-fatal exception in hide_viewer: {exc}")
         _pending_sources.clear()
     except Exception:
         try:
             _pending_sources.clear()
-        except Exception:
-            pass
+        except Exception as exc:
+            _dbg(f"Suppressed non-fatal exception in hide_viewer: {exc}")
     _is_showing = False
     to_close = list(_viewer_windows)
     try:
@@ -1568,10 +1568,10 @@ def hide_viewer():
             try:
                 if tl.get_title() == "Material Screensaver" and tl not in to_close:
                     to_close.append(tl)
-            except Exception:
-                pass
-    except Exception:
-        pass
+            except Exception as exc:
+                _dbg(f"Suppressed non-fatal exception in hide_viewer: {exc}")
+    except Exception as exc:
+        _dbg(f"Suppressed non-fatal exception in hide_viewer: {exc}")
     if not to_close:
         _viewer_windows = []
         _uninhibit()
@@ -1581,13 +1581,13 @@ def hide_viewer():
         # Ghost bwrap may remain even when no visible window — still kill (second-show ghost)
         try:
             _kill_orphan_webkit()
-        except Exception:
-            pass
+        except Exception as exc:
+            _dbg(f"Suppressed non-fatal exception in hide_viewer: {exc}")
         try:
             import gc
             gc.collect()
-        except Exception:
-            pass
+        except Exception as exc:
+            _dbg(f"Suppressed non-fatal exception in hide_viewer: {exc}")
         return False
     # Ungrab once before closing
     try:
@@ -1598,10 +1598,10 @@ def hide_viewer():
         if display:
             try:
                 display.get_default_seat().ungrab()
-            except Exception:
-                pass
-    except Exception:
-        pass
+            except Exception as exc:
+                _dbg(f"Suppressed non-fatal exception in hide_viewer: {exc}")
+    except Exception as exc:
+        _dbg(f"Suppressed non-fatal exception in hide_viewer: {exc}")
     for w in list(to_close):
         try:
             # Detach WebView first — crucial to let WebKit release bwrap/WebProcess
@@ -1617,46 +1617,46 @@ def hide_viewer():
                         ucm = web.get_user_content_manager()
                         ucm.remove_all_style_sheets()
                         ucm.remove_all_scripts()
-                    except Exception:
-                        pass
-                except Exception:
-                    pass
+                    except Exception as exc:
+                        _dbg(f"Suppressed non-fatal exception in hide_viewer: {exc}")
+                except Exception as exc:
+                    _dbg(f"Suppressed non-fatal exception in hide_viewer: {exc}")
                 try:
                     w.set_child(None)
-                except Exception:
-                    pass
+                except Exception as exc:
+                    _dbg(f"Suppressed non-fatal exception in hide_viewer: {exc}")
                 try:
                     web.stop_loading()
-                except Exception:
-                    pass
+                except Exception as exc:
+                    _dbg(f"Suppressed non-fatal exception in hide_viewer: {exc}")
                 # Don't load about:blank — it spawns new navigation; just terminate
                 try:
                     web.terminate_web_process()
-                except Exception:
-                    pass
+                except Exception as exc:
+                    _dbg(f"Suppressed non-fatal exception in hide_viewer: {exc}")
                 try:
                     web.unparent()
-                except Exception:
-                    pass
+                except Exception as exc:
+                    _dbg(f"Suppressed non-fatal exception in hide_viewer: {exc}")
                 try:
                     # GTK4: run_dispose frees underlying GObject and bwrap pipes (fixes Tasks leak)
                     web.run_dispose()
-                except Exception:
-                    pass
+                except Exception as exc:
+                    _dbg(f"Suppressed non-fatal exception in hide_viewer: {exc}")
             # Remove from Gtk.Application if applicable (prevents ghost dash entry)
             try:
                 if _daemon_app is not None:
                     _daemon_app.remove_window(w)
-            except Exception:
-                pass
+            except Exception as exc:
+                _dbg(f"Suppressed non-fatal exception in hide_viewer: {exc}")
             try:
                 w.close()
-            except Exception:
-                pass
+            except Exception as exc:
+                _dbg(f"Suppressed non-fatal exception in hide_viewer: {exc}")
             try:
                 w.set_visible(False)
-            except Exception:
-                pass
+            except Exception as exc:
+                _dbg(f"Suppressed non-fatal exception in hide_viewer: {exc}")
             # Drop ephemeral ctx reference to allow GC (fixes 30M per cycle creep)
             try:
                 if hasattr(w, "_ephemeral_ctx"):
@@ -1666,22 +1666,22 @@ def hide_viewer():
                         if c is not None:
                             try:
                                 c.clear_cache()
-                            except Exception:
-                                pass
-                    except Exception:
-                        pass
+                            except Exception as exc:
+                                _dbg(f"Suppressed non-fatal exception in hide_viewer: {exc}")
+                    except Exception as exc:
+                        _dbg(f"Suppressed non-fatal exception in hide_viewer: {exc}")
                     try:
                         delattr(w, "_ephemeral_ctx")
-                    except Exception:
-                        pass
-            except Exception:
-                pass
+                    except Exception as exc:
+                        _dbg(f"Suppressed non-fatal exception in hide_viewer: {exc}")
+            except Exception as exc:
+                _dbg(f"Suppressed non-fatal exception in hide_viewer: {exc}")
             try:
                 w.run_dispose()
-            except Exception:
-                pass
-        except Exception:
-            pass
+            except Exception as exc:
+                _dbg(f"Suppressed non-fatal exception in hide_viewer: {exc}")
+        except Exception as exc:
+            _dbg(f"Suppressed non-fatal exception in hide_viewer: {exc}")
     _viewer_windows = []
     _uninhibit()
     _restore_overview()
@@ -1698,54 +1698,54 @@ def hide_viewer():
                 continue
             try:
                 _ctx.clear_cache()
-            except Exception:
-                pass
+            except Exception as exc:
+                _dbg(f"Suppressed non-fatal exception in hide_viewer: {exc}")
             try:
                 mgr = _ctx.get_website_data_manager()
                 if mgr is not None:
                     try:
                         mgr.clear(WebKit.WebsiteDataTypes.MEMORY_CACHE, _GLib.Variant("t", 0), None, None, None)
-                    except Exception:
-                        pass
+                    except Exception as exc:
+                        _dbg(f"Suppressed non-fatal exception in hide_viewer: {exc}")
                     try:
                         mgr.clear(WebKit.WebsiteDataTypes.DISK_CACHE, _GLib.Variant("t", 0), None, None, None)
-                    except Exception:
-                        pass
-            except Exception:
-                pass
+                    except Exception as exc:
+                        _dbg(f"Suppressed non-fatal exception in hide_viewer: {exc}")
+            except Exception as exc:
+                _dbg(f"Suppressed non-fatal exception in hide_viewer: {exc}")
         # also try default context
         try:
             dctx = WebKit.WebContext.get_default()
             if dctx not in (_shared_web_context, _ephemeral_ctx):
                 try:
                     dctx.clear_cache()
-                except Exception:
-                    pass
-        except Exception:
-            pass
+                except Exception as exc:
+                    _dbg(f"Suppressed non-fatal exception in hide_viewer: {exc}")
+        except Exception as exc:
+            _dbg(f"Suppressed non-fatal exception in hide_viewer: {exc}")
         # drop ephemeral to fully free its NetworkProcess (trade ~30M create vs 38M retain)
         try:
             if _ephemeral_ctx is not None:
                 try:
                     _ephemeral_ctx.clear_cache()
-                except Exception:
-                    pass
+                except Exception as exc:
+                    _dbg(f"Suppressed non-fatal exception in hide_viewer: {exc}")
                 _ephemeral_ctx = None
-        except Exception:
-            pass
-    except Exception:
-        pass
+        except Exception as exc:
+            _dbg(f"Suppressed non-fatal exception in hide_viewer: {exc}")
+    except Exception as exc:
+        _dbg(f"Suppressed non-fatal exception in hide_viewer: {exc}")
     try:
         import gc
         gc.collect()
-    except Exception:
-        pass
+    except Exception as exc:
+        _dbg(f"Suppressed non-fatal exception in hide_viewer: {exc}")
     # Kill lingering orphans — btop ghost (also second-show ghost if shared NetworkProcess killed)
     try:
         if not is_viewer_active():
             _kill_orphan_webkit()
-    except Exception:
-        pass
+    except Exception as exc:
+        _dbg(f"Suppressed non-fatal exception in hide_viewer: {exc}")
     try:
         import gi
         gi.require_version("Gtk", "4.0")
@@ -1754,8 +1754,8 @@ def hide_viewer():
             try:
                 import gc as _gc
                 _gc.collect()
-            except Exception:
-                pass
+            except Exception as exc:
+                _dbg(f"Suppressed non-fatal exception in _gc_once: {exc}")
             try:
                 import gi as _gi
                 _gi.require_version("WebKit", "6.0")
@@ -1764,14 +1764,14 @@ def hide_viewer():
                 if c is not None:
                     try:
                         c.clear_cache()
-                    except Exception:
-                        pass
-            except Exception:
-                pass
+                    except Exception as exc:
+                        _dbg(f"Suppressed non-fatal exception in _gc_once: {exc}")
+            except Exception as exc:
+                _dbg(f"Suppressed non-fatal exception in _gc_once: {exc}")
             return False
         GLib.idle_add(_gc_once, priority=GLib.PRIORITY_LOW)
-    except Exception:
-        pass
+    except Exception as exc:
+        _dbg(f"Suppressed non-fatal exception in hide_viewer: {exc}")
     return True
 
 # ---------- D-Bus delegation helpers ----------
@@ -1815,8 +1815,8 @@ def is_running():
         ok, res = _call_daemon("IsActive")
         if ok:
             return bool(res)
-    except Exception:
-        pass
+    except Exception as exc:
+        _dbg(f"Suppressed non-fatal exception in is_running: {exc}")
     return is_viewer_active()
 
 def start():
@@ -1857,19 +1857,19 @@ def start():
             hide_viewer()
             try:
                 loop.quit()
-            except Exception:
-                pass
+            except Exception as exc:
+                _dbg(f"Suppressed non-fatal exception in handle_sigterm: {exc}")
             return GLib.SOURCE_REMOVE
         try:
             GLib.unix_signal_add(GLib.PRIORITY_DEFAULT, signal.SIGTERM, handle_sigterm)
-        except Exception:
-            pass
+        except Exception as exc:
+            _dbg(f"Suppressed non-fatal exception in start: {exc}")
         loop.run()
         # hide_viewer already uninhibited; ensure cleanup even if loop exited without hide
         try:
             hide_viewer()
-        except Exception:
-            pass
+        except Exception as exc:
+            _dbg(f"Suppressed non-fatal exception in start: {exc}")
         _is_showing = False
         _uninhibit()
         _restore_overview()
@@ -1898,8 +1898,8 @@ def stop():
     except Exception:
         try:
             subprocess.run(["pkill", "-f", "material-screensaver-ctl.py start"], capture_output=True, timeout=2)
-        except Exception:
-            pass
+        except Exception as exc:
+            _dbg(f"Suppressed non-fatal exception in stop: {exc}")
 
 def toggle():
     # Use daemon atomic Toggle if available (avoids IsActive→Show race)
@@ -1933,8 +1933,8 @@ def run_daemon():
     # Hold to keep app running without windows
     try:
         app.hold()
-    except Exception:
-        pass
+    except Exception as exc:
+        _dbg(f"Suppressed non-fatal exception in run_daemon: {exc}")
 
     # Ensure overlay/hold cleaned on SIGTERM/SIGINT (systemd stop)
     try:
@@ -1943,34 +1943,34 @@ def run_daemon():
             # have a live session, then release the application hold and quit.
             try:
                 hide_viewer()
-            except Exception:
-                pass
+            except Exception as exc:
+                _dbg(f"Suppressed non-fatal exception in _sig_handler: {exc}")
             try:
                 _restore_overview()
-            except Exception:
-                pass
+            except Exception as exc:
+                _dbg(f"Suppressed non-fatal exception in _sig_handler: {exc}")
             try:
                 _uninhibit()
-            except Exception:
-                pass
+            except Exception as exc:
+                _dbg(f"Suppressed non-fatal exception in _sig_handler: {exc}")
             try:
                 _cancel_lock()
-            except Exception:
-                pass
+            except Exception as exc:
+                _dbg(f"Suppressed non-fatal exception in _sig_handler: {exc}")
             try:
                 app.release()
-            except Exception:
-                pass
+            except Exception as exc:
+                _dbg(f"Suppressed non-fatal exception in _sig_handler: {exc}")
             try:
                 app.quit()
-            except Exception:
-                pass
+            except Exception as exc:
+                _dbg(f"Suppressed non-fatal exception in _sig_handler: {exc}")
             return GLib.SOURCE_REMOVE
         GLib.unix_signal_add(GLib.PRIORITY_DEFAULT, signal.SIGTERM, _sig_handler)
         GLib.unix_signal_add(GLib.PRIORITY_DEFAULT, signal.SIGINT, _sig_handler)
         GLib.unix_signal_add(GLib.PRIORITY_DEFAULT, signal.SIGHUP, _sig_handler)
-    except Exception:
-        pass
+    except Exception as exc:
+        _dbg(f"Suppressed non-fatal exception in run_daemon: {exc}")
 
     # Need to wait for app to be registered before getting display — use globals so manual Show/Hide can switch watches
     global _idle_proxy, _idle_watch_ids
@@ -1998,8 +1998,8 @@ def run_daemon():
             if wid is not None:
                 try:
                     _idle_proxy.call_sync("RemoveWatch", GLib.Variant("(u)", (wid,)), Gio.DBusCallFlags.NONE, -1, None)
-                except Exception:
-                    pass
+                except Exception as exc:
+                    _dbg(f"Suppressed non-fatal exception in remove_watch: {exc}")
                 _idle_watch_ids[kind] = None
 
         def add_idle_watch():
@@ -2048,8 +2048,8 @@ def run_daemon():
 
         try:
             _idle_proxy.connect("g-signal", on_signal)
-        except Exception:
-            pass
+        except Exception as exc:
+            _dbg(f"Suppressed non-fatal exception in setup_idle_watches: {exc}")
         add_idle_watch()
         # Re-read the idle timeout while the daemon is running. Settings writes
         # config.json directly; Mutter's existing idle watch does not update by
@@ -2115,14 +2115,14 @@ def run_daemon():
                         return False
                     try:
                         hide_viewer()
-                    except Exception:
-                        pass
+                    except Exception as exc:
+                        _dbg(f"Suppressed non-fatal exception in _rebuild_for_monitors: {exc}")
                     # small delay so the old process group is fully reaped
                     def _reshow():
                         try:
                             show_viewer()
-                        except Exception:
-                            pass
+                        except Exception as exc:
+                            _dbg(f"Suppressed non-fatal exception in _reshow: {exc}")
                         return False
                     GLib.timeout_add(350, _reshow)
                     return False
@@ -2134,8 +2134,8 @@ def run_daemon():
                     if _mon_rebuild_id["id"] is not None:
                         try:
                             GLib.source_remove(_mon_rebuild_id["id"])
-                        except Exception:
-                            pass
+                        except Exception as exc:
+                            _dbg(f"Suppressed non-fatal exception in _on_monitors_changed: {exc}")
                     _mon_rebuild_id["id"] = GLib.timeout_add(400, _rebuild_for_monitors)
 
                 try:
@@ -2143,8 +2143,8 @@ def run_daemon():
                 except Exception:
                     # older Gdk may not expose the signal on the list model
                     pass
-        except Exception:
-            pass
+        except Exception as exc:
+            _dbg(f"Suppressed non-fatal exception in on_startup: {exc}")
         # Own D-Bus name for delegation (same as before, but ensure app holds it)
         try:
             def on_bus_acquired(conn, name):
@@ -2210,8 +2210,8 @@ def run_daemon():
         print(f"app.run failed: {e}", file=sys.stderr)
         try:
             GLib.MainLoop().run()
-        except Exception:
-            pass
+        except Exception as exc:
+            _dbg(f"Suppressed non-fatal exception in on_activate: {exc}")
 
 if __name__ == "__main__":
     action = sys.argv[1] if len(sys.argv) > 1 else None
