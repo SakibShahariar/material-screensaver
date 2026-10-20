@@ -12,11 +12,16 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      - name: Set up Python for linting
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.x"
+
       - name: Install lint tools
         run: |
           sudo apt-get update -qq
           sudo apt-get install -y -qq shellcheck desktop-file-utils
-          python3 -m pip install --user ruff
+          python -m pip install ruff
 
       - name: Bash syntax + shellcheck
         run: |
@@ -25,7 +30,7 @@ jobs:
 
       - name: Python lint (Ruff)
         run: |
-          "$HOME/.local/bin/ruff" check --select E9,F63,F7,F82 bin/*.py tests/*.py
+          ruff check --select E9,F63,F7,F82 bin/*.py tests/*.py
 
       - name: Desktop file validation
         run: |
