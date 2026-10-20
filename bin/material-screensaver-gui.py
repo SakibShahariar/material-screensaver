@@ -199,14 +199,27 @@ class ScreensaverWindow(Adw.ApplicationWindow):
                 frame.set_overflow(Gtk.Overflow.HIDDEN)
             except Exception:
                 pass
-            self.preview_web = WebKit.WebView()
-            self.preview_web.set_size_request(460, 260)
-            # reduce resources for thumbnail
+            # Use an ephemeral WebKit session like the fullscreen viewer, and
+            # keep local-file permissions aligned with the production renderer.
             try:
-                s = self.preview_web.get_settings()
-                s.set_enable_write_console_messages_to_stdout(False)
+                self.preview_context = WebKit.WebContext.new_ephemeral()
+                try:
+                    self.preview_context.set_cache_model(WebKit.CacheModel.DOCUMENT_VIEWER)
+                except Exception:
+                    pass
+                self.preview_web = WebKit.WebView.new_with_context(self.preview_context)
             except Exception:
-                pass
+                self.preview_context = None
+                self.preview_web = WebKit.WebView()
+            self.preview_web.set_size_request(460, 260)
+            try:
+                settings = self.preview_web.get_settings()
+                settings.set_allow_file_access_from_file_urls(False)
+                settings.set_allow_universal_access_from_file_urls(False)
+                settings.set_enable_write_console_messages_to_stdout(False)
+                settings.set_enable_javascript(True)
+            except Exception as exc:
+                print(f"Could not configure preview WebKit security: {exc}", file=sys.stderr)
             frame.set_child(self.preview_web)
             click = Gtk.GestureClick()
             click.connect("pressed", lambda *_: self._update_preview())
@@ -280,6 +293,7 @@ class ScreensaverWindow(Adw.ApplicationWindow):
         self.set_content(self.toast_overlay)
 
         self.load_state()
+        self.connect("notify::is-active", self.on_preview_activity_changed)
 
         # connect after loading so initial population doesn't trigger writes
         self.random_switch.connect("notify::active", self.on_random_toggled)
@@ -313,6 +327,19 @@ class ScreensaverWindow(Adw.ApplicationWindow):
         self.autostart_switch.set_active(result.stdout.strip() == "enabled")
 
         self.refresh_shortcut_label()
+
+    def on_preview_activity_changed(self, _win, _pspec):
+        """Unload animated preview pages while Settings is not the active window."""
+        if not HAS_WEBKIT or getattr(self, "preview_web", None) is None:
+            return
+        try:
+            if self.get_property("is-active"):
+                self._update_preview()
+            else:
+                self.preview_web.stop_loading()
+                self.preview_web.load_uri("about:blank")
+        except Exception as exc:
+            print(f"Could not suspend inactive preview: {exc}", file=sys.stderr)
 
     def _update_preview(self):
         if not HAS_WEBKIT or not hasattr(self, "preview_web") or self.preview_web is None:
