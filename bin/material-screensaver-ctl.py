@@ -51,6 +51,7 @@ _saved_shell_toggle = None  # saved shell toggle-overview
 _is_showing = False  # guard double-Show TOCTOU
 _pending_sources = []  # GLib source ids for fullscreen retry / gc to cancel on Hide
 _viewer_process = None  # subprocess.Popen for isolated viewer (daemon only, keeps daemon 30M flat)
+_viewer_child_watch_id = None  # GLib child-watch source; removed before synchronous Hide/reap
 _ephemeral_ctx = None  # single ephemeral WebContext reused across Shows (fixes per-Show leak)
 _is_viewer_mode = False  # True in viewer subprocess (isolated WebKit, daemon stays lean)
 _viewer_loop = None  # GLib.MainLoop for viewer subprocess
@@ -1233,7 +1234,8 @@ def show_viewer():
                 watched_pid = _viewer_process.pid
 
                 def _on_child_exit(pid, wait_status, _user_data=None):
-                    global _is_showing, _viewer_process
+                    global _is_showing, _viewer_process, _viewer_child_watch_id
+                    _viewer_child_watch_id = None
                     if _viewer_process is None or _viewer_process.pid != pid:
                         return
                     try:
@@ -1254,7 +1256,8 @@ def show_viewer():
                             print(f"Viewer-exit cleanup failed ({cleanup.__name__}): {exc}",
                                   file=sys.stderr)
 
-                GLib.child_watch_add(GLib.PRIORITY_DEFAULT, watched_pid, _on_child_exit)
+                _viewer_child_watch_id = GLib.child_watch_add(
+                    GLib.PRIORITY_DEFAULT, watched_pid, _on_child_exit)
             else:
                 # In-process fallback has no child to watch; retain a light
                 # visibility check only for that exceptional path.
@@ -1285,7 +1288,7 @@ def show_viewer():
 
 def hide_viewer():
     """Hide/destroy viewer windows in this process. Thorough cleanup to prevent ghost dash/bwrap leak."""
-    global _viewer_windows, _is_showing, _pending_sources, _ephemeral_ctx, _viewer_process, _is_viewer_mode, _viewer_loop
+    global _viewer_windows, _is_showing, _pending_sources, _ephemeral_ctx, _viewer_process, _viewer_child_watch_id, _is_viewer_mode, _viewer_loop
     if not _is_showing and not is_viewer_active():
         return False
     # Viewer subprocess: just close windows and exit, daemon handles inhibit/overlay via child watch
@@ -1323,6 +1326,14 @@ def hide_viewer():
         except Exception:
             pass
         return True
+    # Hide reaps synchronously, so remove GLib's competing child watch first.
+    if _viewer_child_watch_id is not None:
+        try:
+            from gi.repository import GLib
+            GLib.source_remove(_viewer_child_watch_id)
+        except Exception as exc:
+            print(f"Unable to remove viewer child watch before Hide: {exc}", file=sys.stderr)
+        _viewer_child_watch_id = None
     # Daemon: if isolated viewer subprocess alive, terminate it (keeps daemon lean)
     if _viewer_process is not None:
         try:
