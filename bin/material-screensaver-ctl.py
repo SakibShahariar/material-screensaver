@@ -720,6 +720,27 @@ def _lock_screen():
     print("Unable to lock the session: all lock commands failed; keeping screensaver visible.", file=sys.stderr)
     return False
 
+def _handle_viewer_exit(returncode):
+    """Fail closed if the viewer crashes while a lock timeout is configured."""
+    if returncode == 0:
+        return
+    try:
+        lock_after = int(load_config().get("lock_after_seconds", 0) or 0)
+    except (TypeError, ValueError):
+        lock_after = 0
+    if lock_after <= 0:
+        return
+    print(
+        f"Viewer exited abnormally (status {returncode}); attempting immediate session lock.",
+        file=sys.stderr,
+    )
+    if not _lock_screen():
+        print(
+            "Unable to lock the session after abnormal viewer exit.",
+            file=sys.stderr,
+        )
+
+
 def _on_screen_saver_active_changed(active):
     """React to external lock/unlock (GNOME ScreenSaver ActiveChanged signal).
 
@@ -1189,7 +1210,7 @@ def show_viewer():
         try:
             _viewer_process = subprocess.Popen(
                 [sys.executable, os.path.abspath(__file__), "viewer", html_path, clock_format],
-                stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
+                stdout=subprocess.DEVNULL, stderr=None,
                 preexec_fn=os.setsid if hasattr(os, "setsid") else None)
         except Exception as e:
             print(f"Failed to spawn viewer subprocess: {e}", file=sys.stderr)
@@ -1207,7 +1228,9 @@ def show_viewer():
                     if _viewer_process is not None:
                         poll = _viewer_process.poll()
                         if poll is not None:
-                            # child exited (e.g., Super+Q) — cleanup daemon state
+                            # A clean exit is user dismissal; a crash/signal must
+                            # trigger the configured lock policy before cleanup.
+                            _handle_viewer_exit(poll)
                             _is_showing = False
                             _viewer_process = None
                             try:

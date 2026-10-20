@@ -104,6 +104,51 @@ class TestLockCommandChain(unittest.TestCase):
         return self.ctl._lock_screen()
 
 
+class TestAbnormalViewerExit(unittest.TestCase):
+    @classmethod
+    def setUpClass(cls):
+        cls.ctl = support.load_ctl()
+
+    def setUp(self):
+        self._orig = {
+            "load_config": self.ctl.load_config,
+            "_lock_screen": self.ctl._lock_screen,
+        }
+        self.lock_calls = 0
+
+    def tearDown(self):
+        for name, fn in self._orig.items():
+            setattr(self.ctl, name, fn)
+
+    def _lock(self):
+        self.lock_calls += 1
+        return True
+
+    def test_clean_exit_does_not_lock(self):
+        self.ctl.load_config = lambda: {"lock_after_seconds": 300}
+        self.ctl._lock_screen = self._lock
+        self.ctl._handle_viewer_exit(0)
+        self.assertEqual(self.lock_calls, 0)
+
+    def test_abnormal_exit_locks_when_timeout_enabled(self):
+        self.ctl.load_config = lambda: {"lock_after_seconds": 300}
+        self.ctl._lock_screen = self._lock
+        self.ctl._handle_viewer_exit(1)
+        self.assertEqual(self.lock_calls, 1)
+
+    def test_signal_exit_locks_when_timeout_enabled(self):
+        self.ctl.load_config = lambda: {"lock_after_seconds": 300}
+        self.ctl._lock_screen = self._lock
+        self.ctl._handle_viewer_exit(-9)
+        self.assertEqual(self.lock_calls, 1)
+
+    def test_abnormal_exit_does_not_lock_when_disabled(self):
+        self.ctl.load_config = lambda: {"lock_after_seconds": 0}
+        self.ctl._lock_screen = self._lock
+        self.ctl._handle_viewer_exit(1)
+        self.assertEqual(self.lock_calls, 0)
+
+
 class TestExternalLockHandling(unittest.TestCase):
     """org.gnome.ScreenSaver.ActiveChanged(true) while the viewer is up must
     tear the screensaver down — external locks (Super+L, loginctl, GNOME timer)
