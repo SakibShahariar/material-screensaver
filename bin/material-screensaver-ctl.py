@@ -1877,6 +1877,24 @@ def run_daemon():
         except Exception:
             pass
         add_idle_watch()
+        # Re-read the idle timeout while the daemon is running. Settings writes
+        # config.json directly; Mutter's existing idle watch does not update by
+        # itself. Defer re-arming while the viewer is visible, then refresh the
+        # watch as soon as the desktop is active again.
+        last_idle_seconds = [current_idle_seconds()]
+
+        def check_idle_config():
+            try:
+                current = current_idle_seconds()
+                if current != last_idle_seconds[0] and not is_viewer_active():
+                    add_idle_watch()
+                    last_idle_seconds[0] = current
+            except Exception as exc:
+                print(f"Failed to refresh idle timeout: {exc}", file=sys.stderr)
+            return GLib.SOURCE_CONTINUE
+
+        GLib.timeout_add_seconds(2, check_idle_config)
+
         # Expose helpers for manual Show/Hide watch switching
         global _daemon_switch_to_active_watch, _daemon_switch_to_idle_watch
         _daemon_switch_to_active_watch = add_active_watch

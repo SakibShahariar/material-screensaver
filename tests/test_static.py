@@ -175,6 +175,13 @@ class TestJsSyntax(unittest.TestCase):
             except OSError:
                 pass
 
+    def test_daemon_refreshes_idle_watch_when_config_changes(self):
+        source = _read(os.path.join(support.REPO_ROOT, "bin", "material-screensaver-ctl.py"))
+        self.assertIn("def check_idle_config()", source)
+        self.assertIn("GLib.timeout_add_seconds(2, check_idle_config)", source)
+        self.assertIn("current != last_idle_seconds[0] and not is_viewer_active()", source)
+        self.assertIn('print(f"Failed to refresh idle timeout: {exc}"', source)
+
     def test_viewer_disables_universal_file_url_access(self):
         source = _read(os.path.join(support.REPO_ROOT, "bin", "material-screensaver-ctl.py"))
         self.assertIn("set_allow_universal_access_from_file_urls(False)", source)
