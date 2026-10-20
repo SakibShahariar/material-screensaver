@@ -116,6 +116,8 @@ class TestGuiLogic(unittest.TestCase):
             {"random": 1},
             {"clock_format": "12H"},
             {"lock_after_seconds": -2},
+            {"matugen_colors_path": "/tmp/custom-colors.css"},
+            {"matugen_colors_path": "relative.css"},
             {"active": 42},
         ]
         for case in cases:
@@ -182,6 +184,16 @@ class TestGuiLogic(unittest.TestCase):
         self.assertIn("Gtk.GestureClick()", src)
         self.assertIn('self.preview_web.add_controller(click)', src)
         self.assertIn('click.connect("pressed", lambda *_', src)
+
+    def test_matugen_path_setting_is_present_and_applied(self):
+        with open(os.path.join(support.REPO_ROOT, "bin", "material-screensaver-gui.py"),
+                  encoding="utf-8") as f:
+            src = f.read()
+        self.assertIn('title="Colors stylesheet"', src)
+        self.assertIn('self.matugen_path_apply.connect("clicked", self.on_matugen_path_apply)', src)
+        self.assertIn('self._save_config(matugen_colors_path=path)', src)
+        self.assertIn("sync_matugen_colors_link(cfg)", src)
+        self.assertIn("self.matugen_path_entry.set_text(cfg.get(\"matugen_colors_path\", DEFAULT_MATUGEN_COLORS_PATH))", src)
 
     def test_gui_random_import_present(self):
         with open(os.path.join(support.REPO_ROOT, "bin", "material-screensaver-gui.py"),
