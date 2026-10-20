@@ -154,8 +154,9 @@ class TestThemeConsistency(unittest.TestCase):
         self.assertIn("pointer-events:none", source)
         self.assertIn("[id*=\"clock\" i]", source)
         self.assertIn("if (clockLike) return;", source)
-        self.assertIn('scene_has_shared_clock = "clock-shared.js" in scene_source', source)
-        self.assertIn('and not scene_has_shared_clock:', source)
+        self.assertIn("Decide whether to add the overlay from the rendered DOM", source)
+        self.assertIn("if (clockLike) return;", source)
+        self.assertNotIn('scene_has_shared_clock = "clock-shared.js" in scene_source', source)
 
     def test_clock_shared_referenced(self):
         # Every style renders a clock; each must at least reference the helper

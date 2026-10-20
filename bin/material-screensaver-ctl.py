@@ -403,14 +403,11 @@ def _create_viewer_windows(html_path, clock_format="24h", scene_options=None):
         # so never layer a second clock over their canvas-rendered clocks.
         try:
             cfg = load_config()
-            try:
-                with open(html_path, encoding="utf-8", errors="replace") as scene_file:
-                    scene_source = scene_file.read()
-            except OSError as exc:
-                _dbg(f"Could not inspect scene clock support: {exc}")
-                scene_source = ""
-            scene_has_shared_clock = "clock-shared.js" in scene_source
-            if cfg.get("clock_overlay", False) and not scene_has_shared_clock:
+            # Decide whether to add the overlay from the rendered DOM, not
+            # from a source-file helper reference: scenes may load clock-shared.js
+            # without actually rendering a clock, and source inspection can be
+            # stale when scenes build their HUD dynamically.
+            if cfg.get("clock_overlay", False):
                 overlay_config = json.dumps({
                     "position": cfg.get("clock_overlay_position", "bottom-right"),
                     "opacity": cfg.get("clock_overlay_opacity", 80) / 100,
