@@ -399,6 +399,37 @@ def _create_viewer_windows(html_path, clock_format="24h", scene_options=None):
                 _dbg(f"Suppressed non-fatal exception in _create_viewer_windows: {exc}")
         except Exception as exc:
             _dbg(f"Suppressed non-fatal exception in _create_viewer_windows: {exc}")
+        # Cap requestAnimationFrame-driven scenes to reduce CPU/GPU use.
+        # Timer-driven scenes are unaffected by this cap.
+        try:
+            cfg = load_config()
+            fps_limit = cfg.get("fps_limit", 30)
+            fps_script = """(() => {
+const limit = __FPS_LIMIT__;
+const nativeRAF = window.requestAnimationFrame.bind(window);
+let lastFrame = 0;
+window.requestAnimationFrame = callback => nativeRAF(timestamp => {
+  const interval = 1000 / limit;
+  if (timestamp - lastFrame < interval) {
+    window.requestAnimationFrame(callback);
+    return;
+  }
+  lastFrame = timestamp;
+  callback(timestamp);
+});
+})();""".replace("__FPS_LIMIT__", str(fps_limit))
+            ucm = web.get_user_content_manager()
+            fps_user_script = WebKit.UserScript.new(
+                fps_script,
+                WebKit.UserContentInjectedFrames.ALL_FRAMES,
+                WebKit.UserScriptInjectionTime.START,
+                None,
+                None,
+            )
+            ucm.add_script(fps_user_script)
+        except Exception as exc:
+            _dbg(f"Could not install animation frame cap: {exc}")
+
         # Optional shared clock/date overlay. Built-in scenes use clock-shared.js,
         # so never layer a second clock over their canvas-rendered clocks.
         try:

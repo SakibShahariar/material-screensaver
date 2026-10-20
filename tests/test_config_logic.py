@@ -115,6 +115,16 @@ class TestNormalizeConfig(CtlTestCase):
             out = self.ctl.normalize_config({"idle_seconds": bad})
             self.assertEqual(out["idle_seconds"], 300, f"accepted idle_seconds={bad!r}")
 
+    def test_fps_limit_defaults_and_validates(self):
+        self.assertEqual(self.ctl.normalize_config({})["fps_limit"], 30)
+        for good in (10, 30, 60, "45"):
+            self.assertEqual(self.ctl.normalize_config({"fps_limit": good})["fps_limit"], int(good))
+        for bad in (0, 9, 61, True, 30.5, "fast", None):
+            self.assertEqual(self.ctl.normalize_config({"fps_limit": bad})["fps_limit"], 30,
+                             f"accepted fps_limit={bad!r}")
+        self.ctl.config_store.save_config(self.cfg_path, fps_limit=45)
+        self.assertEqual(self.ctl.load_config()["fps_limit"], 45)
+
     def test_lock_after_seconds_zero_ok(self):
         cfg = self.ctl.normalize_config({"lock_after_seconds": 0})
         self.assertEqual(cfg["lock_after_seconds"], 0)

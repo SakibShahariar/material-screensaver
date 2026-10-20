@@ -305,6 +305,11 @@ class ScreensaverWindow(Adw.ApplicationWindow):
         self.lock_row.set_title("Lock after")
         self.lock_row.set_subtitle("Seconds on screensaver before lock (0 = never; max 86,400)")
         timing_group.add(self.lock_row)
+        self.fps_row = Adw.SpinRow.new_with_range(10, 60, 5)
+        self.fps_row.set_digits(0)
+        self.fps_row.set_title("Animation frame-rate cap")
+        self.fps_row.set_subtitle("Limit requestAnimationFrame scenes to 10–60 FPS (default 30)")
+        timing_group.add(self.fps_row)
 
         # --- Clock format ---
         clock_group = Adw.PreferencesGroup(title="Clock")
@@ -405,6 +410,7 @@ class ScreensaverWindow(Adw.ApplicationWindow):
         self.combo_row.connect("notify::selected", self.on_screensaver_changed)
         self.idle_row.connect("notify::value", self.on_idle_changed)
         self.lock_row.connect("notify::value", self.on_lock_changed)
+        self.fps_row.connect("notify::value", self.on_fps_changed)
         self.ampm_switch.connect("notify::active", self.on_ampm_toggled)
         self.clock_overlay_switch.connect("notify::active", self.on_clock_overlay_toggled)
         self.clock_overlay_position_row.connect("notify::selected", self.on_clock_overlay_position_changed)
@@ -441,6 +447,7 @@ class ScreensaverWindow(Adw.ApplicationWindow):
 
         self.idle_row.set_value(cfg.get("idle_seconds", 300))
         self.lock_row.set_value(cfg.get("lock_after_seconds", 300))
+        self.fps_row.set_value(cfg.get("fps_limit", 30))
 
         self.ampm_switch.set_active(cfg.get("clock_format", "24h") == "12h")
         self.clock_overlay_switch.set_active(cfg.get("clock_overlay", False))
@@ -721,6 +728,10 @@ class ScreensaverWindow(Adw.ApplicationWindow):
 
     def on_lock_changed(self, row, _pspec):
         self._save_config(lock_after_seconds=int(row.get_value()))
+
+    def on_fps_changed(self, row, _pspec):
+        if self._save_config(fps_limit=int(row.get_value())):
+            self._update_preview()
 
     def on_ampm_toggled(self, switch, _pspec):
         self._save_config(clock_format="12h" if switch.get_active() else "24h")
