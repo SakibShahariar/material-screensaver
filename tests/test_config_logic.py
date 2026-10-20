@@ -130,6 +130,18 @@ class TestNormalizeConfig(CtlTestCase):
             self.assertEqual(self.ctl.normalize_config({"clock_format": bad})["clock_format"], "24h",
                              f"accepted clock_format={bad!r}")
 
+    def test_favorites_accept_unique_safe_html_filenames_only(self):
+        self.assertEqual(self.ctl.normalize_config({})["favorites"], [])
+        cfg = self.ctl.normalize_config({
+            "favorites": ["blob.html", "starfield.html", "blob.html", "../secret.html", 12, ""]
+        })
+        self.assertEqual(cfg["favorites"], ["blob.html", "starfield.html"])
+
+    def test_favorites_roundtrip_through_config_file(self):
+        self.ctl.CONFIG_PATH = self.cfg_path
+        self.ctl.save_config(favorites=["blob.html", "sakura.html"])
+        self.assertEqual(self.ctl.load_config()["favorites"], ["blob.html", "sakura.html"])
+
     def test_matugen_path_requires_absolute_nonempty_string(self):
         default = self.ctl.DEFAULT_MATUGEN_COLORS_PATH
         self.assertEqual(self.ctl.normalize_config({})["matugen_colors_path"], default)

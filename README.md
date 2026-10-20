@@ -76,6 +76,7 @@ The settings app also has command-line hooks for suite integrations that should 
 The settings app lets you:
 
 - choose a specific screensaver or enable **Random each time**;
+- search scenes by name, filter by category, and persist favorites;
 - set the idle timeout (default: 5 minutes);
 - set **Lock after**, the time the screensaver remains visible before locking the GNOME session (default: 5 minutes; set to 0 to disable);
 - choose a 12-hour or 24-hour clock;

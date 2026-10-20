@@ -13,6 +13,7 @@ DEFAULT_CONFIG = {
     "random": False,
     "lock_after_seconds": 300,
     "matugen_colors_path": DEFAULT_MATUGEN_COLORS_PATH,
+    "favorites": [],
 }
 
 
@@ -52,6 +53,12 @@ def normalize_config(data):
         colors_path = os.path.expanduser(colors_path.strip())
         if os.path.isabs(colors_path):
             cfg["matugen_colors_path"] = os.path.normpath(colors_path)
+    favorites = data.get("favorites", [])
+    if isinstance(favorites, list):
+        cfg["favorites"] = list(dict.fromkeys(
+            name for name in favorites
+            if isinstance(name, str) and name.endswith(".html") and os.path.basename(name) == name
+        ))
     return cfg
 
 

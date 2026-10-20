@@ -197,6 +197,33 @@ class TestGuiLogic(unittest.TestCase):
         ))
         self.assertEqual(os.readlink(link), second)
 
+    def test_filter_screensavers_search_category_and_favorites(self):
+        files = ["blob.html", "starfield.html", "sakura.html", "voronoi.html"]
+        self.assertEqual(self.gui.filter_screensavers(files, query="STAR"), ["starfield.html"])
+        self.assertEqual(self.gui.filter_screensavers(files, category="Nature"), ["sakura.html"])
+        self.assertEqual(
+            self.gui.filter_screensavers(files, favorites=["blob.html"], favorites_only=True),
+            ["blob.html"],
+        )
+        self.assertEqual(
+            self.gui.filter_screensavers(
+                files, query="o", category="Geometric", favorites=["voronoi.html"],
+                favorites_only=True,
+            ),
+            ["voronoi.html"],
+        )
+        self.assertEqual(self.gui.filter_screensavers(files, query="no match"), [])
+        self.assertEqual(files, ["blob.html", "starfield.html", "sakura.html", "voronoi.html"])
+
+    def test_filtering_does_not_persist_or_change_active_scene(self):
+        with open(os.path.join(support.REPO_ROOT, "bin", "material-screensaver-gui.py"),
+                  encoding="utf-8") as f:
+            src = f.read()
+        start = src.index("    def _rebuild_screensaver_picker(self, preserve_scene=None):")
+        end = src.index("    def on_picker_filter_changed(", start)
+        self.assertNotIn("_save_config", src[start:end])
+        self.assertIn("self.selected_scene = self.filtered_screensaver_files[idx]", src)
+
     def test_cli_lists_scenes_without_opening_gui(self):
         import contextlib
         import io

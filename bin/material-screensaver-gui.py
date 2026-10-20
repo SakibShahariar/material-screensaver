@@ -94,6 +94,66 @@ def list_screensavers():
     return [os.path.basename(path) for path in config_store.list_screensavers(SCREENSAVER_DIR)]
 
 
+SCENE_CATEGORIES = {
+    "autumnleaves.html": "Nature",
+    "blob.html": "Abstract",
+    "bounce.html": "Abstract",
+    "bubbles.html": "Nature",
+    "circuitboard.html": "Geometric",
+    "city.html": "Abstract",
+    "constellation.html": "Space",
+    "cymatics.html": "Generative Art",
+    "fireworks.html": "Nature",
+    "flow.html": "Generative Art",
+    "gameoflife.html": "Generative Art",
+    "glitch.html": "Generative Art",
+    "kaleidoscope.html": "Geometric",
+    "lanterns.html": "Nature",
+    "magnetic-field-lines.html": "Space",
+    "metaphysical-horizon.html": "Space",
+    "n-body-galaxies.html": "Space",
+    "organic-harmonic-field.html": "Generative Art",
+    "origami.html": "Geometric",
+    "papercranes.html": "Geometric",
+    "quantum-interference.html": "Space",
+    "rain-on-a-window.html": "Nature",
+    "rain.html": "Nature",
+    "sakura.html": "Nature",
+    "soft-body-creatures.html": "Nature",
+    "solar-system.html": "Space",
+    "starfield.html": "Space",
+    "strange-attractor-flow.html": "Generative Art",
+    "typewriter.html": "Abstract",
+    "voronoi.html": "Geometric",
+    "wave-function-collapse.html": "Generative Art",
+}
+CATEGORY_OPTIONS = [
+    "All categories", "Space", "Nature", "Generative Art",
+    "Geometric", "Abstract", "Other",
+]
+
+
+def filter_screensavers(filenames, query="", category="All categories",
+                        favorites=(), favorites_only=False):
+    """Filter scene filenames without changing selection or persisted config."""
+    query = (query or "").strip().casefold()
+    favorite_names = {
+        name for name in favorites if isinstance(name, str)
+    }
+    if category not in CATEGORY_OPTIONS:
+        category = "All categories"
+    result = []
+    for filename in filenames:
+        if query and query not in filename.casefold() and query not in display_name(filename).casefold():
+            continue
+        if category != "All categories" and SCENE_CATEGORIES.get(filename, "Other") != category:
+            continue
+        if favorites_only and filename not in favorite_names:
+            continue
+        result.append(filename)
+    return result
+
+
 class ScreensaverWindow(Adw.ApplicationWindow):
     def __init__(self, app):
         super().__init__(application=app, title="Screensaver")
@@ -118,7 +178,37 @@ class ScreensaverWindow(Adw.ApplicationWindow):
         random_row.set_activatable_widget(self.random_switch)
         sv_group.add(random_row)
 
+        self.search_entry = Gtk.SearchEntry(hexpand=True)
+        self.search_entry.set_placeholder_text("Search scenes by name")
+        search_row = Adw.ActionRow(title="Search")
+        search_row.add_suffix(self.search_entry)
+        sv_group.add(search_row)
+
+        self.category_row = Adw.ComboRow(title="Category")
+        self.category_row.set_model(Gtk.StringList.new(CATEGORY_OPTIONS))
+        sv_group.add(self.category_row)
+
+        self.favorites_only_switch = Gtk.Switch(valign=Gtk.Align.CENTER)
+        favorites_only_row = Adw.ActionRow(
+            title="Favorites only",
+            subtitle="Filter the picker to saved favorites",
+        )
+        favorites_only_row.add_suffix(self.favorites_only_switch)
+        favorites_only_row.set_activatable_widget(self.favorites_only_switch)
+        sv_group.add(favorites_only_row)
+
+        self.favorite_button = Gtk.Button(label="☆ Add to favorites", valign=Gtk.Align.CENTER)
+        favorite_row = Adw.ActionRow(
+            title="Selected scene",
+            subtitle="Save or remove the selected scene from favorites",
+        )
+        favorite_row.add_suffix(self.favorite_button)
+        sv_group.add(favorite_row)
+
         self.screensaver_files = list_screensavers()
+        self.filtered_screensaver_files = list(self.screensaver_files)
+        self.selected_scene = None
+        self._picker_updating = False
         self.combo_row = Adw.ComboRow(title="Active screensaver")
         if self.screensaver_files:
             names = Gtk.StringList.new([display_name(f) for f in self.screensaver_files])
@@ -264,6 +354,10 @@ class ScreensaverWindow(Adw.ApplicationWindow):
         self.idle_row.connect("notify::value", self.on_idle_changed)
         self.lock_row.connect("notify::value", self.on_lock_changed)
         self.ampm_switch.connect("notify::active", self.on_ampm_toggled)
+        self.search_entry.connect("search-changed", self.on_picker_filter_changed)
+        self.category_row.connect("notify::selected", self.on_picker_filter_changed)
+        self.favorites_only_switch.connect("notify::active", self.on_picker_filter_changed)
+        self.favorite_button.connect("clicked", self.on_toggle_favorite)
         self.autostart_switch.connect("notify::active", self.on_autostart_toggled)
 
     def load_state(self):
@@ -271,12 +365,11 @@ class ScreensaverWindow(Adw.ApplicationWindow):
 
         is_random = cfg.get("random", False) and self._preview_override is None
         self.random_switch.set_active(is_random)
-        self.combo_row.set_sensitive(bool(self.screensaver_files) and not is_random)
-
-        if self.screensaver_files:
-            active = self._preview_override or cfg.get("active")
-            idx = self.screensaver_files.index(active) if active in self.screensaver_files else 0
-            self.combo_row.set_selected(idx)
+        active = self._preview_override or cfg.get("active")
+        self.selected_scene = active if active in self.screensaver_files else (
+            self.screensaver_files[0] if self.screensaver_files else None
+        )
+        self._rebuild_screensaver_picker(self.selected_scene)
 
         self.idle_row.set_value(cfg.get("idle_seconds", 300))
         self.lock_row.set_value(cfg.get("lock_after_seconds", 300))
@@ -315,6 +408,56 @@ class ScreensaverWindow(Adw.ApplicationWindow):
         self._run_systemctl_async(["is-active", SERVICE_NAME], on_active_checked)
         self.refresh_shortcut_label()
 
+    def _rebuild_screensaver_picker(self, preserve_scene=None):
+        cfg = load_config()
+        category_index = self.category_row.get_selected()
+        category = CATEGORY_OPTIONS[category_index] if category_index < len(CATEGORY_OPTIONS) else "All categories"
+        filtered = filter_screensavers(
+            self.screensaver_files,
+            query=self.search_entry.get_text(),
+            category=category,
+            favorites=cfg.get("favorites", []),
+            favorites_only=self.favorites_only_switch.get_active(),
+        )
+        self.filtered_screensaver_files = filtered
+        self._picker_updating = True
+        try:
+            if filtered:
+                self.combo_row.set_model(Gtk.StringList.new([display_name(f) for f in filtered]))
+                selected = filtered.index(preserve_scene) if preserve_scene in filtered else Gtk.INVALID_LIST_POSITION
+                self.combo_row.set_selected(selected)
+                subtitle = "" if preserve_scene in filtered else "Current selection is hidden by filters; it has not changed"
+            else:
+                self.combo_row.set_model(Gtk.StringList.new(["No matching scenes"]))
+                self.combo_row.set_selected(0)
+                subtitle = "No scenes match these filters; current selection is unchanged"
+            self.combo_row.set_subtitle(subtitle)
+            self.combo_row.set_sensitive(bool(filtered) and not self.random_switch.get_active())
+        finally:
+            self._picker_updating = False
+        self._refresh_favorite_button()
+
+    def on_picker_filter_changed(self, *_args):
+        self._rebuild_screensaver_picker(self.selected_scene)
+
+    def _refresh_favorite_button(self):
+        favorites = load_config().get("favorites", [])
+        is_favorite = self.selected_scene in favorites
+        self.favorite_button.set_label("★ Remove from favorites" if is_favorite else "☆ Add to favorites")
+        self.favorite_button.set_sensitive(self.selected_scene in self.screensaver_files)
+
+    def on_toggle_favorite(self, _button):
+        if self.selected_scene not in self.screensaver_files:
+            return
+        favorites = list(load_config().get("favorites", []))
+        if self.selected_scene in favorites:
+            favorites.remove(self.selected_scene)
+        else:
+            favorites.append(self.selected_scene)
+        if self._save_config(favorites=favorites):
+            self._rebuild_screensaver_picker(self.selected_scene)
+
+
     def on_preview_activity_changed(self, _win, _pspec):
         """Unload animated preview pages while Settings is not the active window."""
         if not HAS_WEBKIT or getattr(self, "preview_web", None) is None:
@@ -339,14 +482,13 @@ class ScreensaverWindow(Adw.ApplicationWindow):
         cfg = load_config()
         sync_matugen_colors_link(cfg)
         if self._preview_override in self.screensaver_files:
-            idx = self.screensaver_files.index(self._preview_override)
+            fn = self._preview_override
         elif cfg.get("random", False):
             # Random mode previews a random style each refresh.
-            idx = random.randrange(len(self.screensaver_files)) if self.screensaver_files else -1
+            fn = random.choice(self.screensaver_files) if self.screensaver_files else None
         else:
-            idx = self.combo_row.get_selected()
-        if 0 <= idx < len(self.screensaver_files):
-            fn = self.screensaver_files[idx]
+            fn = self.selected_scene
+        if fn in self.screensaver_files:
             path = os.path.join(SCREENSAVER_DIR, fn)
             fmt = cfg.get("clock_format", "24h")
             uri = Gio.File.new_for_path(path).get_uri()
@@ -447,18 +589,23 @@ class ScreensaverWindow(Adw.ApplicationWindow):
         self._preview_override = None
         is_random = switch.get_active()
         self._save_config(random=is_random)
-        self.combo_row.set_sensitive(bool(self.screensaver_files) and not is_random)
+        self.combo_row.set_sensitive(bool(self.filtered_screensaver_files) and not is_random)
         self._update_preview()
 
     def on_screensaver_changed(self, row, _pspec):
+        if self._picker_updating:
+            return
+        idx = row.get_selected()
+        if not 0 <= idx < len(self.filtered_screensaver_files):
+            return
         had_preview_override = self._preview_override is not None
         self._preview_override = None
-        idx = row.get_selected()
-        if 0 <= idx < len(self.screensaver_files):
-            updates = {"active": self.screensaver_files[idx]}
-            if had_preview_override:
-                updates["random"] = False
-            self._save_config(**updates)
+        self.selected_scene = self.filtered_screensaver_files[idx]
+        updates = {"active": self.selected_scene}
+        if had_preview_override:
+            updates["random"] = False
+        self._save_config(**updates)
+        self._refresh_favorite_button()
         self._update_preview()
 
     def on_idle_changed(self, row, _pspec):
