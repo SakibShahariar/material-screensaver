@@ -14,12 +14,15 @@ function formatClock() {
     h = h % 12;
     if (h === 0) h = 12;
   }
-  const days = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
-  const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+  const date = new Intl.DateTimeFormat(undefined, {
+    weekday: 'short',
+    month: 'short',
+    day: 'numeric',
+  }).format(now);
   return {
     time: `${use12h ? h : pad2(h)}:${pad2(now.getMinutes())}`,
     suffix,
-    date: `${days[now.getDay()]}, ${months[now.getMonth()]} ${now.getDate()}`,
+    date,
   };
 }
 

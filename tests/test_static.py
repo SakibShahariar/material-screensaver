@@ -175,6 +175,13 @@ class TestJsSyntax(unittest.TestCase):
             except OSError:
                 pass
 
+    def test_shared_clock_uses_runtime_locale_for_date(self):
+        text = _read(os.path.join(support.REPO_ROOT, "screensavers", "clock-shared.js"))
+        self.assertIn("new Intl.DateTimeFormat(undefined", text)
+        self.assertIn("weekday: 'short'", text)
+        self.assertIn("month: 'short'", text)
+        self.assertNotIn("const days = ['Sun'", text)
+
     def test_solar_system_fallback_respects_clock_format(self):
         text = _read(os.path.join(support.REPO_ROOT, "screensavers", "solar-system.html"))
         start = text.index("function fallbackClock()")
