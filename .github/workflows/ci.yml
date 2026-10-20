@@ -69,7 +69,8 @@ jobs:
             gir1.2-gtk-4.0 \
             gir1.2-adw-1 \
             gir1.2-webkit-6.0 \
-            gir1.2-gdkpixbuf-2.0
+            gir1.2-gdkpixbuf-2.0 \
+            xvfb
 
       - name: Python syntax + GI import smoke test
         run: |
@@ -88,3 +89,7 @@ jobs:
           # Use Ubuntu's system Python so apt-installed PyGObject is importable;
           # otherwise GUI logic tests silently skip under setup-python.
           /usr/bin/python3 -m unittest discover -s tests -v
+
+      - name: WebKit CSP resource-policy integration test
+        run: |
+          xvfb-run -a /usr/bin/python3 -m unittest discover -s tests -p test_webkit_csp.py -v
