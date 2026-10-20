@@ -451,10 +451,14 @@ class ScreensaverWindow(Adw.ApplicationWindow):
         self._update_preview()
 
     def on_screensaver_changed(self, row, _pspec):
+        had_preview_override = self._preview_override is not None
         self._preview_override = None
         idx = row.get_selected()
         if 0 <= idx < len(self.screensaver_files):
-            self._save_config(active=self.screensaver_files[idx])
+            updates = {"active": self.screensaver_files[idx]}
+            if had_preview_override:
+                updates["random"] = False
+            self._save_config(**updates)
         self._update_preview()
 
     def on_idle_changed(self, row, _pspec):
@@ -523,6 +527,7 @@ class ScreensaverApp(Adw.Application):
 
 def main(argv=None):
     global REQUESTED_PREVIEW
+    REQUESTED_PREVIEW = None
     parser = argparse.ArgumentParser(
         description="Open Material Screensaver settings or a specific live scene preview."
     )
