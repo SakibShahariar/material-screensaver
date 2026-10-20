@@ -142,9 +142,11 @@ class TestShellExtension(unittest.TestCase):
     def test_install_stages_and_can_restore_previous_screensavers(self):
         sh = self._read_sh()
         self.assertIn('mktemp -d "$DATA_DIR/.screensavers.new.XXXXXX"', sh)
-        self.assertIn('BACKUP_DIR="$(mktemp -u "$DATA_DIR/.screensavers.backup.XXXXXX")"', sh)
+        self.assertIn('BACKUP_DIR="$(mktemp -d "$DATA_DIR/.screensavers.backup.XXXXXX")"', sh)
+        self.assertNotIn('mktemp -u', sh)
+        self.assertIn('"$BACKUP_DIR/previous"', sh)
         self.assertIn('mv -- "$SCREENSAVERS_DIR" "$BACKUP_DIR"', sh)
-        self.assertIn('mv -- "$BACKUP_DIR" "$SCREENSAVERS_DIR"', sh)
+        self.assertIn('mv -- "$BACKUP_DIR/previous" "$SCREENSAVERS_DIR"', sh)
         self.assertIn('if [[ "$status" -ne 0 && -d "$SCREENSAVERS_DIR" ]]', sh)
         self.assertIn('systemctl --user start material-screensaver.service', sh)
         self.assertNotIn('rm -rf ~/.local/share/material-screensaver/screensavers', sh)
