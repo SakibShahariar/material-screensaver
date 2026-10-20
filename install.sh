@@ -63,9 +63,7 @@ if [[ -e "$SCREENSAVERS_DIR" ]]; then
 fi
 if ! mv -- "$TMP_DIR" "$SCREENSAVERS_DIR"; then
   echo "Failed to install screensavers; attempting to restore the previous version." >&2
-  if [[ -d "$BACKUP_DIR" ]]; then
-    mv -- "$BACKUP_DIR" "$SCREENSAVERS_DIR" || true
-  fi
+  # The EXIT trap restores BACKUP_DIR/previous after this nonzero exit.
   exit 1
 fi
 TMP_DIR=""
