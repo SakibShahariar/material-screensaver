@@ -12,18 +12,10 @@ mkdir -p ~/.local/bin \
          ~/.config/systemd/user \
          ~/.local/share/applications
 
-# stop daemon briefly to avoid launching a half-written screensaver
-systemctl --user stop material-screensaver.service 2>/dev/null || true
-
-cp "$SCRIPT_DIR"/bin/*.py ~/.local/bin/
-chmod +x ~/.local/bin/material-screensaver-ctl.py ~/.local/bin/material-screensaver-gui.py
-
 # Stage on the same filesystem as the destination so the final rename is atomic.
 DATA_DIR="$HOME/.local/share/material-screensaver"
 SCREENSAVERS_DIR="$DATA_DIR/screensavers"
-TMP_DIR="$(mktemp -d "$DATA_DIR/.screensavers.new.XXXXXX")"
-BACKUP_DIR="$DATA_DIR/.screensavers.backup.$"
-
+TMP_DIR=""
 cleanup_screensaver_stage() {
   local status=$?
   if [[ -n "${TMP_DIR:-}" && -d "$TMP_DIR" ]]; then
@@ -45,6 +37,13 @@ cleanup_screensaver_stage() {
 }
 trap cleanup_screensaver_stage EXIT
 
+# stop daemon briefly to avoid launching a half-written screensaver
+systemctl --user stop material-screensaver.service 2>/dev/null || true
+
+cp "$SCRIPT_DIR"/bin/*.py ~/.local/bin/
+chmod +x ~/.local/bin/material-screensaver-ctl.py ~/.local/bin/material-screensaver-gui.py
+
+TMP_DIR="$(mktemp -d "$DATA_DIR/.screensavers.new.XXXXXX")"
 cp -a "$SCRIPT_DIR"/screensavers/. "$TMP_DIR"/
 # Pages use this local name. Keep it linked to the installing user's Matugen
 # output; a missing target is harmless because pages have built-in fallbacks.
