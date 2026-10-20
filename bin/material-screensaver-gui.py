@@ -17,6 +17,7 @@ import json
 import glob
 import random
 import subprocess
+import tempfile
 import re
 import html as html_lib
 from urllib.parse import urlencode
@@ -98,25 +99,28 @@ def save_config(**updates):
     # Always write a normalized config so bad values (e.g. fractional
     # idle from a hand-edited JSON) cannot persist across restarts.
     cfg = normalize_config(cfg)
-    os.makedirs(os.path.dirname(CONFIG_PATH), exist_ok=True)
-    tmp = CONFIG_PATH + ".tmp"
+    config_dir = os.path.dirname(CONFIG_PATH)
+    os.makedirs(config_dir, exist_ok=True)
+    fd, tmp = tempfile.mkstemp(prefix=".material-screensaver-", suffix=".tmp", dir=config_dir)
     try:
-        with open(tmp, "w") as f:
+        handle = os.fdopen(fd, "w", encoding="utf-8")
+        fd = None
+        with handle as f:
             json.dump(cfg, f, indent=2)
             f.flush()
             os.fsync(f.fileno())
-        os.rename(tmp, CONFIG_PATH)
+        os.replace(tmp, CONFIG_PATH)
     except Exception:
+        if fd is not None:
+            try:
+                os.close(fd)
+            except OSError:
+                pass
         try:
-            with open(CONFIG_PATH, "w") as f:
-                json.dump(cfg, f, indent=2)
-        except Exception:
+            os.unlink(tmp)
+        except OSError:
             pass
-        try:
-            if os.path.exists(tmp):
-                os.remove(tmp)
-        except Exception:
-            pass
+        raise
 
 
 def display_name(filename):
@@ -266,7 +270,9 @@ class ScreensaverWindow(Adw.ApplicationWindow):
         shortcut_group.add(self.shortcut_row)
 
         toolbar_view.set_content(page)
-        self.set_content(toolbar_view)
+        self.toast_overlay = Adw.ToastOverlay()
+        self.toast_overlay.set_child(toolbar_view)
+        self.set_content(self.toast_overlay)
 
         self.load_state()
 
@@ -322,6 +328,15 @@ class ScreensaverWindow(Adw.ApplicationWindow):
                 self.preview_web.load_uri(uri)
             except Exception:
                 pass
+
+    def _save_config(self, **updates):
+        try:
+            save_config(**updates)
+        except Exception as exc:
+            print(f"Failed to save Material Screensaver settings: {exc}", file=sys.stderr)
+            self.toast_overlay.add_toast(
+                Adw.Toast.new(f"Settings could not be saved: {exc}")
+            )
 
     def refresh_shortcut_label(self):
         try:
@@ -386,24 +401,24 @@ class ScreensaverWindow(Adw.ApplicationWindow):
 
     def on_random_toggled(self, switch, _pspec):
         is_random = switch.get_active()
-        save_config(random=is_random)
+        self._save_config(random=is_random)
         self.combo_row.set_sensitive(bool(self.screensaver_files) and not is_random)
         self._update_preview()
 
     def on_screensaver_changed(self, row, _pspec):
         idx = row.get_selected()
         if 0 <= idx < len(self.screensaver_files):
-            save_config(active=self.screensaver_files[idx])
+            self._save_config(active=self.screensaver_files[idx])
         self._update_preview()
 
     def on_idle_changed(self, row, _pspec):
-        save_config(idle_seconds=int(row.get_value() * 60))
+        self._save_config(idle_seconds=int(row.get_value() * 60))
 
     def on_lock_changed(self, row, _pspec):
-        save_config(lock_after_seconds=int(row.get_value() * 60))
+        self._save_config(lock_after_seconds=int(row.get_value() * 60))
 
     def on_ampm_toggled(self, switch, _pspec):
-        save_config(clock_format="12h" if switch.get_active() else "24h")
+        self._save_config(clock_format="12h" if switch.get_active() else "24h")
         self._update_preview()
 
     def on_autostart_toggled(self, switch, _pspec):

@@ -126,11 +126,23 @@ class TestGuiLogic(unittest.TestCase):
     def test_save_config_atomic_and_roundtrip(self):
         self.gui.save_config(active="blob.html", idle_seconds=123)
         self.assertTrue(os.path.isfile(self.gui.CONFIG_PATH))
-        # no lingering .tmp after an atomic rename
-        self.assertFalse(os.path.exists(self.gui.CONFIG_PATH + ".tmp"))
+        # The unique temporary file is removed after an atomic replacement.
+        leftovers = [name for name in os.listdir(self._tmp.name) if name.endswith(".tmp")]
+        self.assertEqual(leftovers, [])
         cfg = self.gui.load_config()
         self.assertEqual(cfg["active"], "blob.html")
         self.assertEqual(cfg["idle_seconds"], 123)
+
+    def test_save_config_propagates_atomic_write_failure(self):
+        original = self.gui.os.replace
+        self.gui.os.replace = lambda *_args: (_ for _ in ()).throw(OSError("read-only filesystem"))
+        try:
+            with self.assertRaisesRegex(OSError, "read-only filesystem"):
+                self.gui.save_config(active="blob.html")
+        finally:
+            self.gui.os.replace = original
+        leftovers = [name for name in os.listdir(self._tmp.name) if name.endswith(".tmp")]
+        self.assertEqual(leftovers, [])
 
     def test_save_preserves_other_keys(self):
         self._write({"active": "a.html", "clock_format": "12h", "random": True})
