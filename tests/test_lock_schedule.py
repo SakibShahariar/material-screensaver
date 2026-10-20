@@ -46,7 +46,10 @@ class TestScheduleLock(unittest.TestCase):
         self.cfg = {"active": "blob.html", "idle_seconds": 300,
                     "lock_after_seconds": 1, "clock_format": "24h",
                     "random": False}
-        self.ctl._lock_screen = lambda: self.calls.append("lock")
+        def fake_lock():
+            self.calls.append("lock")
+            return True  # the scheduler hides only after a confirmed lock
+        self.ctl._lock_screen = fake_lock
         self.ctl.hide_viewer = lambda: self.calls.append("hide")
         self.ctl.is_viewer_active = lambda: self.viewer_active
         self.ctl.load_config = lambda: self.cfg
