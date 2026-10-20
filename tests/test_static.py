@@ -98,12 +98,12 @@ class TestThemeConsistency(unittest.TestCase):
         for path in support.html_files():
             text = _read(path)
             name = os.path.basename(path)
-            root = re.search(r":root\\s*\\{([^}]*)\\}", text, re.I | re.S)
+            root = re.search(r":root\s*\{([^}]*)\}", text, re.I | re.S)
             with self.subTest(file=name):
                 self.assertIsNotNone(root, f"{name}: no inline :root palette fallback")
                 self.assertRegex(
                     root.group(1),
-                    r"--[\\w-]+\\s*:\\s*(?:#[0-9a-f]{3,8}\\b|rgb|rgba|[0-9])",
+                    r"--[\w-]+\s*:\s*(?:#[0-9a-f]{3,8}\b|rgb|rgba|[0-9])",
                     f"{name}: no concrete inline CSS variable fallback",
                 )
 
