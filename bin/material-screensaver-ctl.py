@@ -34,6 +34,32 @@ SCREENSAVER_DIR = os.path.expanduser("~/.local/share/material-screensaver/screen
 CONFIG_PATH = os.path.expanduser("~/.config/material-screensaver/config.json")
 DEFAULT_MATUGEN_COLORS_PATH = config_store.DEFAULT_MATUGEN_COLORS_PATH
 DEFAULT_CONFIG = config_store.DEFAULT_CONFIG
+
+# D-Bus service for daemon delegation (PID file gone)
+SERVICE_NAME = "io.github.sakib.MaterialScreensaver"
+OBJECT_PATH = "/io/github/sakib/MaterialScreensaver"
+INTERFACE_NAME = "io.github.sakib.MaterialScreensaver"
+
+# Viewer state (daemon or standalone)
+_viewer_windows = []  # list[Gtk.Window]
+_viewer_inhibit_cookie = None
+_viewer_inhibit_proxy = None
+_daemon_app = None  # Gtk.Application for daemon (Wayland fullscreen needs ApplicationWindow)
+_idle_proxy = None  # Gio.DBusProxy for org.gnome.Mutter.IdleMonitor (daemon only)
+_idle_watch_ids = {"idle": None, "active": None}
+_lock_timeout_id = None  # GLib source id for lock after screensaver
+_session_locked = False  # suppress idle-triggered shows during a GNOME lock
+_login1_session_proxy = None  # retain logind session proxy for lock notifications
+_saved_overlay_key = None  # saved org.gnome.mutter overlay-key while Super+Q is exclusive
+_saved_shell_toggle = None  # saved shell toggle-overview
+_is_showing = False  # guard double-Show TOCTOU
+_pending_sources = []  # GLib source ids for fullscreen retry / gc to cancel on Hide
+_viewer_process = None  # subprocess.Popen for isolated viewer (daemon only, keeps daemon 30M flat)
+_viewer_child_watch_id = None  # GLib child-watch source; removed before synchronous Hide/reap
+_ephemeral_ctx = None  # single ephemeral WebContext reused across Shows (fixes per-Show leak)
+_is_viewer_mode = False  # True in viewer subprocess (isolated WebKit, daemon stays lean)
+_viewer_loop = None  # GLib.MainLoop for viewer subprocess
+
 _valid_int = config_store._valid_int
 normalize_config = config_store.normalize_config
 
