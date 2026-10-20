@@ -2,6 +2,7 @@
 import glob
 import json
 import os
+import sys
 import tempfile
 
 DEFAULT_MATUGEN_COLORS_PATH = os.path.expanduser("~/.config/matugen/matugen-colors.css")
