@@ -32,14 +32,19 @@ jobs:
         run: |
           ruff check --select E9,F63,F7,F82 bin/*.py tests/*.py
 
+      - name: JavaScript lint (ESLint)
+        run: |
+          npx --yes eslint@9 screensavers/clock-shared.js extensions/material-screensaver-gestures@io.github.sakib/extension.js
+
       - name: Desktop file validation
         run: |
           desktop-file-validate applications/material-screensaver-settings.desktop
 
-      - name: Systemd unit sanity
+      - name: Systemd unit validation
         run: |
-          grep -q 'ExecStart=.*material-screensaver-ctl.py daemon' systemd/material-screensaver.service
-          grep -q 'WantedBy=graphical-session.target' systemd/material-screensaver.service
+          mkdir -p "$HOME/.local/bin"
+          ln -sf "$PWD/bin/material-screensaver-ctl.py" "$HOME/.local/bin/material-screensaver-ctl.py"
+          systemd-analyze --user verify systemd/material-screensaver.service
 
   tests:
     runs-on: ubuntu-latest
