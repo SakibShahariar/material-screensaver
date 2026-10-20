@@ -57,6 +57,7 @@ class TestScriptsAndUnits(unittest.TestCase):
         self.assertIn("_session_locked = False", ctl)
         self.assertIn("if _session_locked:\n                _dbg(\"idle watch not armed while session is locked\")", ctl)
         self.assertIn("ignored idle WatchFired while session is locked", ctl)
+        self.assertIn("refused to show viewer while session is locked", ctl)
         self.assertIn("session unlocked; re-arming idle watch", ctl)
         self.assertIn("Unable to monitor GNOME session lock state", ctl)
 
