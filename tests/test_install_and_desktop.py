@@ -52,6 +52,14 @@ class TestScriptsAndUnits(unittest.TestCase):
         self.assertIn("self._save_config(idle_seconds=int(row.get_value()))", gui)
         self.assertIn("self._save_config(lock_after_seconds=int(row.get_value()))", gui)
 
+    def test_autostart_systemctl_runs_asynchronously_and_reverts_on_failure(self):
+        gui = self._read("bin/material-screensaver-gui.py")
+        self.assertIn("Gio.Subprocess.new([\"systemctl\", \"--user\", *args]", gui)
+        self.assertIn("proc.communicate_utf8_async(None, None, completed)", gui)
+        self.assertIn("switch.set_active(previous)", gui)
+        self.assertIn("self.toast_overlay.add_toast(Adw.Toast.new(detail))", gui)
+        self.assertNotIn('subprocess.run(["systemctl", "--user", action, "--now", SERVICE_NAME])', gui)
+
     def test_preview_uses_ephemeral_restricted_webkit_and_suspends(self):
         gui = self._read("bin/material-screensaver-gui.py")
         self.assertIn("WebKit.WebContext.new_ephemeral()", gui)
