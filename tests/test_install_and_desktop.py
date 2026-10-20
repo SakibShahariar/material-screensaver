@@ -145,7 +145,7 @@ class TestShellExtension(unittest.TestCase):
         self.assertIn('BACKUP_DIR="$(mktemp -d "$DATA_DIR/.screensavers.backup.XXXXXX")"', sh)
         self.assertNotIn('BACKUP_DIR="$(mktemp -u ', sh)
         self.assertIn('"$BACKUP_DIR/previous"', sh)
-        self.assertIn('mv -- "$SCREENSAVERS_DIR" "$BACKUP_DIR"', sh)
+        self.assertIn('mv -- "$SCREENSAVERS_DIR" "$BACKUP_DIR/previous"', sh)
         self.assertIn('mv -- "$BACKUP_DIR/previous" "$SCREENSAVERS_DIR"', sh)
         self.assertNotIn('mv -- "$BACKUP_DIR" "$SCREENSAVERS_DIR"', sh)
         self.assertIn('if [[ "$status" -ne 0 && -d "$SCREENSAVERS_DIR" ]]', sh)
