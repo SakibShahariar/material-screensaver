@@ -16,6 +16,13 @@ class TestScriptsAndUnits(unittest.TestCase):
         with open(os.path.join(support.REPO_ROOT, rel), encoding="utf-8") as f:
             return f.read()
 
+    def test_installer_preserves_configured_matugen_path(self):
+        sh = self._read("install.sh")
+        self.assertIn('MATUGEN_COLORS_PATH="$HOME/.config/matugen/matugen-colors.css"', sh)
+        self.assertIn('$HOME/.config/material-screensaver/config.json', sh)
+        self.assertIn('get("matugen_colors_path", "")', sh)
+        self.assertIn('ln -sfn "$MATUGEN_COLORS_PATH" "$TMP_DIR/matugen-colors.css"', sh)
+
     def test_install_sh_bash_syntax(self):
         r = subprocess.run(["bash", "-n", os.path.join(support.REPO_ROOT, "install.sh")],
                            capture_output=True, text=True)
