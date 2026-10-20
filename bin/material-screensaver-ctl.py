@@ -309,13 +309,10 @@ def _create_viewer_windows(html_path, clock_format="24h"):
     gi.require_version("WebKit", "6.0")
     from gi.repository import Gtk, Gdk, Gio, WebKit, GLib
 
-    # Always clean orphans before create — second Show often ghosts if previous Hide left bwrap
+    # Clean lingering WebKit descendants before creating new windows. The
+    # cleanup uses /proc and schedules escalation, so it does not block GTK.
     try:
-        import subprocess
-        out = subprocess.run(["ps", "--ppid", str(os.getpid()), "-o", "args="],
-                             capture_output=True, text=True, timeout=2)
-        if "WebKit" in out.stdout or "bwrap" in out.stdout:
-            _kill_orphan_webkit()
+        _kill_orphan_webkit()
         if is_viewer_active():
             hide_viewer()
     except Exception:
