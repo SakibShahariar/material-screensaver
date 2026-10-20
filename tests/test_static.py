@@ -182,11 +182,12 @@ class TestJsSyntax(unittest.TestCase):
         self.assertIn("current != last_idle_seconds[0] and not is_viewer_active()", source)
         self.assertIn('print(f"Failed to refresh idle timeout: {exc}"', source)
 
-    def test_viewer_disables_universal_file_url_access(self):
+    def test_viewer_disables_cross_origin_file_url_access(self):
         source = _read(os.path.join(support.REPO_ROOT, "bin", "material-screensaver-ctl.py"))
         self.assertIn("set_allow_universal_access_from_file_urls(False)", source)
         self.assertNotIn("set_allow_universal_access_from_file_urls(True)", source)
-        self.assertIn("set_allow_file_access_from_file_urls(True)", source)
+        self.assertIn("set_allow_file_access_from_file_urls(False)", source)
+        self.assertNotIn("set_allow_file_access_from_file_urls(True)", source)
 
     def test_shared_clock_uses_runtime_locale_for_date(self):
         text = _read(os.path.join(support.REPO_ROOT, "screensavers", "clock-shared.js"))
