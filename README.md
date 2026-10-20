@@ -101,7 +101,7 @@ The settings app lets you:
 - customize the Starfield animation speed, saved separately from the global selection;
 - set the idle timeout (default: 5 minutes);
 - set **Lock after**, the time the screensaver remains visible before locking the GNOME session (default: 5 minutes; set to 0 to disable);
-- choose a 12-hour or 24-hour clock;
+- choose a 12-hour or 24-hour clock, and optionally enable a shared clock/date overlay for scenes without a detected clock (with position and opacity controls);
 - configure the absolute path to Matugen's generated CSS stylesheet;
 - set a keyboard shortcut to show or hide the viewer;
 - enable or disable automatic idle-triggered launching.

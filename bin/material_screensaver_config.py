@@ -22,6 +22,9 @@ DEFAULT_CONFIG = {
     "active": None,
     "idle_seconds": 300,
     "clock_format": "24h",
+    "clock_overlay": False,
+    "clock_overlay_position": "bottom-right",
+    "clock_overlay_opacity": 80,
     "random": False,
     "lock_after_seconds": 300,
     "matugen_colors_path": DEFAULT_MATUGEN_COLORS_PATH,
@@ -90,6 +93,13 @@ def normalize_config(data):
         cfg["lock_after_seconds"] = lock
     if data.get("clock_format") in ("12h", "24h"):
         cfg["clock_format"] = data["clock_format"]
+    if isinstance(data.get("clock_overlay"), bool):
+        cfg["clock_overlay"] = data["clock_overlay"]
+    if data.get("clock_overlay_position") in ("top-left", "top-right", "bottom-left", "bottom-right"):
+        cfg["clock_overlay_position"] = data["clock_overlay_position"]
+    opacity = _valid_int(data.get("clock_overlay_opacity"), 20, 100)
+    if opacity is not None:
+        cfg["clock_overlay_opacity"] = opacity
     colors_path = data.get("matugen_colors_path", DEFAULT_MATUGEN_COLORS_PATH)
     if isinstance(colors_path, str) and colors_path.strip():
         colors_path = os.path.expanduser(colors_path.strip())

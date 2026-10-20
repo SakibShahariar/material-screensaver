@@ -123,6 +123,23 @@ class TestNormalizeConfig(CtlTestCase):
         cfg = self.ctl.normalize_config({"lock_after_seconds": True})
         self.assertEqual(cfg["lock_after_seconds"], 300)
 
+    def test_clock_overlay_options_are_validated_and_persisted(self):
+        defaults = self.ctl.normalize_config({})
+        self.assertFalse(defaults["clock_overlay"])
+        self.assertEqual(defaults["clock_overlay_position"], "bottom-right")
+        self.assertEqual(defaults["clock_overlay_opacity"], 80)
+        for position in ("top-left", "top-right", "bottom-left", "bottom-right"):
+            self.assertEqual(self.ctl.normalize_config({"clock_overlay_position": position})["clock_overlay_position"], position)
+        for bad in ("center", "../top-left", None, 2):
+            self.assertEqual(self.ctl.normalize_config({"clock_overlay_position": bad})["clock_overlay_position"], "bottom-right")
+        for opacity in (20, 80, 100):
+            self.assertEqual(self.ctl.normalize_config({"clock_overlay_opacity": opacity})["clock_overlay_opacity"], opacity)
+        for bad in (19, 101, True, 80.5, "high", None):
+            self.assertEqual(self.ctl.normalize_config({"clock_overlay_opacity": bad})["clock_overlay_opacity"], 80)
+        for bad in (1, 0, "true", None):
+            self.assertFalse(self.ctl.normalize_config({"clock_overlay": bad})["clock_overlay"])
+        self.assertTrue(self.ctl.normalize_config({"clock_overlay": True})["clock_overlay"])
+
     def test_clock_format_whitelist(self):
         for good in ("12h", "24h"):
             self.assertEqual(self.ctl.normalize_config({"clock_format": good})["clock_format"], good)

@@ -314,6 +314,23 @@ class ScreensaverWindow(Adw.ApplicationWindow):
         ampm_row.add_suffix(self.ampm_switch)
         ampm_row.set_activatable_widget(self.ampm_switch)
         clock_group.add(ampm_row)
+        self.clock_overlay_switch = Gtk.Switch(valign=Gtk.Align.CENTER)
+        overlay_row = Adw.ActionRow(
+            title="Show clock overlay when a scene has no clock",
+            subtitle="Automatically skips scenes with a detected clock or date",
+        )
+        overlay_row.add_suffix(self.clock_overlay_switch)
+        overlay_row.set_activatable_widget(self.clock_overlay_switch)
+        clock_group.add(overlay_row)
+        self.clock_overlay_positions = ["top-left", "top-right", "bottom-left", "bottom-right"]
+        self.clock_overlay_position_row = Adw.ComboRow(title="Overlay position")
+        self.clock_overlay_position_row.set_model(Gtk.StringList.new(["Top left", "Top right", "Bottom left", "Bottom right"]))
+        clock_group.add(self.clock_overlay_position_row)
+        self.clock_overlay_opacity_row = Adw.SpinRow.new_with_range(20, 100, 5)
+        self.clock_overlay_opacity_row.set_digits(0)
+        self.clock_overlay_opacity_row.set_title("Overlay opacity (%)")
+        self.clock_overlay_opacity_row.set_subtitle("20%–100% opacity")
+        clock_group.add(self.clock_overlay_opacity_row)
 
         # --- Matugen palette ---
         matugen_group = Adw.PreferencesGroup(title="Matugen")
@@ -389,6 +406,9 @@ class ScreensaverWindow(Adw.ApplicationWindow):
         self.idle_row.connect("notify::value", self.on_idle_changed)
         self.lock_row.connect("notify::value", self.on_lock_changed)
         self.ampm_switch.connect("notify::active", self.on_ampm_toggled)
+        self.clock_overlay_switch.connect("notify::active", self.on_clock_overlay_toggled)
+        self.clock_overlay_position_row.connect("notify::selected", self.on_clock_overlay_position_changed)
+        self.clock_overlay_opacity_row.connect("notify::value", self.on_clock_overlay_opacity_changed)
         self.search_entry.connect("search-changed", self.on_picker_filter_changed)
         self.category_row.connect("notify::selected", self.on_picker_filter_changed)
         self.favorites_only_switch.connect("notify::active", self.on_picker_filter_changed)
@@ -423,6 +443,10 @@ class ScreensaverWindow(Adw.ApplicationWindow):
         self.lock_row.set_value(cfg.get("lock_after_seconds", 300))
 
         self.ampm_switch.set_active(cfg.get("clock_format", "24h") == "12h")
+        self.clock_overlay_switch.set_active(cfg.get("clock_overlay", False))
+        position = cfg.get("clock_overlay_position", "bottom-right")
+        self.clock_overlay_position_row.set_selected(self.clock_overlay_positions.index(position) if position in self.clock_overlay_positions else 3)
+        self.clock_overlay_opacity_row.set_value(cfg.get("clock_overlay_opacity", 80))
         self.matugen_path_entry.set_text(cfg.get("matugen_colors_path", DEFAULT_MATUGEN_COLORS_PATH))
         self.lock_message_entry.set_text(cfg.get("lock_message", ""))
 
@@ -558,7 +582,7 @@ class ScreensaverWindow(Adw.ApplicationWindow):
         if fn in self.screensaver_files:
             path = os.path.join(SCREENSAVER_DIR, fn)
             fmt = cfg.get("clock_format", "24h")
-            params = {"format": fmt}
+            params = {"format": fmt, "clockOverlay": "1" if cfg.get("clock_overlay", False) else "0", "clockOverlayPosition": cfg.get("clock_overlay_position", "bottom-right"), "clockOverlayOpacity": str(cfg.get("clock_overlay_opacity", 80))}
             params.update(config_store.get_scene_options(cfg, fn))
             uri = Gio.File.new_for_path(path).get_uri()
             uri = f"{uri}?{urlencode(params)}"
@@ -701,6 +725,20 @@ class ScreensaverWindow(Adw.ApplicationWindow):
     def on_ampm_toggled(self, switch, _pspec):
         self._save_config(clock_format="12h" if switch.get_active() else "24h")
         self._update_preview()
+
+    def on_clock_overlay_toggled(self, switch, _pspec):
+        if self._save_config(clock_overlay=switch.get_active()):
+            self._update_preview()
+
+    def on_clock_overlay_position_changed(self, row, _pspec):
+        index = row.get_selected()
+        if 0 <= index < len(self.clock_overlay_positions):
+            if self._save_config(clock_overlay_position=self.clock_overlay_positions[index]):
+                self._update_preview()
+
+    def on_clock_overlay_opacity_changed(self, row, _pspec):
+        if self._save_config(clock_overlay_opacity=int(row.get_value())):
+            self._update_preview()
 
     def _run_systemctl_async(self, args, on_finished):
         """Run a user-systemd command off the GTK main loop."""
