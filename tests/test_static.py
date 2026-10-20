@@ -23,8 +23,12 @@ class TestHtmlBasics(unittest.TestCase):
         if not support.using_default_dir():
             self.skipTest("targeting a non-repo screensaver dir")
         readme = _read(os.path.join(support.REPO_ROOT, "README.md"))
+        # Accept the current README's explicit style count and the older
+        # "— N total" wording so this test checks content, not prose phrasing.
         m = re.search(r"— (\d+) total\*?\*?\.", readme.replace("**", ""))
-        self.assertIsNotNone(m, "README count marker '— N total' not found")
+        if m is None:
+            m = re.search(r"\*\*(\d+) styles\*\*", readme)
+        self.assertIsNotNone(m, "README must state the total number of styles")
         self.assertEqual(len(support.html_files()), int(m.group(1)),
                          "screensavers/ count drifted from the count claimed in README")
 

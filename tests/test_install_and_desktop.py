@@ -103,7 +103,8 @@ class TestShellExtension(unittest.TestCase):
                               capture_output=True, text=True)
         self.assertEqual(text.returncode, 0)
         sh = self._read_sh()
-        self.assertIn(f'"$EXT_BASE/$EXT_UUID"', sh)
+        self.assertIn('EXT_BASE="$HOME/.local/share/gnome-shell/extensions"', sh)
+        self.assertIn('"${EXT_BASE:?}/$EXT_UUID"', sh)
         self.assertIn("enabled-extensions", sh)
 
     def _read_sh(self):
