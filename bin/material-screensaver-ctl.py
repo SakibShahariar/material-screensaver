@@ -399,10 +399,18 @@ def _create_viewer_windows(html_path, clock_format="24h", scene_options=None):
                 _dbg(f"Suppressed non-fatal exception in _create_viewer_windows: {exc}")
         except Exception as exc:
             _dbg(f"Suppressed non-fatal exception in _create_viewer_windows: {exc}")
-        # Optional shared clock/date overlay. Avoid duplicating clocks already in a scene.
+        # Optional shared clock/date overlay. Built-in scenes use clock-shared.js,
+        # so never layer a second clock over their canvas-rendered clocks.
         try:
             cfg = load_config()
-            if cfg.get("clock_overlay", False):
+            try:
+                with open(html_path, encoding="utf-8", errors="replace") as scene_file:
+                    scene_source = scene_file.read()
+            except OSError as exc:
+                _dbg(f"Could not inspect scene clock support: {exc}")
+                scene_source = ""
+            scene_has_shared_clock = "clock-shared.js" in scene_source
+            if cfg.get("clock_overlay", False) and not scene_has_shared_clock:
                 overlay_config = json.dumps({
                     "position": cfg.get("clock_overlay_position", "bottom-right"),
                     "opacity": cfg.get("clock_overlay_opacity", 80) / 100,
