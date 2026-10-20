@@ -130,6 +130,45 @@ class TestNormalizeConfig(CtlTestCase):
             self.assertEqual(self.ctl.normalize_config({"clock_format": bad})["clock_format"], "24h",
                              f"accepted clock_format={bad!r}")
 
+    def test_matugen_path_requires_absolute_nonempty_string(self):
+        default = self.ctl.DEFAULT_MATUGEN_COLORS_PATH
+        self.assertEqual(self.ctl.normalize_config({})["matugen_colors_path"], default)
+        for bad in ("", "relative.css", None, 12):
+            self.assertEqual(
+                self.ctl.normalize_config({"matugen_colors_path": bad})["matugen_colors_path"],
+                default,
+                f"accepted invalid Matugen path {bad!r}",
+            )
+        self.assertEqual(
+            self.ctl.normalize_config({"matugen_colors_path": "/tmp/custom-colors.css"})["matugen_colors_path"],
+            "/tmp/custom-colors.css",
+        )
+
+    def test_matugen_path_roundtrips_config_file(self):
+        self.write_config({"matugen_colors_path": "/tmp/custom-colors.css"})
+        self.assertEqual(self.ctl.load_config()["matugen_colors_path"], "/tmp/custom-colors.css")
+
+    def test_matugen_link_tracks_configured_target(self):
+        first = os.path.join(self._tmp.name, "first.css")
+        second = os.path.join(self._tmp.name, "second.css")
+        cfg = dict(self.defaults, matugen_colors_path=first)
+        self.assertTrue(self.ctl.sync_matugen_colors_link(cfg))
+        link = os.path.join(self.savers_dir, "matugen-colors.css")
+        self.assertTrue(os.path.islink(link))
+        self.assertEqual(os.readlink(link), first)
+        self.assertTrue(self.ctl.sync_matugen_colors_link(dict(cfg, matugen_colors_path=second)))
+        self.assertEqual(os.readlink(link), second)
+
+    def test_matugen_link_does_not_replace_regular_file(self):
+        link = os.path.join(self.savers_dir, "matugen-colors.css")
+        with open(link, "w", encoding="utf-8") as handle:
+            handle.write("user-owned")
+        self.assertFalse(self.ctl.sync_matugen_colors_link(
+            dict(self.defaults, matugen_colors_path="/tmp/custom-colors.css")
+        ))
+        with open(link, encoding="utf-8") as handle:
+            self.assertEqual(handle.read(), "user-owned")
+
     def test_boolean_flags_fall_back_to_default(self):
         # Invalid values for a bool flag must silently revert to the built-in
         # default FOR THAT KEY (random defaults False).
