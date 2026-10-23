@@ -1,89 +1,61 @@
+<div align="center">
+
+<img src="icons/material-screensaver-icon.png" width="96" alt="Material Screensaver icon">
+
 # Material Screensaver
 
-<img src="icons/material-screensaver-icon.png" width="96" height="96" alt="Material Screensaver icon">
+**Ambient animated scenes for GNOME on Wayland.**
 
-A collection of animated, Matugen-themed screensavers for GNOME on Wayland, with a GTK4/libadwaita settings app.
+A lightweight collection of offline HTML/JavaScript screensavers, with a GTK4 and libadwaita settings app.
 
-Since GNOME no longer provides a native animated-screensaver framework, Material Screensaver displays standalone HTML/JavaScript scenes in a fullscreen WebKitGTK 6.0 window on each monitor. Its user service watches for idle time through Mutter's D-Bus idle monitor and can launch the viewer automatically. While visible, the viewer inhibits session idle handling and grabs input. **Super+Q dismisses the viewer**; ordinary input does not close it, although interactive scenes can respond to input within the page.
+[Install](#install) · [Features](#features) · [Configure](#configure) · [Contributing scenes](docs/scene-authoring.md)
 
-## Included styles
+</div>
 
-Solar System, Starfield, N-Body Galaxies, Cymatics, Kaleidoscope, Magnetic Field Lines, Strange Attractor Flow, Soft-Body Creatures, Blob, Flow, Bounce, Game of Life, Wave-Function Collapse, Circuit Board, Glitch, Constellation, Voronoi, Origami, Paper Cranes, Sakura, Lanterns, Rain, Bubbles, City, Autumn Leaves, Fireworks, Typewriter, Quantum Interference (GLSL/WebGL), Organic Harmonic Field (GLSL/WebGL), Metaphysical Horizon, and Rain on a Window — **31 styles**.
+## Preview
 
-The scenes use a Matugen-generated stylesheet so their colors follow your wallpaper-derived Material You palette. The default stylesheet path is `~/.config/matugen/matugen-colors.css`; change it in Settings under **Matugen → Colors stylesheet**. The path is saved in `~/.config/material-screensaver/config.json` and retained when reinstalling. If Matugen is not configured or the file is absent, scenes retain their built-in fallback colors.
-
-An optional plain-text message can be shown over the animated screensaver, configured in Settings or with the control script. It is off by default and is **not** a secure lock-screen notice; anyone looking at the display can read it. Messages are limited to 160 printable characters and are rendered as text, not HTML:
-
-```sh
-material-screensaver-ctl.py message set "Back at 15:00"
-material-screensaver-ctl.py message clear
-```
-
-The message appears the next time the animated screensaver starts.
-
-Optional lock/unlock hooks can be configured in `~/.config/material-screensaver/config.json`. They are **off by default** and use argument arrays, not shell command strings:
-
-```json
-{
-  "lock_hook": ["/usr/bin/playerctl", "pause"],
-  "unlock_hook": []
-}
-```
-
-Merge these keys into the existing JSON file rather than replacing the rest of your settings. Each hook is started asynchronously on a lock-state transition; no shell expansion is performed, repeated lock signals do not run the hook twice, and launch/non-zero-exit failures are written to the user service journal without blocking lock or unlock. Use only commands you trust.
-
-
-### Reduced motion
-
-The viewer respects the system `prefers-reduced-motion: reduce` preference by
-capping requestAnimationFrame-driven scenes at **10 FPS** (or the lower configured
-FPS limit). This is a global fallback and requires no per-scene changes. It slows
-frame-driven animation rather than making every scene completely static; scenes
-that animate with independent timers may not be affected.
-
-Shared helpers are available for new styles:
-- `screensavers/clock-shared.js` — clock utilities.
-- [Scene authoring guide](docs/scene-authoring.md) and [starter template](docs/scene-template.html) — offline, accessible scene conventions.
-
-## Screenshots
-
-| | | |
+| Solar System | Starfield | Kaleidoscope |
 |---|---|---|
-| ![shot 1](screenshots/shot01.png) | ![shot 2](screenshots/shot02.png) | ![shot 3](screenshots/shot03.png) |
-| ![shot 4](screenshots/shot04.png) | ![shot 5](screenshots/shot05.png) | ![shot 6](screenshots/shot06.png) |
-| ![shot 7](screenshots/shot07.png) | ![shot 8](screenshots/shot08.png) | ![shot 9](screenshots/shot09.png) |
-| ![shot 10](screenshots/shot10.png) | ![shot 11](screenshots/shot11.png) | ![shot 12](screenshots/shot12.png) |
-| ![shot 13](screenshots/shot13.png) | ![shot 14](screenshots/shot14.png) | |
+| ![Solar System](screenshots/shot01.png) | ![Starfield](screenshots/shot02.png) | ![Kaleidoscope](screenshots/shot03.png) |
+
+## Features
+
+- **31 animated scenes** — from space and nature to generative and geometric art.
+- **GNOME integration** — launches after idle time and supports multiple monitors.
+- **Quick controls** — configurable shortcut; `Super+Q` dismisses the viewer.
+- **Settings app** — search, categories, favorites, random selection, per-scene options, and clock overlay.
+- **Power controls** — configurable frame-rate cap, optional battery saver, and display blanking.
+- **Theme-aware colors** — optional Matugen stylesheet, with fallback colors when it is unavailable.
+- **Reduced motion** — honors the system preference by lowering frame-driven animation to 10 FPS.
+- **Offline by default** — included scenes do not require a network connection.
+
+> **Note:** This is an animated screensaver, not a secure lock screen. Use GNOME's normal session-lock mechanism to lock your computer.
 
 ## Requirements
 
-- GNOME on **Wayland**; automatic idle detection uses `org.gnome.Mutter.IdleMonitor`.
-- Python 3 with PyGObject, GTK 4, libadwaita, and **WebKitGTK 6.0** GI bindings.
-- Matugen is optional; when configured, it should generate `~/.config/matugen/matugen-colors.css`.
-- A running graphical GNOME session is required to display the viewer or open the settings GUI.
+- GNOME on **Wayland**
+- Python 3 with PyGObject
+- GTK 4, libadwaita, and WebKitGTK 6.0 GI bindings
+- Matugen is optional
 
-No external browser or network connection is required for the included scenes. Solar System uses Canvas 2D; the previous Three.js CDN dependency has been removed.
-
-Package names vary by distribution. On Fedora, install the GTK4/libadwaita and WebKitGTK 6.0 Python/GI packages from your enabled repositories; on Debian/Ubuntu-based systems, the corresponding packages commonly include `python3-gi`, `gir1.2-gtk-4.0`, `gir1.2-adw-1`, and `gir1.2-webkit-6.0`.
+Package names differ by distribution. On Debian/Ubuntu, packages commonly include `python3-gi`, `gir1.2-gtk-4.0`, `gir1.2-adw-1`, and `gir1.2-webkit-6.0`. On Fedora, install the corresponding GTK4, libadwaita, and WebKitGTK 6.0 Python/GI packages from enabled repositories.
 
 ## Install
 
-From the repository directory:
+From the repository checkout:
 
 ```sh
 ./install.sh
 ```
 
-The installer copies the scripts, screensaver scenes, icons, desktop entry, and user systemd service into your home directory. It also installs and enables the companion GNOME Shell extension that suppresses three-finger touchpad gestures while the fullscreen viewer is focused.
+After installation, log out and back in once so GNOME Shell discovers the companion extension. Open **Material Screensaver Settings** from Activities.
 
-The installer attempts to enable and start `material-screensaver.service` immediately. If it reports that no user bus is available, run this after logging into your graphical session:
+If the installer cannot access your user systemd bus, run this from your graphical session:
 
 ```sh
 systemctl --user daemon-reload
 systemctl --user enable --now material-screensaver.service
 ```
-
-After a fresh installation, **log out and back in once** so GNOME Shell discovers the companion extension. The settings app should then be available from Activities as **Material Screensaver Settings**.
 
 ## Configure
 
@@ -93,79 +65,46 @@ Open **Material Screensaver Settings** from Activities, or run:
 ~/.local/bin/material-screensaver-gui.py
 ```
 
-The settings app also has command-line hooks for suite integrations that should launch the GTK app rather than embed WebKit in a Shell popup:
+The app lets you choose scenes, set idle and lock timers, configure the FPS cap and battery saver, manage favorites, and adjust clock and theme settings.
+
+Useful commands:
 
 ```sh
-~/.local/bin/material-screensaver-gui.py --settings
-~/.local/bin/material-screensaver-gui.py --list-screensavers
-~/.local/bin/material-screensaver-gui.py --preview blob.html
+~/.local/bin/material-screensaver-ctl.py start
+~/.local/bin/material-screensaver-ctl.py stop
+~/.local/bin/material-screensaver-ctl.py toggle
+~/.local/bin/material-screensaver-ctl.py message set "Back at 15:00"
+~/.local/bin/material-screensaver-ctl.py message clear
 ```
 
-`--preview` opens Settings with the requested scene selected in the live preview without changing the saved global selection. Scene names can be queried with `--list-screensavers`; unknown names and path traversal are rejected.
+To add a scene, place an `.html` file in `~/.local/share/material-screensaver/screensavers/`. See the [scene authoring guide](docs/scene-authoring.md) and [starter template](docs/scene-template.html).
 
-The settings app lets you:
+## Advanced integrations
 
-- choose a specific screensaver or enable **Random each time**;
-- search scenes by name, filter by category, and persist favorites;
-- customize the Starfield animation speed, saved separately from the global selection;
-- set the idle timeout (default: 5 minutes);
-- set **Lock after**, the time the screensaver remains visible before locking the GNOME session (default: 5 minutes; set to 0 to disable);
-- choose a 12-hour or 24-hour clock, and optionally enable a shared clock/date overlay for scenes without a detected clock (with position and opacity controls);
-- configure the absolute path to Matugen's generated CSS stylesheet;
-- set a keyboard shortcut to show or hide the viewer;
-- enable or disable automatic idle-triggered launching.
+Optional lock/unlock hooks can run trusted commands when the session lock state changes. They are disabled by default and use argument arrays rather than shell command strings. Configure `lock_hook` and `unlock_hook` in `~/.config/material-screensaver/config.json`; merge them into the existing file rather than replacing your settings.
 
-To add a new scene, place an `.html` file in `~/.local/share/material-screensaver/screensavers/`; the picker discovers HTML files in that directory automatically.
-
-## Manual control
-
-The control script is installed at `~/.local/bin/material-screensaver-ctl.py`:
-
-```sh
-material-screensaver-ctl.py start    # show the screensaver
-material-screensaver-ctl.py stop     # hide it
-material-screensaver-ctl.py toggle   # show if hidden; hide if visible
-material-screensaver-ctl.py daemon   # run the idle watcher (normally started by systemd)
-```
-
-The viewer is dismissed with **Super+Q**. The configured keyboard shortcut can toggle it, and `stop` can also hide it from the command line. If the daemon is running, control commands delegate to it; otherwise, they start a standalone viewer.
-
-### Integration with other suite components
-
-Use the installed control script or its user-session D-Bus service when a component wants to **show or dismiss the animated screensaver**:
-
-- `material-screensaver-ctl.py toggle` — toggle the viewer.
-- `material-screensaver-ctl.py start` / `stop` — show / dismiss the viewer.
-
-A **Lock** action must use GNOME's normal session-lock mechanism, not launch a second lock-screen UI. For example, `material-system-actions` uses `loginctl lock-session`; panels and control-center integrations should use the same standard lock entry point. The configured **Lock after** timer also tries the session's `org.gnome.ScreenSaver.Lock` method first, then `loginctl lock-session`, with `xdg-screensaver lock` as a fallback. When GNOME reports that the session is locked, Material Screensaver dismisses its viewer so it does not remain over the lock screen after unlock.
-
-These are intentionally separate operations: showing the animated screensaver is not a security lock, and a lock request should be handled by GNOME.
+For suite integrations, use the control script to show or dismiss the animated viewer. Locking the session is a separate operation and should use GNOME's normal session-lock mechanism.
 
 ## Uninstall
 
-To stop and remove the user service, scripts, scenes, icons, desktop entry, and
-companion GNOME Shell extension, run the repository's `uninstall.sh` before
-deleting the source checkout:
+From the repository checkout:
 
 ```sh
 bash uninstall.sh
 ```
 
-The uninstall script removes only Material Screensaver's own extension UUID and
-preserves other enabled GNOME extensions and `~/.config/material-screensaver`
-user settings. Log out and back in if GNOME Shell still has the extension loaded.
+The uninstaller removes Material Screensaver's service, files, and companion extension while preserving other GNOME extensions and user settings.
 
-## Tests
+## Development
 
-Run the test suite from the repository root:
+Run automated tests:
 
 ```sh
 python3 -m unittest discover -s tests -v
 ```
 
-The suite includes Python configuration and scheduling tests, installer/desktop-entry checks, HTML structure and theme-link checks, and JavaScript syntax checks. It does not fully test live interaction with a running GNOME session, including Mutter idle-watch registration, SessionManager inhibition, or locking a real session. For the repeatable live-session test matrix, see [GNOME Wayland integration test plan](docs/gnome-integration-test-plan.md).
-
+These checks do not replace live testing in a GNOME Wayland session. See the [integration test plan](docs/gnome-integration-test-plan.md).
 
 ## License
 
-Material Screensaver's original code, screensaver scenes, and GNOME Shell extension are licensed under the GNU General Public License, version 3 only (GPL-3.0-only). See [LICENSE](LICENSE) for the full license text. Third-party dependencies and assets retain any separate licenses or notices that accompany them.
+GPL-3.0-only. See [LICENSE](LICENSE). Third-party assets and dependencies may have separate notices or licenses.
