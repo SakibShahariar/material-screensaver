@@ -1,0 +1,48 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="color-scheme" content="dark light">
+  <title>Example Scene</title>
+  <style>
+    :root {
+      color-scheme: dark;
+      --scene-bg: var(--background, #101418);
+      --scene-fg: var(--on-background, #e2e2e9);
+      --scene-accent: var(--primary, #b8c7dc);
+    }
+    * { box-sizing: border-box; }
+    html, body { width: 100%; height: 100%; margin: 0; overflow: hidden; }
+    body {
+      display: grid;
+      place-items: center;
+      background: var(--scene-bg);
+      color: var(--scene-fg);
+      font: 500 clamp(1rem, 2vw, 2rem) system-ui, sans-serif;
+    }
+    .scene { text-align: center; padding: 2rem; }
+    .orb {
+      width: min(24vw, 12rem);
+      aspect-ratio: 1;
+      margin: 0 auto 1.5rem;
+      border-radius: 50%;
+      background: radial-gradient(circle at 30% 30%, var(--scene-fg), var(--scene-accent) 35%, transparent 72%);
+      animation: breathe 5s ease-in-out infinite alternate;
+    }
+    @keyframes breathe {
+      from { transform: scale(.88); opacity: .65; }
+      to { transform: scale(1); opacity: 1; }
+    }
+    @media (prefers-reduced-motion: reduce) {
+      .orb { animation: none; }
+    }
+  </style>
+</head>
+<body>
+  <main class="scene" aria-label="Example screensaver scene">
+    <div class="orb" aria-hidden="true"></div>
+    <p>Replace this example with your scene</p>
+  </main>
+</body>
+</html>
