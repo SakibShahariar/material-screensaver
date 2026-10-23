@@ -1631,7 +1631,7 @@ def show_viewer():
                 [sys.executable, os.path.abspath(__file__), "viewer", html_path, clock_format, json.dumps(scene_options)],
                 stdout=subprocess.DEVNULL, stderr=None,
                 start_new_session=True)
-            _log_event("viewer_spawned", scene=os.path.basename(html_path))
+            _log_event("viewer_spawned")
         except Exception as e:
             _log_event("viewer_spawn_failed", error=type(e).__name__)
             print(f"Failed to spawn viewer subprocess: {e}", file=sys.stderr)
