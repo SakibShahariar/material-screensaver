@@ -122,6 +122,16 @@ def _get_session_proxy():
     except Exception:
         return None
 
+def _log_event(event, **fields):
+    """Emit a compact journal-friendly lifecycle event without user content."""
+    details = " ".join(
+        f"{key}={str(value).replace(chr(10), ' ')[:120]!r}"
+        for key, value in fields.items()
+    )
+    suffix = f" {details}" if details else ""
+    print(f"[material-screensaver] event={event}{suffix}", file=sys.stderr, flush=True)
+
+
 def _dbg(msg):
     """Best-effort debug log, active only when MS_DEBUG is set (keeps idle silent)."""
     if os.environ.get("MS_DEBUG"):
@@ -146,8 +156,9 @@ def _inhibit():
             0, -1, None)
         _viewer_inhibit_cookie = res.unpack()[0]
         _viewer_inhibit_proxy = proxy
+        _log_event("inhibit_acquired")
     except Exception as e:
-        _dbg(f"inhibit failed: {e}")
+        _log_event("inhibit_failed", error=type(e).__name__)
 
 def _uninhibit():
     global _viewer_inhibit_cookie, _viewer_inhibit_proxy
@@ -157,8 +168,9 @@ def _uninhibit():
         from gi.repository import GLib
         _viewer_inhibit_proxy.call_sync("Uninhibit",
             GLib.Variant("(u)", (_viewer_inhibit_cookie,)), 0, -1, None)
+        _log_event("inhibit_released")
     except Exception as e:
-        _dbg(f"uninhibit failed: {e}")
+        _log_event("uninhibit_failed", error=type(e).__name__)
     _viewer_inhibit_cookie = None
     _viewer_inhibit_proxy = None
 
@@ -1015,6 +1027,7 @@ def _idle_watch_needs_refresh(
 
 def _handle_viewer_exit(returncode):
     """Fail closed if the viewer crashes while a lock timeout is configured."""
+    _log_event("viewer_exit", status=returncode)
     if returncode == 0:
         return
     try:
@@ -1048,10 +1061,14 @@ def _run_user_hook(event):
         process_key = id(process)
         _user_hook_processes[process_key] = process
 
+        _log_event("hook_started", action=event)
+
         def completed(proc, result):
             try:
                 proc.wait_check_finish(result)
+                _log_event("hook_completed", action=event)
             except Exception as exc:
+                _log_event("hook_failed", action=event, error=type(exc).__name__)
                 print(f"Configured {event} hook failed: {exc}", file=sys.stderr)
             finally:
                 _user_hook_processes.pop(process_key, None)
@@ -1060,6 +1077,7 @@ def _run_user_hook(event):
     except Exception as exc:
         if process is not None:
             _user_hook_processes.pop(id(process), None)
+        _log_event("hook_start_failed", action=event, error=type(exc).__name__)
         print(f"Could not start configured {event} hook: {exc}", file=sys.stderr)
 
 
@@ -1069,6 +1087,7 @@ def _on_screen_saver_active_changed(active):
     was_locked = _session_locked
     _session_locked = bool(active)
     if was_locked != _session_locked:
+        _log_event("session_lock_detected" if _session_locked else "session_unlocked")
         _run_user_hook("lock" if _session_locked else "unlock")
     if _session_locked:
         _dbg("session lock detected; hiding viewer and suspending idle watch")
@@ -1133,9 +1152,10 @@ def _monitor_login1_session_lock():
                     _daemon_switch_to_idle_watch()
                 except Exception as exc:
                     print(f"Failed to arm idle watch from initial logind state: {exc}", file=sys.stderr)
-        _dbg("subscribed to systemd-logind LockedHint")
+        _log_event("lock_monitor_subscribed", backend="systemd-logind")
         return True
     except Exception as exc:
+        _log_event("lock_monitor_failed", backend="systemd-logind", error=type(exc).__name__)
         print(f"Unable to monitor session lock state via systemd-logind: {exc}", file=sys.stderr)
         return False
 
@@ -1603,7 +1623,9 @@ def show_viewer():
                 [sys.executable, os.path.abspath(__file__), "viewer", html_path, clock_format, json.dumps(scene_options)],
                 stdout=subprocess.DEVNULL, stderr=None,
                 start_new_session=True)
+            _log_event("viewer_spawned", scene=os.path.basename(html_path))
         except Exception as e:
+            _log_event("viewer_spawn_failed", error=type(e).__name__)
             print(f"Failed to spawn viewer subprocess: {e}", file=sys.stderr)
             # fallback to in-process (old path) if spawn fails
             _viewer_windows = _create_viewer_windows(html_path, clock_format, scene_options)
@@ -2244,7 +2266,10 @@ def run_daemon():
                 result = _idle_proxy.call_sync("AddIdleWatch", GLib.Variant("(t)", (current_idle_seconds() * 1000,)), Gio.DBusCallFlags.NONE, -1, None)
                 _idle_watch_ids["idle"] = result.unpack()[0]
                 return True
+                _log_event("idle_watch_registered", timeout_seconds=current_idle_seconds())
+                return True
             except Exception as e:
+                _log_event("idle_watch_registration_failed", error=type(e).__name__)
                 print(f"AddIdleWatch failed: {e}", file=sys.stderr)
                 return False
 
@@ -2255,7 +2280,9 @@ def run_daemon():
             try:
                 result = _idle_proxy.call_sync("AddUserActiveWatch", None, Gio.DBusCallFlags.NONE, -1, None)
                 _idle_watch_ids["active"] = result.unpack()[0]
+                _log_event("active_watch_registered")
             except Exception as e:
+                _log_event("active_watch_registration_failed", error=type(e).__name__)
                 print(f"AddUserActiveWatch failed: {e}", file=sys.stderr)
 
         def on_signal(_proxy, _sender, signal_name, params):
