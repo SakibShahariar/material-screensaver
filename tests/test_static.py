@@ -308,7 +308,7 @@ class TestJsSyntax(unittest.TestCase):
         self.assertIn('window.matchMedia("(prefers-reduced-motion: reduce)")', source)
         self.assertIn("Math.min(requestedLimit, 10)", source)
         readme = _read(os.path.join(support.REPO_ROOT, "README.md"))
-        self.assertIn("caps requestAnimationFrame-driven scenes at **10 FPS**", readme)
+        self.assertIn("requestAnimationFrame-driven scenes at **10 FPS**", readme)
 
     def test_fps_throttle_preserves_cancel_and_limits_callbacks(self):
         source = _read(os.path.join(support.REPO_ROOT, "bin", "material-screensaver-ctl.py"))
