@@ -33,7 +33,7 @@ Explore the full screenshot collection:
 - **Quick controls** — configurable shortcut; `Super+Q` dismisses the viewer.
 - **Settings app** — search, categories, favorites, random selection, per-scene options, and clock overlay.
 - **Power controls** — configurable frame-rate cap, optional battery saver, and display blanking.
-- **Reduced motion** — honors the system preference by lowering frame-driven animation to 10 FPS.
+- **Reduced motion** — honors the system preference by capping requestAnimationFrame-driven scenes at **10 FPS**.
 - **Offline by default** — included scenes do not require a network connection.
 
 > **Note:** This is an animated screensaver, not a secure lock screen. Use GNOME's normal session-lock mechanism to lock your computer.
