@@ -442,16 +442,55 @@ def _create_viewer_windows(html_path, clock_format="24h", scene_options=None):
             fps_script = """(() => {
 const limit = __FPS_LIMIT__;
 const nativeRAF = window.requestAnimationFrame.bind(window);
-let lastFrame = 0;
-window.requestAnimationFrame = callback => nativeRAF(timestamp => {
-  const interval = 1000 / limit;
+const nativeCancelRAF = window.cancelAnimationFrame.bind(window);
+const interval = 1000 / limit;
+const callbacks = new Map();
+let nextId = 1;
+let framePending = false;
+let lastFrame = -Infinity;
+
+function scheduleFrame() {
+  if (!framePending && callbacks.size > 0) {
+    framePending = true;
+    nativeRAF(dispatchFrame);
+  }
+}
+
+function dispatchFrame(timestamp) {
+  framePending = false;
   if (timestamp - lastFrame < interval) {
-    window.requestAnimationFrame(callback);
+    scheduleFrame();
     return;
   }
   lastFrame = timestamp;
-  callback(timestamp);
-});
+  const batch = Array.from(callbacks.entries());
+  callbacks.clear();
+  for (const [id, callback] of batch) {
+    if (!cancelled.has(id)) {
+      try { callback(timestamp); }
+      finally { cancelled.delete(id); }
+    } else {
+      cancelled.delete(id);
+    }
+  }
+  scheduleFrame();
+}
+
+const cancelled = new Set();
+window.requestAnimationFrame = callback => {
+  const id = nextId++;
+  callbacks.set(id, callback);
+  scheduleFrame();
+  return id;
+};
+window.cancelAnimationFrame = id => {
+  if (callbacks.delete(id)) {
+    cancelled.delete(id);
+    return;
+  }
+  // A callback already taken into the current dispatch batch may still be cancelled.
+  cancelled.add(id);
+};
 })();""".replace("__FPS_LIMIT__", str(fps_limit))
             ucm = web.get_user_content_manager()
             fps_user_script = WebKit.UserScript.new(
