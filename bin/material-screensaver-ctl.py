@@ -146,6 +146,7 @@ def _inhibit():
         return
     proxy = _get_session_proxy()
     if proxy is None:
+        _log_event("inhibit_unavailable")
         _dbg("inhibit: no session proxy (SessionManager unavailable)")
         return
     try:
