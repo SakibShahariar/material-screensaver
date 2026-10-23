@@ -957,13 +957,16 @@ def _lock_screen():
             print(f"Session lock command failed ({cmd[0]}): {exc}", file=sys.stderr)
             continue  # binary missing or timed out -> try the next candidate
         if r.returncode == 0:
+            _log_event("session_lock_succeeded", backend=cmd[0])
             return True
+        _log_event("session_lock_backend_failed", backend=cmd[0], status=r.returncode)
         detail = (r.stderr or b"").decode("utf-8", errors="replace").strip()
         suffix = f": {detail}" if detail else ""
         print(
             f"Session lock command failed ({cmd[0]}, exit {r.returncode}){suffix}",
             file=sys.stderr,
         )
+    _log_event("session_lock_failed")
     print("Unable to lock the session: all lock commands failed; keeping screensaver visible.", file=sys.stderr)
     return False
 
@@ -988,6 +991,7 @@ def _lock_screen_async(on_complete):
         try:
             cmd = next(candidates)
         except StopIteration:
+            _log_event("session_lock_failed")
             print("Unable to lock the session: all lock commands failed; keeping screensaver visible.",
                   file=sys.stderr)
             on_complete(False)
@@ -1008,8 +1012,10 @@ def _lock_screen_async(on_complete):
                 try_next()
                 return
             if succeeded:
+                _log_event("session_lock_succeeded", backend=cmd[0])
                 on_complete(True)
             else:
+                _log_event("session_lock_backend_failed", backend=cmd[0])
                 try_next()
 
         proc.wait_check_async(None, on_wait, None)
@@ -1180,6 +1186,7 @@ def _schedule_lock():
         def _do_lock():
             global _lock_timeout_id
             _lock_timeout_id=None
+            _log_event("lock_timer_fired")
             if is_viewer_active():
                 # Never dismiss the screensaver unless a lock command reports success.
                 # Async execution keeps the GTK/GLib main loop responsive.
@@ -2239,6 +2246,7 @@ def run_daemon():
                 "org.gnome.Mutter.IdleMonitor", None,
             )
         except Exception as e:
+            _log_event("idle_monitor_setup_failed", error=type(e).__name__)
             print(f"IdleMonitor proxy failed: {e}", file=sys.stderr)
             return
 
@@ -2265,7 +2273,6 @@ def run_daemon():
             try:
                 result = _idle_proxy.call_sync("AddIdleWatch", GLib.Variant("(t)", (current_idle_seconds() * 1000,)), Gio.DBusCallFlags.NONE, -1, None)
                 _idle_watch_ids["idle"] = result.unpack()[0]
-                return True
                 _log_event("idle_watch_registered", timeout_seconds=current_idle_seconds())
                 return True
             except Exception as e:
@@ -2355,6 +2362,7 @@ def run_daemon():
             ss_proxy.connect("g-signal", _on_lock_signal)
             _dbg("subscribed to org.gnome.ScreenSaver ActiveChanged")
         except Exception as exc:
+            _log_event("lock_monitor_failed", backend="gnome-screensaver", error=type(exc).__name__)
             print(f"Unable to monitor GNOME session lock state via org.gnome.ScreenSaver: {exc}", file=sys.stderr)
         # GNOME's ScreenSaver D-Bus name is not present in every modern session.
         # logind LockedHint provides an independent signal when that interface is absent.
