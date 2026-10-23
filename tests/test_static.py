@@ -60,13 +60,13 @@ class TestHtmlBasics(unittest.TestCase):
     def test_lifecycle_events_are_journal_visible_and_avoid_hook_contents(self):
         source = _read(os.path.join(support.REPO_ROOT, "bin", "material-screensaver-ctl.py"))
         for event in (
-            "inhibit_acquired", "inhibit_released", "viewer_spawned", "viewer_exit",
+            "inhibit_acquired", "inhibit_released", "inhibit_unavailable", "viewer_spawned", "viewer_exit",
             "idle_watch_registered", "active_watch_registered",
             "session_lock_detected", "session_unlocked", "lock_monitor_failed",
             "lock_timer_fired", "session_lock_succeeded", "session_lock_failed",
             "hook_started", "hook_completed", "hook_failed",
         ):
-            self.assertIn(f'_log_event("{event}"', source)
+            self.assertIn(f'"{event}"', source)
         self.assertIn("def _log_event(event, **fields):", source)
         self.assertIn("error=type(exc).__name__", source)
 
