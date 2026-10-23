@@ -28,6 +28,8 @@ class TestHtmlBasics(unittest.TestCase):
         m = re.search(r"— (\d+) total\*?\*?\.", readme.replace("**", ""))
         if m is None:
             m = re.search(r"\*\*(\d+) styles\*\*", readme)
+        if m is None:
+            m = re.search(r"\*\*(\d+) animated scenes\*\*", readme)
         self.assertIsNotNone(m, "README must state the total number of styles")
         self.assertEqual(len(support.html_files()), int(m.group(1)),
                          "screensavers/ count drifted from the count claimed in README")
