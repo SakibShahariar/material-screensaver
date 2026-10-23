@@ -14,9 +14,17 @@ A lightweight collection of offline HTML/JavaScript screensavers, with a GTK4 an
 
 ## Preview
 
-| Preview 1 | Preview 2 | Preview 3 |
-|---|---|---|
-| ![Scene preview](screenshots/shot01.png) | ![Scene preview](screenshots/shot02.png) | ![Scene preview](screenshots/shot03.png) |
+Explore the full screenshot collection:
+
+| Preview | Preview |
+|---|---|
+| ![Scene preview 1](screenshots/shot01.png) | ![Scene preview 2](screenshots/shot02.png) |
+| ![Scene preview 3](screenshots/shot03.png) | ![Scene preview 4](screenshots/shot04.png) |
+| ![Scene preview 5](screenshots/shot05.png) | ![Scene preview 6](screenshots/shot06.png) |
+| ![Scene preview 7](screenshots/shot07.png) | ![Scene preview 8](screenshots/shot08.png) |
+| ![Scene preview 9](screenshots/shot09.png) | ![Scene preview 10](screenshots/shot10.png) |
+| ![Scene preview 11](screenshots/shot11.png) | ![Scene preview 12](screenshots/shot12.png) |
+| ![Scene preview 13](screenshots/shot13.png) | ![Scene preview 14](screenshots/shot14.png) |
 
 ## Features
 
@@ -25,7 +33,6 @@ A lightweight collection of offline HTML/JavaScript screensavers, with a GTK4 an
 - **Quick controls** — configurable shortcut; `Super+Q` dismisses the viewer.
 - **Settings app** — search, categories, favorites, random selection, per-scene options, and clock overlay.
 - **Power controls** — configurable frame-rate cap, optional battery saver, and display blanking.
-- **Theme-aware colors** — optional Matugen stylesheet, with fallback colors when it is unavailable.
 - **Reduced motion** — honors the system preference by lowering frame-driven animation to 10 FPS.
 - **Offline by default** — included scenes do not require a network connection.
 
@@ -36,7 +43,6 @@ A lightweight collection of offline HTML/JavaScript screensavers, with a GTK4 an
 - GNOME on **Wayland**
 - Python 3 with PyGObject
 - GTK 4, libadwaita, and WebKitGTK 6.0 GI bindings
-- Matugen is optional
 
 Package names differ by distribution. On Debian/Ubuntu, packages commonly include `python3-gi`, `gir1.2-gtk-4.0`, `gir1.2-adw-1`, and `gir1.2-webkit-6.0`. On Fedora, install the corresponding GTK4, libadwaita, and WebKitGTK 6.0 Python/GI packages from enabled repositories.
 
@@ -65,7 +71,7 @@ Open **Material Screensaver Settings** from Activities, or run:
 ~/.local/bin/material-screensaver-gui.py
 ```
 
-The app lets you choose scenes, set idle and lock timers, configure the FPS cap and battery saver, manage favorites, and adjust clock and theme settings.
+The app lets you choose scenes, set idle and lock timers, configure the FPS cap and battery saver, manage favorites, and adjust clock settings.
 
 Useful commands:
 
