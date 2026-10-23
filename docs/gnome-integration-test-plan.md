@@ -66,6 +66,14 @@ systemctl --user status material-screensaver.service --no-pager
 
 Also note the exact steps, expected vs. actual behavior, whether the issue reproduces, and whether the viewer was launched manually or by idle detection. Avoid including personal paths or sensitive data in public issue reports.
 
+The daemon emits lifecycle events prefixed with `[material-screensaver] event=`. To isolate them from the journal:
+
+```sh
+journalctl --user -u material-screensaver.service --since "10 minutes ago" --no-pager | grep 'event='
+```
+
+For recovery-related failures, preserve the event name and safe metadata such as `backend`, `status`, or `error` type. Useful events include `idle_watch_registration_failed`, `viewer_spawn_failed`, `lock_monitor_failed`, `session_lock_backend_failed`, and `session_lock_failed`. Do not copy configured hook commands or private message text into public reports.
+
 ## Current verification boundary
 
 Passing CI establishes that the repository's configured static checks and automated tests passed. It does **not** establish that Mutter idle watches, GNOME locking, real fullscreen coverage, touchpad gesture interception, WebKit file isolation, suspend/resume, or monitor hot-plug behavior passed. Those require this live-session checklist and must be recorded separately.
