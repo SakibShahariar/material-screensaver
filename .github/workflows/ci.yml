@@ -48,6 +48,7 @@ jobs:
 
   tests:
     runs-on: ubuntu-latest
+    timeout-minutes: 15
     steps:
       - uses: actions/checkout@v4
 
@@ -63,8 +64,15 @@ jobs:
 
       - name: Install system dependencies
         run: |
-          sudo apt-get update -qq
-          sudo apt-get install -y -qq \
+          # Bound apt networking so a stalled package mirror fails with useful logs.
+          timeout 6m sudo apt-get update -qq \
+            -o Acquire::Retries=3 \
+            -o Acquire::http::Timeout=30 \
+            -o Acquire::https::Timeout=30
+          timeout 6m sudo apt-get install -y -qq \
+            -o Acquire::Retries=3 \
+            -o Acquire::http::Timeout=30 \
+            -o Acquire::https::Timeout=30 \
             python3-gi \
             gir1.2-gtk-4.0 \
             gir1.2-adw-1 \
