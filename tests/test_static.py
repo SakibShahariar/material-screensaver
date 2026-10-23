@@ -57,6 +57,18 @@ class TestHtmlBasics(unittest.TestCase):
         # The debug logger itself must remain best-effort to avoid recursive logging.
         self.assertLessEqual(len(silent_catches), 1, "unexpected silent broad exception handlers")
 
+    def test_lifecycle_events_are_journal_visible_and_avoid_hook_contents(self):
+        source = _read(os.path.join(support.REPO_ROOT, "bin", "material-screensaver-ctl.py"))
+        for event in (
+            "inhibit_acquired", "inhibit_released", "viewer_spawned", "viewer_exit",
+            "idle_watch_registered", "active_watch_registered",
+            "session_lock_detected", "session_unlocked", "lock_monitor_failed",
+            "hook_started", "hook_completed", "hook_failed",
+        ):
+            self.assertIn(f'event="{event}"', source)
+        self.assertIn("def _log_event(event, **fields):", source)
+        self.assertIn("error=type(exc).__name__", source)
+
     def test_screensavers_have_restrictive_csp_before_resources(self):
         for path in support.html_files():
             text = _read(path)
