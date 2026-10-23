@@ -270,11 +270,14 @@ class TestJsSyntax(unittest.TestCase):
         self.assertIn("def _battery_is_discharging():", source)
         self.assertIn('["upower", "-i", "/org/freedesktop/UPower/devices/DisplayDevice"]', source)
         self.assertIn("min(fps_limit, 15)", source)
+        self.assertIn('viewer_cfg.get("reduce_fps_on_battery", True)', source)
+
+    def test_reduced_motion_caps_global_frame_rate(self):
+        source = _read(os.path.join(support.REPO_ROOT, "bin", "material-screensaver-ctl.py"))
         self.assertIn('window.matchMedia("(prefers-reduced-motion: reduce)")', source)
         self.assertIn("Math.min(requestedLimit, 10)", source)
         readme = _read(os.path.join(support.REPO_ROOT, "README.md"))
         self.assertIn("caps requestAnimationFrame-driven scenes at **10 FPS**", readme)
-        self.assertIn('viewer_cfg.get("reduce_fps_on_battery", True)', source)
 
     def test_fps_throttle_preserves_cancel_and_limits_callbacks(self):
         source = _read(os.path.join(support.REPO_ROOT, "bin", "material-screensaver-ctl.py"))
