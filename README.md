@@ -35,6 +35,7 @@ Merge these keys into the existing JSON file rather than replacing the rest of y
 
 Shared helpers are available for new styles:
 - `screensavers/clock-shared.js` — clock utilities.
+- [Scene authoring guide](docs/scene-authoring.md) and [starter template](docs/scene-template.html) — offline, accessible scene conventions.
 
 ## Screenshots
 
