@@ -468,7 +468,8 @@ function dispatchFrame(timestamp) {
   for (const [id, callback] of batch) {
     if (!activeIds.has(id)) continue;
     activeIds.delete(id);
-    callback(timestamp);
+    try { callback(timestamp); }
+    catch (error) { console.error("Screensaver animation callback failed:", error); }
   }
   scheduleFrame();
 }
