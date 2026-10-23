@@ -44,7 +44,7 @@ class TestHtmlBasics(unittest.TestCase):
     def test_scene_template_has_theme_security_and_motion_conventions(self):
         template = _read(os.path.join(support.REPO_ROOT, "docs", "scene-template.html"))
         csp = re.search(
-            r'<meta\\s+http-equiv="Content-Security-Policy"\\s+content="([^"]+)"',
+            r'<meta\s+http-equiv="Content-Security-Policy"\s+content="([^"]+)"',
             template,
             re.I,
         )
