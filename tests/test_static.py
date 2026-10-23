@@ -272,6 +272,48 @@ class TestJsSyntax(unittest.TestCase):
         self.assertIn("min(fps_limit, 15)", source)
         self.assertIn('viewer_cfg.get("reduce_fps_on_battery", True)', source)
 
+    def test_fps_throttle_preserves_cancel_and_limits_callbacks(self):
+        source = _read(os.path.join(support.REPO_ROOT, "bin", "material-screensaver-ctl.py"))
+        match = re.search(
+            r'fps_script = """(.*?)""".replace\("__FPS_LIMIT__", str\(fps_limit\)\)',
+            source,
+            re.S,
+        )
+        self.assertIsNotNone(match, "viewer FPS throttle script missing")
+        throttle = match.group(1).replace("__FPS_LIMIT__", "30")
+        harness = r"""
+const nativeFrames = [];
+global.window = {
+  requestAnimationFrame(callback) { nativeFrames.push(callback); return nativeFrames.length; },
+  cancelAnimationFrame() {},
+};
+""" + throttle + r"""
+const delivered = [];
+const cancelledId = window.requestAnimationFrame(() => delivered.push("cancelled"));
+window.cancelAnimationFrame(cancelledId);
+const firstId = window.requestAnimationFrame(timestamp => delivered.push(timestamp));
+if (nativeFrames.length !== 1) throw new Error("scheduler did not coalesce native frames");
+nativeFrames.shift()(0);
+if (delivered.length !== 1 || delivered[0] !== 0) throw new Error("first frame was not delivered");
+window.requestAnimationFrame(timestamp => delivered.push(timestamp));
+nativeFrames.shift()(10);
+if (delivered.length !== 1) throw new Error("frame cap did not defer an early callback");
+nativeFrames.shift()(34);
+if (delivered.length !== 2 || delivered[1] !== 34) throw new Error("deferred callback was not delivered");
+window.cancelAnimationFrame(firstId);
+"""
+        fd, tmp = tempfile.mkstemp(suffix=".js")
+        try:
+            with os.fdopen(fd, "w") as handle:
+                handle.write(harness)
+            result = subprocess.run([self.NODE, tmp], capture_output=True, text=True)
+            self.assertEqual(result.returncode, 0, result.stderr.strip())
+        finally:
+            try:
+                os.remove(tmp)
+            except OSError:
+                pass
+
     def test_viewer_disables_cross_origin_file_url_access(self):
         source = _read(os.path.join(support.REPO_ROOT, "bin", "material-screensaver-ctl.py"))
         self.assertIn("set_allow_universal_access_from_file_urls(False)", source)
