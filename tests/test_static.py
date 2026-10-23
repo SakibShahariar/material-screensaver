@@ -41,6 +41,22 @@ class TestHtmlBasics(unittest.TestCase):
         for h in support.shared_helpers():
             self.assertTrue(os.path.isfile(h), f"missing shared helper {h}")
 
+    def test_scene_template_has_theme_security_and_motion_conventions(self):
+        template = _read(os.path.join(support.REPO_ROOT, "docs", "scene-template.html"))
+        csp = re.search(
+            r'<meta\\s+http-equiv="Content-Security-Policy"\\s+content="([^"]+)"',
+            template,
+            re.I,
+        )
+        self.assertIsNotNone(csp, "scene template must include a restrictive CSP")
+        for directive in ("default-src 'none'", "connect-src 'none'", "object-src 'none'", "base-uri 'none'"):
+            self.assertIn(directive, csp.group(1))
+        self.assertLess(template.index(csp.group(0)), template.index("matugen-colors.css"))
+        self.assertIn('href="matugen-colors.css"', template)
+        self.assertIn("prefers-reduced-motion: reduce", template)
+        self.assertNotIn("https://", template)
+        self.assertNotIn("eval(", template)
+
     def test_required_markers_everywhere(self):
         for path in support.html_files():
             text = _read(path)
