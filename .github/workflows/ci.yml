@@ -19,8 +19,16 @@ jobs:
 
       - name: Install lint tools
         run: |
-          sudo apt-get update -qq
-          sudo apt-get install -y -qq shellcheck desktop-file-utils
+          # Bound apt networking so a stalled package mirror fails with useful logs.
+          timeout 6m sudo apt-get update -qq \
+            -o Acquire::Retries=3 \
+            -o Acquire::http::Timeout=30 \
+            -o Acquire::https::Timeout=30
+          timeout 6m sudo apt-get install -y -qq \
+            -o Acquire::Retries=3 \
+            -o Acquire::http::Timeout=30 \
+            -o Acquire::https::Timeout=30 \
+            shellcheck desktop-file-utils
           python -m pip install ruff
 
       - name: Bash syntax + shellcheck
