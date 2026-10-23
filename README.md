@@ -14,9 +14,9 @@ A lightweight collection of offline HTML/JavaScript screensavers, with a GTK4 an
 
 ## Preview
 
-| Solar System | Starfield | Kaleidoscope |
+| Preview 1 | Preview 2 | Preview 3 |
 |---|---|---|
-| ![Solar System](screenshots/shot01.png) | ![Starfield](screenshots/shot02.png) | ![Kaleidoscope](screenshots/shot03.png) |
+| ![Scene preview](screenshots/shot01.png) | ![Scene preview](screenshots/shot02.png) | ![Scene preview](screenshots/shot03.png) |
 
 ## Features
 
