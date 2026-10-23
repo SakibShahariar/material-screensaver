@@ -33,6 +33,14 @@ Optional lock/unlock hooks can be configured in `~/.config/material-screensaver/
 Merge these keys into the existing JSON file rather than replacing the rest of your settings. Each hook is started asynchronously on a lock-state transition; no shell expansion is performed, repeated lock signals do not run the hook twice, and launch/non-zero-exit failures are written to the user service journal without blocking lock or unlock. Use only commands you trust.
 
 
+### Reduced motion
+
+The viewer respects the system `prefers-reduced-motion: reduce` preference by
+capping requestAnimationFrame-driven scenes at **10 FPS** (or the lower configured
+FPS limit). This is a global fallback and requires no per-scene changes. It slows
+frame-driven animation rather than making every scene completely static; scenes
+that animate with independent timers may not be affected.
+
 Shared helpers are available for new styles:
 - `screensavers/clock-shared.js` — clock utilities.
 - [Scene authoring guide](docs/scene-authoring.md) and [starter template](docs/scene-template.html) — offline, accessible scene conventions.
