@@ -440,7 +440,10 @@ def _create_viewer_windows(html_path, clock_format="24h", scene_options=None):
             if battery_saving:
                 fps_limit = min(fps_limit, 15)
             fps_script = """(() => {
-const limit = __FPS_LIMIT__;
+const requestedLimit = __FPS_LIMIT__;
+const reducedMotion = window.matchMedia &&
+  window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+const limit = reducedMotion ? Math.min(requestedLimit, 10) : requestedLimit;
 const nativeRAF = window.requestAnimationFrame.bind(window);
 const interval = 1000 / limit;
 const callbacks = new Map();
