@@ -442,9 +442,9 @@ def _create_viewer_windows(html_path, clock_format="24h", scene_options=None):
             fps_script = """(() => {
 const limit = __FPS_LIMIT__;
 const nativeRAF = window.requestAnimationFrame.bind(window);
-const nativeCancelRAF = window.cancelAnimationFrame.bind(window);
 const interval = 1000 / limit;
 const callbacks = new Map();
+const activeIds = new Set();
 let nextId = 1;
 let framePending = false;
 let lastFrame = -Infinity;
@@ -466,30 +466,24 @@ function dispatchFrame(timestamp) {
   const batch = Array.from(callbacks.entries());
   callbacks.clear();
   for (const [id, callback] of batch) {
-    if (!cancelled.has(id)) {
-      try { callback(timestamp); }
-      finally { cancelled.delete(id); }
-    } else {
-      cancelled.delete(id);
-    }
+    if (!activeIds.has(id)) continue;
+    activeIds.delete(id);
+    callback(timestamp);
   }
   scheduleFrame();
 }
 
-const cancelled = new Set();
 window.requestAnimationFrame = callback => {
   const id = nextId++;
+  activeIds.add(id);
   callbacks.set(id, callback);
   scheduleFrame();
   return id;
 };
 window.cancelAnimationFrame = id => {
-  if (callbacks.delete(id)) {
-    cancelled.delete(id);
-    return;
-  }
-  // A callback already taken into the current dispatch batch may still be cancelled.
-  cancelled.add(id);
+  if (!activeIds.has(id)) return;
+  activeIds.delete(id);
+  callbacks.delete(id);
 };
 })();""".replace("__FPS_LIMIT__", str(fps_limit))
             ucm = web.get_user_content_manager()
