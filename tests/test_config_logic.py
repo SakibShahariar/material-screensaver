@@ -202,6 +202,39 @@ class TestNormalizeConfig(CtlTestCase):
             self.assertEqual(self.ctl.normalize_config({"clock_format": bad})["clock_format"], "24h",
                              f"accepted clock_format={bad!r}")
 
+    def test_monitor_identifier_prefers_connector_and_falls_back_stably(self):
+        class Geometry:
+            x, y, width, height = 0, 0, 1920, 1080
+
+        class ConnectorMonitor:
+            def get_connector(self):
+                return "HDMI-1"
+
+            def get_model(self):
+                return "Panel"
+
+            def get_geometry(self):
+                return Geometry()
+
+        class FallbackMonitor:
+            def get_connector(self):
+                return None
+
+            def get_model(self):
+                return "Panel"
+
+            def get_geometry(self):
+                return Geometry()
+
+        self.assertEqual(
+            self.ctl.config_store.monitor_identifier(ConnectorMonitor(), 0),
+            "connector:HDMI-1",
+        )
+        self.assertEqual(
+            self.ctl.config_store.monitor_identifier(FallbackMonitor(), 0),
+            "model:Panel|geometry:0,0,1920,1080",
+        )
+
     def test_monitor_assignments_are_sanitized_and_resolve_with_fallback(self):
         cfg = self.ctl.normalize_config({
             "monitor_screensavers": {
