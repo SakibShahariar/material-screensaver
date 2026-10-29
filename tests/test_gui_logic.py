@@ -67,6 +67,23 @@ class TestGuiLogic(unittest.TestCase):
             json.dump({"width": True, "height": "large"}, handle)
         self.assertEqual(self.gui.load_window_size(path), (480, 600))
 
+    def test_query_battery_discharging_states_and_failures(self):
+        original = self.gui.subprocess.run
+        try:
+            class Result:
+                returncode = 0
+                stdout = "state: discharging\\n"
+            self.gui.subprocess.run = lambda *_args, **_kwargs: Result()
+            self.assertIs(self.gui.query_battery_discharging(), True)
+            Result.stdout = "state: fully-charged\\n"
+            self.assertIs(self.gui.query_battery_discharging(), False)
+            Result.returncode = 1
+            self.assertIsNone(self.gui.query_battery_discharging())
+            self.gui.subprocess.run = lambda *_args, **_kwargs: (_ for _ in ()).throw(TimeoutError())
+            self.assertIsNone(self.gui.query_battery_discharging())
+        finally:
+            self.gui.subprocess.run = original
+
     def test_display_name(self):
         cases = {
             "blob.html": "Blob",
