@@ -296,6 +296,18 @@ class TestJsSyntax(unittest.TestCase):
         self.assertIn("session_locked=_session_locked", source)
         self.assertIn('print(f"Failed to refresh idle timeout: {exc}"', source)
 
+    def test_display_blanking_is_configurable_and_stops_scene_scripts(self):
+        ctl = _read(os.path.join(support.REPO_ROOT, "bin", "material-screensaver-ctl.py"))
+        gui = _read(os.path.join(support.REPO_ROOT, "bin", "material-screensaver-gui.py"))
+        self.assertIn('blank_minutes = cfg.get("blank_display_after_minutes", 0)', ctl)
+        self.assertIn("if blank_minutes > 0:", ctl)
+        self.assertIn("window.setTimeout(() => {", ctl)
+        self.assertIn("document.open();", ctl)
+        self.assertIn("document.write(", ctl)
+        self.assertIn("background:#000", ctl)
+        self.assertIn('self.blank_display_row.set_title("Blank display after")', gui)
+        self.assertIn('self.blank_display_row.connect("notify::value", self.on_blank_display_changed)', gui)
+
     def test_battery_fps_saver_uses_upower_and_respects_setting(self):
         source = open(os.path.join(support.REPO_ROOT, "bin", "material-screensaver-ctl.py"), encoding="utf-8").read()
         self.assertIn("def _battery_is_discharging():", source)
