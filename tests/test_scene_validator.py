@@ -63,10 +63,13 @@ class TestSceneValidator(unittest.TestCase):
     def test_checks_assets_in_linked_and_imported_stylesheets(self):
         with tempfile.TemporaryDirectory() as temp:
             root = Path(temp)
-            (root / "nested.css").write_text(
-                '@font-face { src: url("missing-font.woff2"); }', encoding="utf-8"
+            styles = root / "styles"
+            styles.mkdir()
+            (root / "missing-font.woff2").write_bytes(b"not the referenced asset")
+            (styles / "nested.css").write_text(
+                '@font-face { src: url("../fonts/missing-font.woff2"); }', encoding="utf-8"
             )
-            (root / "style.css").write_text(
+            (styles / "style.css").write_text(
                 '@import "nested.css"; body { color: white; }', encoding="utf-8"
             )
             scene = root / "scene.html"
@@ -74,11 +77,11 @@ class TestSceneValidator(unittest.TestCase):
                 '<!doctype html><html><head><title>Test</title>'
                 '<meta name="viewport" content="width=device-width, initial-scale=1">'
                 '<meta http-equiv="Content-Security-Policy" content="default-src \'none\'">'
-                '<link rel="stylesheet" href="style.css"></head><body></body></html>',
+                '<link rel="stylesheet" href="styles/style.css"></head><body></body></html>',
                 encoding="utf-8",
             )
             errors = validator.validate_scene(scene)
-        self.assertIn("missing local asset: missing-font.woff2", errors)
+        self.assertIn("missing local asset: ../fonts/missing-font.woff2", errors)
 
     def test_rejects_remote_assets(self):
         with tempfile.TemporaryDirectory() as temp:
