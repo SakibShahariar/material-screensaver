@@ -715,6 +715,31 @@ p{color:#c4c0ca;line-height:1.5}
             indicator.set_margin_start(16)
             indicator.set_can_target(False)
             viewer_content.add_overlay(indicator)
+        lock_seconds = int(viewer_cfg.get("lock_after_seconds", 0) or 0)
+        if viewer_cfg.get("lock_countdown", False) and lock_seconds > 0:
+            countdown = Gtk.Label(label="")
+            countdown.add_css_class("osd")
+            countdown.add_css_class("caption")
+            countdown.set_halign(Gtk.Align.CENTER)
+            countdown.set_valign(Gtk.Align.END)
+            countdown.set_margin_bottom(28)
+            countdown.set_can_target(False)
+            countdown.set_visible(False)
+            viewer_content.add_overlay(countdown)
+            remaining = {"seconds": lock_seconds}
+            def update_countdown(label=countdown, state=remaining):
+                state["seconds"] -= 1
+                if 0 < state["seconds"] <= 10:
+                    label.set_label(f"Locking in {state['seconds']} seconds")
+                    label.set_visible(True)
+                elif state["seconds"] <= 0:
+                    label.set_visible(False)
+                    return False
+                return True
+            GLib.timeout_add_seconds(max(1, lock_seconds - 10), update_countdown)
+            if lock_seconds <= 10:
+                countdown.set_label(f"Locking in {lock_seconds} seconds")
+                countdown.set_visible(True)
         win.set_child(viewer_content)
 
         def on_key(ctrl, keyval, keycode, state, _win=win):
