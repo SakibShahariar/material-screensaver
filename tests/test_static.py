@@ -314,6 +314,15 @@ class TestJsSyntax(unittest.TestCase):
         for sensitive in ('"lock_hook"', '"unlock_hook"', '"lock_message"', '"matugen_colors_path"'):
             self.assertNotIn(sensitive, exported_block)
 
+    def test_scene_favorite_toggle_persists_and_refreshes_picker(self):
+        gui = _read(os.path.join(support.REPO_ROOT, "bin", "material-screensaver-gui.py"))
+        self.assertIn('self.favorite_button.connect("clicked", self.on_toggle_favorite)', gui)
+        self.assertIn('self.favorite_button.set_label("★ Remove from favorites" if is_favorite else "☆ Add to favorites")', gui)
+        self.assertIn('favorites.append(self.selected_scene)', gui)
+        self.assertIn('self._save_config(favorites=favorites)', gui)
+        self.assertIn('self._rebuild_screensaver_picker(self.selected_scene)', gui)
+        self.assertIn('favorites_only=self.favorites_only_switch.get_active()', gui)
+
     def test_failed_scene_shows_safe_fallback_and_logs_scene_name(self):
         source = _read(os.path.join(support.REPO_ROOT, "bin", "material-screensaver-ctl.py"))
         self.assertIn('web.connect("load-failed", on_scene_load_failed)', source)
