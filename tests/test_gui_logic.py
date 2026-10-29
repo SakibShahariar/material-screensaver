@@ -45,6 +45,16 @@ class TestGuiLogic(unittest.TestCase):
         with open(self.gui.CONFIG_PATH, "w", encoding="utf-8") as f:
             json.dump(data, f)
 
+    def test_scene_search_matches_category_names(self):
+        self.assertEqual(
+            self.gui.filter_screensavers(["solar-system.html", "blob.html"], query="space"),
+            ["solar-system.html"],
+        )
+        self.assertEqual(
+            self.gui.filter_screensavers(["autumnleaves.html", "blob.html"], query="nature"),
+            ["autumnleaves.html"],
+        )
+
     def test_display_name(self):
         cases = {
             "blob.html": "Blob",
