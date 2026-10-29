@@ -106,6 +106,25 @@ class TestSceneValidator(unittest.TestCase):
             errors = validator.validate_scene(scene)
         self.assertIn("missing local asset: texture.png", errors)
 
+    def test_checks_unquoted_css_import_url_assets(self):
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp)
+            styles = root / "styles"
+            styles.mkdir()
+            (styles / "style.css").write_text(
+                "@import url(missing.css); body { color: white; }", encoding="utf-8"
+            )
+            scene = root / "scene.html"
+            scene.write_text(
+                '<!doctype html><html><head><title>Test</title>'
+                '<meta name="viewport" content="width=device-width, initial-scale=1">'
+                '<meta http-equiv="Content-Security-Policy" content="default-src \'none\'">'
+                '<link rel="stylesheet" href="styles/style.css"></head><body></body></html>',
+                encoding="utf-8",
+            )
+            errors = validator.validate_scene(scene)
+        self.assertIn("missing local asset: missing.css", errors)
+
     def test_rejects_remote_assets(self):
         with tempfile.TemporaryDirectory() as temp:
             scene = Path(temp) / "remote.html"
