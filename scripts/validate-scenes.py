@@ -94,18 +94,29 @@ def validate_scene(path: Path) -> list[str]:
     )
     errors.extend(message for passed, message in checks if not passed)
 
-    # CSS url() references are assets too; catch missing images and fonts.
+    # Follow CSS dependencies as well as inline CSS. Checking only the
+    # stylesheet file misses broken fonts/images and nested @import references.
     import re
-    css_assets = []
+
+    css_url_pattern = re.compile(r"""url\(\s*(["']?)(.*?)\1\s*\)""", re.IGNORECASE)
+    css_import_pattern = re.compile(r"""@import\s+(?:url\(\s*)?["']([^"']+)["']\s*\)?""", re.IGNORECASE)
+    pending_assets = list(parser.assets)
     for css in parser.css_sources:
-        css_assets.extend(
-            match.group(2).strip()
-            for match in re.finditer(r"""url\(\s*(["']?)(.*?)\1\s*\)""", css, re.IGNORECASE)
-            if match.group(2).strip()
-        )
+        pending_assets.extend(match.group(2).strip() for match in css_url_pattern.finditer(css)
+                              if match.group(2).strip())
+        pending_assets.extend(match.group(1).strip() for match in css_import_pattern.finditer(css)
+                              if match.group(1).strip())
+    checked_assets: set[str] = set()
+    checked_stylesheets: set[Path] = set()
+    scene_root = path.parent.resolve()
+
     # matugen-colors.css is intentionally generated as a per-user symlink at
     # install time; all other referenced local assets must ship with the scene.
-    for asset in [*parser.assets, *css_assets]:
+    while pending_assets:
+        asset = pending_assets.pop(0).strip()
+        if not asset or asset in checked_assets:
+            continue
+        checked_assets.add(asset)
         if asset.startswith(("http:", "https:", "//")):
             errors.append(f"remote asset is not allowed: {asset}")
             continue
@@ -119,12 +130,24 @@ def validate_scene(path: Path) -> list[str]:
             continue
         resolved = (path.parent / asset_path).resolve()
         try:
-            resolved.relative_to(path.parent.resolve())
+            resolved.relative_to(scene_root)
         except ValueError:
             errors.append(f"asset escapes scene directory: {asset}")
             continue
         if not resolved.is_file():
             errors.append(f"missing local asset: {asset}")
+            continue
+        if resolved.suffix.lower() == ".css" and resolved not in checked_stylesheets:
+            checked_stylesheets.add(resolved)
+            try:
+                css = resolved.read_text(encoding="utf-8")
+            except (OSError, UnicodeError) as exc:
+                errors.append(f"cannot read CSS asset {asset}: {exc}")
+                continue
+            pending_assets.extend(match.group(2).strip() for match in css_url_pattern.finditer(css)
+                                  if match.group(2).strip())
+            pending_assets.extend(match.group(1).strip() for match in css_import_pattern.finditer(css)
+                                  if match.group(1).strip())
     return errors
 
 
