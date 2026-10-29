@@ -414,6 +414,26 @@ class ScreensaverWindow(Adw.ApplicationWindow):
         self.shortcut_row.add_suffix(self.clear_shortcut_button)
         shortcut_group.add(self.shortcut_row)
 
+        # --- Configuration backup and restore ---
+        backup_group = Adw.PreferencesGroup(title="Configuration backup")
+        page.add(backup_group)
+        backup_row = Adw.ActionRow(
+            title="Export settings",
+            subtitle="Save preferences, favorites, scene options, and monitor assignments",
+        )
+        export_button = Gtk.Button(label="Export…", valign=Gtk.Align.CENTER)
+        export_button.connect("clicked", self.on_export_config)
+        backup_row.add_suffix(export_button)
+        backup_group.add(backup_row)
+        restore_row = Adw.ActionRow(
+            title="Import settings",
+            subtitle="Validate a backup and confirm before applying it",
+        )
+        import_button = Gtk.Button(label="Import…", valign=Gtk.Align.CENTER)
+        import_button.connect("clicked", self.on_import_config)
+        restore_row.add_suffix(import_button)
+        backup_group.add(restore_row)
+
         toolbar_view.set_content(page)
         self.toast_overlay = Adw.ToastOverlay()
         self.toast_overlay.set_child(toolbar_view)
@@ -672,6 +692,117 @@ class ScreensaverWindow(Adw.ApplicationWindow):
                 self.preview_web.load_uri(uri)
             except Exception:
                 pass
+
+    def on_export_config(self, _button):
+        dialog = Gtk.FileChooserNative.new(
+            "Export Material Screensaver settings", self,
+            Gtk.FileChooserAction.SAVE, "Export", "Cancel",
+        )
+        dialog.set_current_name("material-screensaver-settings.json")
+
+        def on_response(chooser, response):
+            if response != Gtk.ResponseType.ACCEPT:
+                return
+            file = chooser.get_file()
+            path = file.get_path() if file else None
+            if not path:
+                self.toast_overlay.add_toast(Adw.Toast.new("Choose a local file to export settings"))
+                return
+            cfg = load_config()
+            # Backups deliberately omit hook commands, lock message text, and
+            # machine-specific Matugen paths; importing must not execute or
+            # disclose local commands or private message content.
+            safe_keys = (
+                "active", "idle_seconds", "fps_limit", "blank_display_after_minutes",
+                "reduce_fps_on_battery", "clock_format", "clock_overlay",
+                "clock_overlay_position", "clock_overlay_opacity", "random",
+                "lock_after_seconds", "favorites", "screensaver_options",
+                "monitor_screensavers",
+            )
+            payload = {
+                "format": "material-screensaver-config",
+                "version": 1,
+                "settings": {key: cfg[key] for key in safe_keys if key in cfg},
+            }
+            try:
+                with open(path, "w", encoding="utf-8") as handle:
+                    json.dump(payload, handle, indent=2)
+                    handle.write("\n")
+                self.toast_overlay.add_toast(Adw.Toast.new("Settings backup exported"))
+            except (OSError, TypeError, ValueError) as exc:
+                self.toast_overlay.add_toast(Adw.Toast.new(f"Could not export settings: {exc}"))
+            finally:
+                chooser.destroy()
+
+        dialog.connect("response", on_response)
+        dialog.show()
+
+    def on_import_config(self, _button):
+        dialog = Gtk.FileChooserNative.new(
+            "Import Material Screensaver settings", self,
+            Gtk.FileChooserAction.OPEN, "Continue", "Cancel",
+        )
+
+        def on_response(chooser, response):
+            if response != Gtk.ResponseType.ACCEPT:
+                return
+            file = chooser.get_file()
+            path = file.get_path() if file else None
+            chooser.destroy()
+            if not path:
+                self.toast_overlay.add_toast(Adw.Toast.new("Choose a local backup file"))
+                return
+            try:
+                with open(path, encoding="utf-8") as handle:
+                    payload = json.load(handle)
+                if (
+                    not isinstance(payload, dict)
+                    or payload.get("format") != "material-screensaver-config"
+                    or payload.get("version") != 1
+                    or not isinstance(payload.get("settings"), dict)
+                ):
+                    raise ValueError("unsupported or malformed backup format")
+                settings = payload["settings"]
+                safe_keys = {
+                    "active", "idle_seconds", "fps_limit", "blank_display_after_minutes",
+                    "reduce_fps_on_battery", "clock_format", "clock_overlay",
+                    "clock_overlay_position", "clock_overlay_opacity", "random",
+                    "lock_after_seconds", "favorites", "screensaver_options",
+                    "monitor_screensavers",
+                }
+                if not settings or not set(settings).issubset(safe_keys):
+                    raise ValueError("backup contains no settings or unsupported fields")
+                current = load_config()
+                candidate = config_store.normalize_config({**current, **settings})
+                if candidate == current:
+                    self.toast_overlay.add_toast(Adw.Toast.new("Backup contains no applicable changes"))
+                    return
+            except (OSError, UnicodeError, json.JSONDecodeError, TypeError, ValueError) as exc:
+                self.toast_overlay.add_toast(Adw.Toast.new(f"Could not import settings: {exc}"))
+                return
+
+            confirm = Adw.MessageDialog.new(
+                self, "Import settings?", 
+                "This will replace the exported preference fields, including favorites and monitor assignments. "
+                "Hook commands, lock message text, and the Matugen path will be preserved.",
+            )
+            confirm.add_response("cancel", "Cancel")
+            confirm.add_response("import", "Import")
+            confirm.set_default_response("cancel")
+            confirm.set_close_response("cancel")
+
+            def on_confirm(_dialog, response_id):
+                if response_id != "import":
+                    return
+                if self._save_config(**{key: candidate[key] for key in safe_keys}):
+                    self.load_state()
+                    self.toast_overlay.add_toast(Adw.Toast.new("Settings backup imported"))
+
+            confirm.connect("response", on_confirm)
+            confirm.present()
+
+        dialog.connect("response", on_response)
+        dialog.show()
 
     def _save_config(self, **updates):
         try:
