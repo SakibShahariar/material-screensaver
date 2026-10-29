@@ -37,6 +37,7 @@ DEFAULT_CONFIG = {
     "screensaver_options": {},
     "monitor_screensavers": {},
     "lock_message": "",
+    "onboarding_dismissed": False,
 }
 
 
@@ -121,6 +122,8 @@ def normalize_config(data):
         cfg["active"] = active
     if isinstance(data.get("random"), bool):
         cfg["random"] = data["random"]
+    if isinstance(data.get("onboarding_dismissed"), bool):
+        cfg["onboarding_dismissed"] = data["onboarding_dismissed"]
     idle = _valid_int(data.get("idle_seconds"), 1, 86400)
     if idle is not None:
         cfg["idle_seconds"] = idle
