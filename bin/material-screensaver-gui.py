@@ -27,6 +27,9 @@ SCREENSAVER_DIR = os.path.expanduser("~/.local/share/material-screensaver/screen
 CONFIG_PATH = os.path.expanduser("~/.config/material-screensaver/config.json")
 CTL_SCRIPT = os.path.expanduser("~/.local/bin/material-screensaver-ctl.py")
 SERVICE_NAME = "material-screensaver.service"
+WINDOW_STATE_PATH = os.path.expanduser("~/.config/material-screensaver/window-state.json")
+DEFAULT_WINDOW_SIZE = (480, 600)
+WINDOW_SIZE_BOUNDS = ((480, 1600), (600, 1200))
 REQUESTED_PREVIEW = None
 
 KEYBINDING_PATH = "/org/gnome/settings-daemon/plugins/media-keys/custom-keybindings/material-screensaver/"
@@ -88,6 +91,50 @@ def display_name(filename):
     except (OSError, UnicodeError):
         pass
     return stem.replace("-", " ").replace("_", " ").title()
+
+
+def normalize_window_size(data):
+    """Clamp saved dimensions to usable limits and reject malformed values."""
+    if not isinstance(data, dict):
+        return DEFAULT_WINDOW_SIZE
+    dimensions = []
+    for key, default, bounds in zip(("width", "height"), DEFAULT_WINDOW_SIZE, WINDOW_SIZE_BOUNDS):
+        value = data.get(key)
+        if isinstance(value, bool) or not isinstance(value, int):
+            value = default
+        dimensions.append(max(bounds[0], min(bounds[1], value)))
+    return tuple(dimensions)
+
+
+def load_window_size(path=None):
+    path = path or WINDOW_STATE_PATH
+    try:
+        with open(path, encoding="utf-8") as handle:
+            return normalize_window_size(json.load(handle))
+    except (OSError, UnicodeError, json.JSONDecodeError, TypeError):
+        return DEFAULT_WINDOW_SIZE
+
+
+def save_window_size(width, height, path=None):
+    path = path or WINDOW_STATE_PATH
+    if any(isinstance(value, bool) or not isinstance(value, int) or value <= 0 for value in (width, height)):
+        return False
+    width, height = normalize_window_size({"width": width, "height": height})
+    directory = os.path.dirname(path)
+    os.makedirs(directory, exist_ok=True)
+    fd, temporary = tempfile.mkstemp(prefix=".window-state-", suffix=".tmp", dir=directory)
+    try:
+        with os.fdopen(fd, "w", encoding="utf-8") as handle:
+            json.dump({"width": width, "height": height}, handle)
+            handle.write("\\n")
+        os.replace(temporary, path)
+    except Exception:
+        try:
+            os.unlink(temporary)
+        except OSError:
+            pass
+        raise
+    return True
 
 
 def list_screensavers():
@@ -165,7 +212,8 @@ class ScreensaverWindow(Adw.ApplicationWindow):
     def __init__(self, app):
         super().__init__(application=app, title="Screensaver")
         self._preview_override = REQUESTED_PREVIEW
-        self.set_default_size(480, 600)
+        self.set_default_size(*load_window_size())
+        self.connect("close-request", self._save_window_size_on_close)
 
         toolbar_view = Adw.ToolbarView()
         toolbar_view.add_top_bar(Adw.HeaderBar())
@@ -471,6 +519,16 @@ class ScreensaverWindow(Adw.ApplicationWindow):
                     self.on_scene_option_changed(scene, option, changed_row.get_value()),
             )
         self.autostart_switch.connect("notify::active", self.on_autostart_toggled)
+
+    def _save_window_size_on_close(self, *_args):
+        width, height = self.get_width(), self.get_height()
+        if width > 0 and height > 0:
+            try:
+                save_window_size(width, height)
+            except OSError as exc:
+                print(f"Could not save settings window size: {exc}", file=sys.stderr)
+        # GTK4 on Wayland does not permit applications to restore window position.
+        return False
 
     def load_state(self):
         cfg = load_config()
