@@ -122,6 +122,18 @@ def _get_session_proxy():
     except Exception:
         return None
 
+def _session_idle_is_inhibited(proxy, variant):
+    """Return whether GNOME reports an idle inhibitor; fail open if unavailable."""
+    if proxy is None:
+        return False
+    try:
+        result = proxy.call_sync("IsInhibited", variant, 0, -1, None)
+        values = result.unpack()
+        return bool(values[0]) if values else False
+    except Exception as exc:
+        _log_event("idle_inhibit_check_failed", error=type(exc).__name__)
+        return False
+
 def _log_event(event, **fields):
     """Emit a compact journal-friendly lifecycle event without user content."""
     details = " ".join(
@@ -2337,6 +2349,17 @@ def run_daemon():
                 # Ignore stale WatchFired events delivered during a session lock.
                 if _session_locked:
                     _dbg("ignored idle WatchFired while session is locked")
+                    return
+                # Respect GNOME's session idle inhibitors (for example, fullscreen
+                # media). If the query is unavailable, fail open so normal idle
+                # activation is not accidentally disabled.
+                if _session_idle_is_inhibited(
+                    _get_session_proxy(), GLib.Variant("(u)", (8,))
+                ):
+                    _log_event("idle_activation_deferred", reason="session_idle_inhibited")
+                    # Re-arm after a short delay. Mutter then measures from current
+                    # activity again, so activity during the delay cancels activation.
+                    GLib.timeout_add_seconds(5, add_idle_watch)
                     return
                 # Idle reached -> show. Arm the active watch so Super+Q/activity
                 # re-arms the idle watch for the next cycle (it never closes).
