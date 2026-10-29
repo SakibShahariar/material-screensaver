@@ -30,6 +30,7 @@ DEFAULT_CONFIG = {
     "clock_overlay_opacity": 80,
     "random": False,
     "lock_after_seconds": 300,
+    "lock_countdown": False,
     "matugen_colors_path": DEFAULT_MATUGEN_COLORS_PATH,
     "favorites": [],
     "lock_hook": [],
@@ -136,6 +137,8 @@ def normalize_config(data):
     if isinstance(data.get("reduce_fps_on_battery"), bool):
         cfg["reduce_fps_on_battery"] = data["reduce_fps_on_battery"]
     lock = _valid_int(data.get("lock_after_seconds"), 0, 86400)
+    if isinstance(data.get("lock_countdown"), bool):
+        cfg["lock_countdown"] = data["lock_countdown"]
     if lock is not None:
         cfg["lock_after_seconds"] = lock
     if data.get("clock_format") in ("12h", "24h"):
