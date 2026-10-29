@@ -19,9 +19,16 @@ Copy [`scene-template.html`](scene-template.html) into the repository's `screens
 
 ## Validate a scene
 
-From the repository root, run the same checks used by CI:
+Run the dedicated package validator before enabling or distributing a scene. It checks required HTML structure, a non-empty title, viewport and Content Security Policy metadata, and referenced local assets. The generated `matugen-colors.css` link is the one intentional exception because installation creates it for each user.
 
 ```sh
+python3 scripts/validate-scenes.py /path/to/scene-directory
+```
+
+The repository's built-in scenes are validated by default when the directory is omitted. The same validation is covered by the automated test suite. From the repository root, run the full checks used by CI:
+
+```sh
+python3 scripts/validate-scenes.py
 python3 -m unittest discover -s tests -v
 npx --yes eslint@9 screensavers/clock-shared.js extensions/material-screensaver-gestures@io.github.sakib/extension.js
 ```
