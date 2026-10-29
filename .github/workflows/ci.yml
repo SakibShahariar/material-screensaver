@@ -100,6 +100,9 @@ jobs:
           print('GI imports OK')
           "
 
+      - name: Validate built-in scene packages
+        run: python3 scripts/validate-scenes.py
+
       - name: Run test suite (static, theme, JS syntax, config edge cases)
         run: |
           # Use Ubuntu's system Python so apt-installed PyGObject is importable;
