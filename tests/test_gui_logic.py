@@ -55,6 +55,18 @@ class TestGuiLogic(unittest.TestCase):
             ["autumnleaves.html"],
         )
 
+    def test_window_size_state_roundtrips_and_clamps(self):
+        path = os.path.join(self._tmp.name, "window-state.json")
+        self.assertEqual(self.gui.load_window_size(path), (480, 600))
+        self.assertTrue(self.gui.save_window_size(900, 720, path))
+        self.assertEqual(self.gui.load_window_size(path), (900, 720))
+        with open(path, "w", encoding="utf-8") as handle:
+            json.dump({"width": 1, "height": 99999}, handle)
+        self.assertEqual(self.gui.load_window_size(path), (480, 1200))
+        with open(path, "w", encoding="utf-8") as handle:
+            json.dump({"width": True, "height": "large"}, handle)
+        self.assertEqual(self.gui.load_window_size(path), (480, 600))
+
     def test_display_name(self):
         cases = {
             "blob.html": "Blob",
