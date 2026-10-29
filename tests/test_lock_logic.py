@@ -163,7 +163,7 @@ class TestExternalLockHandling(unittest.TestCase):
         self._orig = {
             "is_viewer_active": self.ctl.is_viewer_active,
             "hide_viewer": self.ctl.hide_viewer,
-            "_daemon_switch_to_idle_watch": self.ctl._daemon_switch_to_idle_watch,
+            "_daemon_switch_to_idle_watch": getattr(self.ctl, "_daemon_switch_to_idle_watch", None),
             "_session_locked": self.ctl._session_locked,
         }
         self.rearm_calls = 0
