@@ -14,18 +14,17 @@ A lightweight collection of offline HTML/JavaScript screensavers, with a GTK4 an
 
 ## Preview
 
-Explore the full screenshot collection:
+The built-in scenes combine animated visuals with an optional clock overlay.
 
-| Preview | Preview |
+| Scene | Scene |
 |---|---|
-| ![Scene preview 1](screenshots/shot01.png) | ![Scene preview 2](screenshots/shot02.png) |
-| ![Scene preview 3](screenshots/shot03.png) | ![Scene preview 4](screenshots/shot04.png) |
-| ![Scene preview 5](screenshots/shot05.png) | ![Scene preview 6](screenshots/shot06.png) |
-| ![Scene preview 7](screenshots/shot07.png) | ![Scene preview 8](screenshots/shot08.png) |
-| ![Scene preview 9](screenshots/shot09.png) | ![Scene preview 10](screenshots/shot10.png) |
-| ![Scene preview 11](screenshots/shot11.png) | ![Scene preview 12](screenshots/shot12.png) |
-| ![Scene preview 13](screenshots/shot13.png) | ![Scene preview 14](screenshots/shot14.png) |
-
+| ![Soft, translucent abstract forms with the clock overlay.](screenshots/shot01.png)<br><sub>Soft, translucent abstract forms with the clock overlay.</sub> | ![A repeating diamond grid in a cool, geometric palette.](screenshots/shot02.png)<br><sub>A repeating diamond grid in a cool, geometric palette.</sub> |
+| ![A night skyline with illuminated windows and a clock overlay.](screenshots/shot03.png)<br><sub>A night skyline with illuminated windows and a clock overlay.</sub> | ![A cityscape scene with a subdued night palette.](screenshots/shot04.png)<br><sub>A cityscape scene with a subdued night palette.</sub> |
+| ![An additional scene preview from the built-in collection.](screenshots/shot05.png)<br><sub>An additional scene preview from the built-in collection.</sub> | ![Floating, translucent bubbles on a dark background.](screenshots/shot06.png)<br><sub>Floating, translucent bubbles on a dark background.</sub> |
+| ![A pixel-style world map made from glowing squares.](screenshots/shot07.png)<br><sub>A pixel-style world map made from glowing squares.</sub> | ![A softly glowing orb framed by a fine border.](screenshots/shot08.png)<br><sub>A softly glowing orb framed by a fine border.</sub> |
+| ![An intricate maze-like line pattern in warm colors.](screenshots/shot09.png)<br><sub>An intricate maze-like line pattern in warm colors.</sub> | ![Floating circles, squares, and bars in a warm palette.](screenshots/shot10.png)<br><sub>Floating circles, squares, and bars in a warm palette.</sub> |
+| ![Autumn-colored leaves drifting across a dark background.](screenshots/shot11.png)<br><sub>Autumn-colored leaves drifting across a dark background.</sub> | ![Large faceted polygons in a warm, low-contrast palette.](screenshots/shot12.png)<br><sub>Large faceted polygons in a warm, low-contrast palette.</sub> |
+| ![A swirling, luminous particle pattern.](screenshots/shot13.png)<br><sub>A swirling, luminous particle pattern.</sub> | ![Small green and blue leaves drifting across a dark background.](screenshots/shot14.png)<br><sub>Small green and blue leaves drifting across a dark background.</sub> |
 ## Features
 
 - **31 animated scenes** — from space and nature to generative and geometric art.
