@@ -106,7 +106,7 @@ def validate_scene(path: Path) -> list[str]:
                               for match in css_url_pattern.finditer(css) if match.group(2).strip())
         pending_assets.extend((match.group(1).strip(), path.parent)
                               for match in css_import_pattern.finditer(css) if match.group(1).strip())
-    checked_assets: set[str] = set()
+    checked_assets: set[tuple[str, Path]] = set()
     checked_stylesheets: set[Path] = set()
     scene_root = path.parent.resolve()
 
@@ -115,9 +115,13 @@ def validate_scene(path: Path) -> list[str]:
     while pending_assets:
         asset, asset_base = pending_assets.pop(0)
         asset = asset.strip()
-        if not asset or asset in checked_assets:
+        # Relative asset strings are only unique within their base directory.
+        # Two stylesheets may both reference "texture.png" but resolve to
+        # different files, so deduplicate by both the spelling and base path.
+        asset_key = (asset, asset_base.resolve())
+        if not asset or asset_key in checked_assets:
             continue
-        checked_assets.add(asset)
+        checked_assets.add(asset_key)
         if asset.startswith(("http:", "https:", "//")):
             errors.append(f"remote asset is not allowed: {asset}")
             continue
