@@ -296,6 +296,22 @@ class TestJsSyntax(unittest.TestCase):
         self.assertIn("session_locked=_session_locked", source)
         self.assertIn('print(f"Failed to refresh idle timeout: {exc}"', source)
 
+    def test_config_backup_validates_import_and_omits_sensitive_fields(self):
+        gui = _read(os.path.join(support.REPO_ROOT, "bin", "material-screensaver-gui.py"))
+        self.assertIn('"format": "material-screensaver-config"', gui)
+        self.assertIn('payload.get("version") != 1', gui)
+        self.assertIn('payload.get("settings"), dict', gui)
+        self.assertIn('confirm = Adw.MessageDialog.new(', gui)
+        self.assertIn('confirm.add_response("import", "Import")', gui)
+        self.assertIn('"lock_hook"', gui)  # sensitive fields are explicitly described as preserved, not exported
+        self.assertIn('"unlock_hook"', gui)
+        self.assertIn('"lock_message"', gui)
+        export_start = gui.index('payload = {')
+        export_end = gui.index('try:', export_start)
+        exported_block = gui[export_start:export_end]
+        for sensitive in ('"lock_hook"', '"unlock_hook"', '"lock_message"', '"matugen_colors_path"'):
+            self.assertNotIn(sensitive, exported_block)
+
     def test_failed_scene_shows_safe_fallback_and_logs_scene_name(self):
         source = _read(os.path.join(support.REPO_ROOT, "bin", "material-screensaver-ctl.py"))
         self.assertIn('web.connect("load-failed", on_scene_load_failed)', source)
