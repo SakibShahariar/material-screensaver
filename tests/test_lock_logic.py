@@ -172,6 +172,9 @@ class TestExternalLockHandling(unittest.TestCase):
         self.ctl.hide_viewer = lambda: self._bump()
         self.ctl._daemon_switch_to_idle_watch = lambda: self._rearm()
 
+    def _rearm(self):
+        self.rearm_calls += 1
+
     def _bump(self):
         self.hidden += 1
         self.active = False  # hiding the viewer deactivates it (real hide_viewer does this)
