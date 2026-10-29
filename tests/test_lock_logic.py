@@ -163,9 +163,14 @@ class TestExternalLockHandling(unittest.TestCase):
         self._orig = {
             "is_viewer_active": self.ctl.is_viewer_active,
             "hide_viewer": self.ctl.hide_viewer,
+            "_daemon_switch_to_idle_watch": self.ctl._daemon_switch_to_idle_watch,
+            "_session_locked": self.ctl._session_locked,
         }
+        self.rearm_calls = 0
+        self.ctl._session_locked = False
         self.ctl.is_viewer_active = lambda: self.active
         self.ctl.hide_viewer = lambda: self._bump()
+        self.ctl._daemon_switch_to_idle_watch = lambda: self._rearm()
 
     def _bump(self):
         self.hidden += 1
@@ -175,10 +180,19 @@ class TestExternalLockHandling(unittest.TestCase):
         for name, fn in self._orig.items():
             setattr(self.ctl, name, fn)
 
-    def test_external_lock_hides_viewer(self):
+    def test_external_lock_hides_viewer_and_marks_session_locked(self):
         self.active = True
         self.ctl._on_screen_saver_active_changed(True)
         self.assertEqual(self.hidden, 1)
+        self.assertTrue(self.ctl._session_locked)
+        self.assertEqual(self.rearm_calls, 0)
+
+    def test_unlock_clears_lock_state_and_rearms_idle_watch(self):
+        self.active = False
+        self.ctl._session_locked = True
+        self.ctl._on_screen_saver_active_changed(False)
+        self.assertFalse(self.ctl._session_locked)
+        self.assertEqual(self.rearm_calls, 1)
 
     def test_unlock_does_not_hide(self):
         self.active = True
