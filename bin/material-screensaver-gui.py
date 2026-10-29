@@ -145,7 +145,13 @@ def filter_screensavers(filenames, query="", category="All categories",
         category = "All categories"
     result = []
     for filename in filenames:
-        if query and query not in filename.casefold() and query not in display_name(filename).casefold():
+        category_name = SCENE_CATEGORIES.get(filename, "Other").casefold()
+        if (
+            query
+            and query not in filename.casefold()
+            and query not in display_name(filename).casefold()
+            and query not in category_name
+        ):
             continue
         if category != "All categories" and SCENE_CATEGORIES.get(filename, "Other") != category:
             continue
