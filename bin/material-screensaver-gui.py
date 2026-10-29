@@ -241,6 +241,48 @@ class ScreensaverWindow(Adw.ApplicationWindow):
 
         page = Adw.PreferencesPage()
 
+        # First-run guide stays out of the way once dismissed or setup is complete.
+        self.onboarding_group = None
+        if not load_config().get("onboarding_dismissed", False):
+            self.onboarding_group = Adw.PreferencesGroup(title="Getting started")
+            page.add(self.onboarding_group)
+            self.onboarding_group.add(Adw.ActionRow(
+                title="1. Choose a scene",
+                subtitle="Pick an animated scene below, or enable Random each time.",
+            ))
+            self.onboarding_group.add(Adw.ActionRow(
+                title="2. Set idle and lock timing",
+                subtitle="Adjust Idle timeout and Lock after in the Timing section.",
+            ))
+            self.onboarding_group.add(Adw.ActionRow(
+                title="3. Optional autostart",
+                subtitle="Use the Autostart switch to start the service with your session.",
+            ))
+            self.onboarding_status_row = Adw.ActionRow(
+                title="Automatic activation",
+                subtitle="Checking service status…",
+            )
+            self.onboarding_enable_button = Gtk.Button(
+                label="Enable service", valign=Gtk.Align.CENTER
+            )
+            self.onboarding_status_row.add_suffix(self.onboarding_enable_button)
+            self.onboarding_group.add(self.onboarding_status_row)
+            self.onboarding_enable_button.connect(
+                "clicked", self.on_enable_service_clicked
+            )
+            self.onboarding_dismiss_button = Gtk.Button(
+                label="Dismiss setup guide", valign=Gtk.Align.CENTER
+            )
+            dismiss_row = Adw.ActionRow(
+                title="Configure later",
+                subtitle="You can change all settings any time.",
+            )
+            dismiss_row.add_suffix(self.onboarding_dismiss_button)
+            self.onboarding_group.add(dismiss_row)
+            self.onboarding_dismiss_button.connect(
+                "clicked", self.on_dismiss_onboarding
+            )
+
         # --- Screensaver picker ---
         sv_group = Adw.PreferencesGroup(title="Screensaver")
         page.add(sv_group)
@@ -634,6 +676,16 @@ class ScreensaverWindow(Adw.ApplicationWindow):
             else:
                 subtitle = "Launch when idle (service state unavailable)"
             self.autostart_row.set_subtitle(subtitle)
+            if self.onboarding_group is not None:
+                self.onboarding_status_row.set_subtitle(
+                    "Service is running; automatic activation is enabled."
+                    if state == "active"
+                    else f"Service status: {state}. Enable it to launch automatically when idle."
+                )
+                configured = cfg.get("random", False) or cfg.get("active") in self.screensaver_files
+                if state == "active" and configured:
+                    if self._save_config(onboarding_dismissed=True):
+                        self.onboarding_group.set_visible(False)
 
         self._run_systemctl_async(["is-active", SERVICE_NAME], on_active_checked)
         self.refresh_shortcut_label()
@@ -1091,6 +1143,38 @@ class ScreensaverWindow(Adw.ApplicationWindow):
                 on_finished(False, "", str(exc))
 
         proc.communicate_utf8_async(None, None, completed)
+
+    def on_enable_service_clicked(self, _button):
+        if self.onboarding_group is None:
+            return
+        self.onboarding_enable_button.set_sensitive(False)
+
+        def on_finished(success, _stdout, stderr):
+            self.onboarding_enable_button.set_sensitive(True)
+            if success:
+                self.onboarding_status_row.set_subtitle(
+                    "Service enabled and started; automatic activation is on."
+                )
+                self.onboarding_enable_button.set_label("Service enabled")
+                self.onboarding_enable_button.set_sensitive(False)
+                if hasattr(self, "autostart_switch"):
+                    self._autostart_updating = True
+                    self.autostart_switch.set_active(True)
+                    self._autostart_updating = False
+                    self._autostart_enabled = True
+                self.toast_overlay.add_toast(Adw.Toast.new("Automatic activation enabled"))
+            else:
+                detail = stderr.strip() or "Could not enable the user service"
+                self.onboarding_status_row.set_subtitle(detail)
+                self.toast_overlay.add_toast(Adw.Toast.new(detail))
+
+        self._run_systemctl_async(["enable", "--now", SERVICE_NAME], on_finished)
+
+    def on_dismiss_onboarding(self, _button):
+        if self.onboarding_group is None:
+            return
+        if self._save_config(onboarding_dismissed=True):
+            self.onboarding_group.set_visible(False)
 
     def on_autostart_toggled(self, switch, _pspec):
         if getattr(self, "_autostart_updating", False):
