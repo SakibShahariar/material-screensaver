@@ -85,6 +85,12 @@ Useful commands:
 
 To add a scene, place an `.html` file in `~/.local/share/material-screensaver/screensavers/`. See the [scene authoring guide](docs/scene-authoring.md) and [starter template](docs/scene-template.html).
 
+## Fullscreen media and idle inhibition
+
+When GNOME applications request session idle inhibition (commonly while fullscreen media is playing), Material Screensaver checks GNOME SessionManager before opening its viewer. If an idle inhibitor is active, activation is deferred and the idle watch is re-armed shortly afterward. If SessionManager is unavailable, the check fails open so ordinary idle activation continues rather than being disabled accidentally.
+
+This behavior depends on GNOME reporting the application's idle inhibitor through the session bus; it does not attempt to infer whether a window is playing video.
+
 ## Troubleshooting
 
 Start with the service status and recent user-service logs. These commands are read-only:
