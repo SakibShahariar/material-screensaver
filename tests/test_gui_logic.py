@@ -45,6 +45,33 @@ class TestGuiLogic(unittest.TestCase):
         with open(self.gui.CONFIG_PATH, "w", encoding="utf-8") as f:
             json.dump(data, f)
 
+    def test_settings_search_matches_descendant_labels(self):
+        class FakeWidget:
+            def __init__(self, title="", children=()):
+                self.title = title
+                self.children = list(children)
+                for index, child in enumerate(self.children):
+                    child.sibling = self.children[index + 1] if index + 1 < len(self.children) else None
+                self.sibling = None
+
+            def get_title(self):
+                return self.title
+
+            def get_first_child(self):
+                return self.children[0] if self.children else None
+
+            def get_next_sibling(self):
+                return self.sibling
+
+        timing = FakeWidget("Timing", [
+            FakeWidget("Idle timeout"),
+            FakeWidget("Animation frame-rate cap"),
+        ])
+        self.assertTrue(self.gui.settings_group_matches(timing, "frame-rate"))
+        self.assertTrue(self.gui.settings_group_matches(timing, "idle"))
+        self.assertFalse(self.gui.settings_group_matches(timing, "keyboard"))
+        self.assertTrue(self.gui.settings_group_matches(timing, ""))
+
     def test_scene_search_matches_category_names(self):
         self.assertEqual(
             self.gui.filter_screensavers(["solar-system.html", "blob.html"], query="space"),
