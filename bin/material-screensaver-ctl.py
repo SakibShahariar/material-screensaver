@@ -312,6 +312,16 @@ def _kill_orphan_webkit():
 
     return len(to_reap)
 
+def _battery_policy_label(cfg, battery_saving):
+    """Return a concise overlay label only when battery FPS reduction is active."""
+    if not battery_saving:
+        return None
+    fps_limit = cfg.get("fps_limit", 30) if isinstance(cfg, dict) else 30
+    if isinstance(fps_limit, bool) or not isinstance(fps_limit, int):
+        fps_limit = 30
+    return f"Battery saver active · FPS cap {min(fps_limit, 15)}"
+
+
 def _battery_is_discharging():
     """Return True/False from UPower, or None when battery state is unknown."""
     try:
@@ -383,6 +393,7 @@ def _create_viewer_windows(html_path, clock_format="24h", scene_options=None):
     )
     if battery_saving:
         _dbg("UPower reports discharging; reducing requestAnimationFrame cap to 15 FPS")
+    battery_indicator_text = _battery_policy_label(viewer_cfg, battery_saving)
     available_scenes = list_screensavers()
     windows = []
     global _ephemeral_ctx
@@ -692,7 +703,19 @@ p{color:#c4c0ca;line-height:1.5}
 
         web.connect("load-failed", on_scene_load_failed)
         web.load_uri(uri)
-        win.set_child(web)
+        viewer_content = Gtk.Overlay()
+        viewer_content.set_child(web)
+        if battery_indicator_text:
+            indicator = Gtk.Label(label=battery_indicator_text)
+            indicator.add_css_class("osd")
+            indicator.add_css_class("caption")
+            indicator.set_halign(Gtk.Align.START)
+            indicator.set_valign(Gtk.Align.START)
+            indicator.set_margin_top(16)
+            indicator.set_margin_start(16)
+            indicator.set_can_target(False)
+            viewer_content.add_overlay(indicator)
+        win.set_child(viewer_content)
 
         def on_key(ctrl, keyval, keycode, state, _win=win):
             # Only Super+Q closes, Super alone is consumed (no overview, no close)
