@@ -169,11 +169,15 @@ Other GNOME extensions and unrelated user settings are preserved.
 
 ## Development
 
-Run automated tests:
+Run automated tests and the deterministic scene source-payload budget:
 
 ```sh
 python3 -m unittest discover -s tests -v
+python3 scripts/validate-scenes.py
+python3 scripts/check-scene-payload-budget.py
 ```
+
+The payload budget catches accidental oversized scene HTML in CI. It is not a runtime CPU/GPU or memory benchmark; those measurements still require a graphical GNOME Wayland runner.
 
 These checks do not replace live testing in a GNOME Wayland session. See the [integration test plan](docs/gnome-integration-test-plan.md).
 
