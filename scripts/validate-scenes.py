@@ -100,12 +100,17 @@ def validate_scene(path: Path) -> list[str]:
 
     css_url_pattern = re.compile(r"""url\(\s*(["']?)(.*?)\1\s*\)""", re.IGNORECASE)
     css_import_pattern = re.compile(r"""@import\s+(?:url\(\s*)?["']([^"']+)["']\s*\)?""", re.IGNORECASE)
+    css_import_url_pattern = re.compile(
+        r"""@import\s+url\(\s*([^"'()\s][^)]*?)\s*\)""", re.IGNORECASE
+    )
     pending_assets = [(asset, path.parent) for asset in parser.assets]
     for css in parser.css_sources:
         pending_assets.extend((match.group(2).strip(), path.parent)
                               for match in css_url_pattern.finditer(css) if match.group(2).strip())
         pending_assets.extend((match.group(1).strip(), path.parent)
                               for match in css_import_pattern.finditer(css) if match.group(1).strip())
+        pending_assets.extend((match.group(1).strip(), path.parent)
+                              for match in css_import_url_pattern.finditer(css) if match.group(1).strip())
     checked_assets: set[tuple[str, Path]] = set()
     checked_stylesheets: set[Path] = set()
     scene_root = path.parent.resolve()
@@ -153,6 +158,8 @@ def validate_scene(path: Path) -> list[str]:
                                   for match in css_url_pattern.finditer(css) if match.group(2).strip())
             pending_assets.extend((match.group(1).strip(), resolved.parent)
                                   for match in css_import_pattern.finditer(css) if match.group(1).strip())
+            pending_assets.extend((match.group(1).strip(), resolved.parent)
+                                  for match in css_import_url_pattern.finditer(css) if match.group(1).strip())
     return errors
 
 
