@@ -93,6 +93,27 @@ def display_name(filename):
     return stem.replace("-", " ").replace("_", " ").title()
 
 
+def query_battery_discharging():
+    """Return True/False from UPower, or None when power state is unavailable."""
+    try:
+        result = subprocess.run(
+            ["upower", "-i", "/org/freedesktop/UPower/devices/DisplayDevice"],
+            capture_output=True, text=True, timeout=1, check=False,
+        )
+        if result.returncode == 0:
+            for line in result.stdout.splitlines():
+                key, sep, value = line.strip().partition(":")
+                if sep and key.strip() == "state":
+                    state = value.strip().lower()
+                    if state == "discharging":
+                        return True
+                    if state in ("charging", "fully-charged", "pending-charge", "pending-discharge"):
+                        return False
+    except (OSError, subprocess.SubprocessError):
+        pass
+    return None
+
+
 def normalize_window_size(data):
     """Clamp saved dimensions to usable limits and reject malformed values."""
     if not isinstance(data, dict):
@@ -381,6 +402,11 @@ class ScreensaverWindow(Adw.ApplicationWindow):
         battery_saver_row.add_suffix(self.battery_saver_switch)
         battery_saver_row.set_activatable_widget(self.battery_saver_switch)
         timing_group.add(battery_saver_row)
+        self.battery_status_row = Adw.ActionRow(
+            title="Effective battery-saving policy",
+            subtitle="Checking UPower battery state…",
+        )
+        timing_group.add(self.battery_status_row)
 
         # --- Clock format ---
         clock_group = Adw.PreferencesGroup(title="Clock")
@@ -520,6 +546,23 @@ class ScreensaverWindow(Adw.ApplicationWindow):
             )
         self.autostart_switch.connect("notify::active", self.on_autostart_toggled)
 
+    def _update_battery_status(self):
+        cfg = load_config()
+        normal_fps = cfg.get("fps_limit", 30)
+        blank_minutes = cfg.get("blank_display_after_minutes", 0)
+        blank_policy = (f"Display blanking: after {blank_minutes} min." if blank_minutes else "Display blanking: disabled.")
+        if not cfg.get("reduce_fps_on_battery", True):
+            status = f"Battery FPS reduction is disabled. Normal cap: {normal_fps} FPS. {blank_policy}"
+        else:
+            discharging = query_battery_discharging()
+            if discharging is True:
+                status = f"Active when the screensaver starts: 15 FPS cap (normal cap {normal_fps} FPS). {blank_policy}"
+            elif discharging is False:
+                status = f"Inactive: power is not discharging. Cap: {normal_fps} FPS. {blank_policy}"
+            else:
+                status = f"Power state unavailable; battery cap cannot be confirmed. Configured cap: {normal_fps} FPS. {blank_policy}"
+        self.battery_status_row.set_subtitle(status)
+
     def _save_window_size_on_close(self, *_args):
         width, height = self.get_width(), self.get_height()
         if width > 0 and height > 0:
@@ -554,6 +597,7 @@ class ScreensaverWindow(Adw.ApplicationWindow):
         self.fps_row.set_value(cfg.get("fps_limit", 30))
         self.blank_display_row.set_value(cfg.get("blank_display_after_minutes", 0))
         self.battery_saver_switch.set_active(cfg.get("reduce_fps_on_battery", True))
+        self._update_battery_status()
 
         self.ampm_switch.set_active(cfg.get("clock_format", "24h") == "12h")
         self.clock_overlay_switch.set_active(cfg.get("clock_overlay", False))
@@ -1002,12 +1046,15 @@ class ScreensaverWindow(Adw.ApplicationWindow):
     def on_fps_changed(self, row, _pspec):
         if self._save_config(fps_limit=int(row.get_value())):
             self._update_preview()
+        self._update_battery_status()
 
     def on_blank_display_changed(self, row, _pspec):
         self._save_config(blank_display_after_minutes=int(row.get_value()))
+        self._update_battery_status()
 
     def on_battery_saver_toggled(self, switch, _pspec):
         self._save_config(reduce_fps_on_battery=switch.get_active())
+        self._update_battery_status()
 
     def on_ampm_toggled(self, switch, _pspec):
         self._save_config(clock_format="12h" if switch.get_active() else "24h")
