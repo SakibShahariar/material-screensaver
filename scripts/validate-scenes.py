@@ -100,12 +100,12 @@ def validate_scene(path: Path) -> list[str]:
 
     css_url_pattern = re.compile(r"""url\(\s*(["']?)(.*?)\1\s*\)""", re.IGNORECASE)
     css_import_pattern = re.compile(r"""@import\s+(?:url\(\s*)?["']([^"']+)["']\s*\)?""", re.IGNORECASE)
-    pending_assets = list(parser.assets)
+    pending_assets = [(asset, path.parent) for asset in parser.assets]
     for css in parser.css_sources:
-        pending_assets.extend(match.group(2).strip() for match in css_url_pattern.finditer(css)
-                              if match.group(2).strip())
-        pending_assets.extend(match.group(1).strip() for match in css_import_pattern.finditer(css)
-                              if match.group(1).strip())
+        pending_assets.extend((match.group(2).strip(), path.parent)
+                              for match in css_url_pattern.finditer(css) if match.group(2).strip())
+        pending_assets.extend((match.group(1).strip(), path.parent)
+                              for match in css_import_pattern.finditer(css) if match.group(1).strip())
     checked_assets: set[str] = set()
     checked_stylesheets: set[Path] = set()
     scene_root = path.parent.resolve()
@@ -113,7 +113,8 @@ def validate_scene(path: Path) -> list[str]:
     # matugen-colors.css is intentionally generated as a per-user symlink at
     # install time; all other referenced local assets must ship with the scene.
     while pending_assets:
-        asset = pending_assets.pop(0).strip()
+        asset, asset_base = pending_assets.pop(0)
+        asset = asset.strip()
         if not asset or asset in checked_assets:
             continue
         checked_assets.add(asset)
@@ -128,7 +129,7 @@ def validate_scene(path: Path) -> list[str]:
         if Path(asset_path).is_absolute():
             errors.append(f"asset must be relative: {asset}")
             continue
-        resolved = (path.parent / asset_path).resolve()
+        resolved = (asset_base / asset_path).resolve()
         try:
             resolved.relative_to(scene_root)
         except ValueError:
@@ -144,10 +145,10 @@ def validate_scene(path: Path) -> list[str]:
             except (OSError, UnicodeError) as exc:
                 errors.append(f"cannot read CSS asset {asset}: {exc}")
                 continue
-            pending_assets.extend(match.group(2).strip() for match in css_url_pattern.finditer(css)
-                                  if match.group(2).strip())
-            pending_assets.extend(match.group(1).strip() for match in css_import_pattern.finditer(css)
-                                  if match.group(1).strip())
+            pending_assets.extend((match.group(2).strip(), resolved.parent)
+                                  for match in css_url_pattern.finditer(css) if match.group(2).strip())
+            pending_assets.extend((match.group(1).strip(), resolved.parent)
+                                  for match in css_import_pattern.finditer(css) if match.group(1).strip())
     return errors
 
 
