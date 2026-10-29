@@ -83,6 +83,29 @@ class TestSceneValidator(unittest.TestCase):
             errors = validator.validate_scene(scene)
         self.assertIn("missing local asset: ../fonts/missing-font.woff2", errors)
 
+    def test_checks_same_relative_asset_from_each_stylesheet_directory(self):
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp)
+            first = root / "first"
+            second = root / "second"
+            first.mkdir()
+            second.mkdir()
+            (first / "texture.png").write_bytes(b"present only in first directory")
+            (first / "style.css").write_text('body { background: url("texture.png"); }', encoding="utf-8")
+            (second / "style.css").write_text('body { background: url("texture.png"); }', encoding="utf-8")
+            scene = root / "scene.html"
+            scene.write_text(
+                '<!doctype html><html><head><title>Test</title>'
+                '<meta name="viewport" content="width=device-width, initial-scale=1">'
+                '<meta http-equiv="Content-Security-Policy" content="default-src \'none\'">'
+                '<link rel="stylesheet" href="first/style.css">'
+                '<link rel="stylesheet" href="second/style.css">'
+                '</head><body></body></html>',
+                encoding="utf-8",
+            )
+            errors = validator.validate_scene(scene)
+        self.assertIn("missing local asset: texture.png", errors)
+
     def test_rejects_remote_assets(self):
         with tempfile.TemporaryDirectory() as temp:
             scene = Path(temp) / "remote.html"
