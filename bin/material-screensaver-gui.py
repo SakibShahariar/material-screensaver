@@ -126,7 +126,7 @@ def save_window_size(width, height, path=None):
     try:
         with os.fdopen(fd, "w", encoding="utf-8") as handle:
             json.dump({"width": width, "height": height}, handle)
-            handle.write("\\n")
+            handle.write("\n")
         os.replace(temporary, path)
     except Exception:
         try:
