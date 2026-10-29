@@ -71,6 +71,13 @@ class TestValidIntEdgeCases(CtlTestCase):
         self.assertEqual(self.ctl._valid_int("60", 1, 100), 60)
 
 
+class TestLockCountdownConfig(CtlTestCase):
+    def test_countdown_is_disabled_by_default_and_accepts_booleans(self):
+        defaults = self.ctl.config_store.normalize_config({})
+        self.assertFalse(defaults["lock_countdown"])
+        self.assertTrue(self.ctl.config_store.normalize_config({"lock_countdown": True})["lock_countdown"])
+        self.assertFalse(self.ctl.config_store.normalize_config({"lock_countdown": "true"})["lock_countdown"])
+
 class TestBatteryPolicyLabel(CtlTestCase):
     def test_label_only_appears_when_battery_saving_is_active(self):
         self.assertIsNone(self.ctl._battery_policy_label({"fps_limit": 30}, False))
