@@ -8,7 +8,7 @@
 
 A lightweight collection of offline HTML/JavaScript screensavers, with a GTK4 and libadwaita settings app.
 
-[Install](#install) · [Features](#features) · [Configure](#configure) · [Contributing scenes](docs/scene-authoring.md)
+[Install](#install) · [Features](#features) · [Configure](#configure) · [Troubleshooting](#troubleshooting) · [Contributing scenes](docs/scene-authoring.md)
 
 </div>
 
@@ -84,6 +84,66 @@ Useful commands:
 ```
 
 To add a scene, place an `.html` file in `~/.local/share/material-screensaver/screensavers/`. See the [scene authoring guide](docs/scene-authoring.md) and [starter template](docs/scene-template.html).
+
+## Troubleshooting
+
+Start with the service status and recent user-service logs. These commands are read-only:
+
+```sh
+systemctl --user status material-screensaver.service --no-pager
+journalctl --user -u material-screensaver.service --since "10 minutes ago" --no-pager
+```
+
+### The service will not start
+
+1. Confirm that you are logged into your GNOME graphical session.
+2. Check the status and journal commands above for the first error.
+3. After correcting any reported configuration or dependency problem, reload and restart the user service:
+
+   ```sh
+   systemctl --user daemon-reload
+   systemctl --user restart material-screensaver.service
+   ```
+
+### The viewer does not appear
+
+Try starting it manually to separate idle-detection problems from viewer problems:
+
+```sh
+~/.local/bin/material-screensaver-ctl.py start
+```
+
+If manual start works, check the idle timeout and service logs. If it fails, look for viewer-spawn, WebKitGTK, or scene-loading errors in the journal. The viewer is intended for GNOME on Wayland.
+
+### A stale viewer or WebKit window remains
+
+Ask the application to stop its viewer, then restart the service and check its status:
+
+```sh
+~/.local/bin/material-screensaver-ctl.py stop
+systemctl --user restart material-screensaver.service
+systemctl --user status material-screensaver.service --no-pager
+```
+
+If the window remains, collect the recent service logs before attempting manual process cleanup; avoid killing unrelated WebKit processes.
+
+### Lock timer or unlock behavior is unexpected
+
+Check the lock-after value in Settings and review recent service logs for lock-related failures. A lock-after value of `0` disables automatic locking by this application. Material Screensaver is not a lock screen; use GNOME's normal session lock. See [issue #8](https://github.com/SakibShahariar/material-screensaver/issues/8).
+
+### A monitor is clipped, blurry, or missing
+
+Check GNOME display settings and the configured scale factors, then restart the viewer after the display layout is stable. Record the monitor count, resolutions, scale factors, and whether a display was hot-plugged. See [issue #43](https://github.com/SakibShahariar/material-screensaver/issues/43) and the [GNOME Wayland integration test plan](docs/gnome-integration-test-plan.md).
+
+### Sharing useful diagnostic information
+
+For a focused log excerpt, run:
+
+```sh
+journalctl --user -u material-screensaver.service --since "10 minutes ago" --no-pager | grep 'event='
+```
+
+Include the symptom, steps to reproduce, expected and actual behavior, and relevant error/event names when reporting a problem. Review output before sharing it: redact personal paths, private message text, hook commands, and other sensitive information. See [issue #6](https://github.com/SakibShahariar/material-screensaver/issues/6) for integration testing and [issue #36](https://github.com/SakibShahariar/material-screensaver/issues/36) for lifecycle logging.
 
 ## Advanced integrations
 
