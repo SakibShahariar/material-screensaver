@@ -43,6 +43,16 @@ a production workstation with unsaved work.
 - [ ] Suspend/resume or dock/undock, then confirm the next activation covers the current display layout.
 - [ ] Repeat the lifecycle and lock checks after restarting GNOME Shell or logging out and back in.
 
+## Record results
+
+Run the checklist against the exact commit under test. Do not mark an item passed from code inspection alone. Copy this table into the test report and add one row per scenario exercised:
+
+| Test ID / scenario | Result (Pass / Fail / Blocked / Not run) | Environment / display topology | Evidence or safe journal event names | Follow-up issue |
+|---|---|---|---|---|
+| Example: LOCK-02 | Not run | GNOME version, Wayland, monitor count and scale | Not run | — |
+
+For any display-related failure, record each monitor's resolution and scale factor, primary-monitor choice, and whether the failure followed a hot-plug, docking, rotation, or resolution change. For recovery failures, include the event name and non-sensitive fields such as backend, status, and exception type; never include configured hook commands or private message text.
+
 ## Collect diagnostics
 
 After a failure, capture the output before restarting the service:
