@@ -46,6 +46,20 @@ class TestSceneValidator(unittest.TestCase):
             errors = validator.validate_scene(scene)
         self.assertIn("missing local asset: missing.png", errors)
 
+    def test_reports_missing_css_url_asset(self):
+        with tempfile.TemporaryDirectory() as temp:
+            scene = Path(temp) / "broken.html"
+            scene.write_text(
+                '<!doctype html><html><head><title>Test</title>'
+                '<meta name="viewport" content="width=device-width, initial-scale=1">'
+                '<meta http-equiv="Content-Security-Policy" content="default-src \'none\'">'
+                '<style>body { background-image: url("missing.png"); }</style>'
+                '</head><body></body></html>',
+                encoding="utf-8",
+            )
+            errors = validator.validate_scene(scene)
+        self.assertIn("missing local asset: missing.png", errors)
+
     def test_rejects_remote_assets(self):
         with tempfile.TemporaryDirectory() as temp:
             scene = Path(temp) / "remote.html"
