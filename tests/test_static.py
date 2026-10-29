@@ -296,6 +296,17 @@ class TestJsSyntax(unittest.TestCase):
         self.assertIn("session_locked=_session_locked", source)
         self.assertIn('print(f"Failed to refresh idle timeout: {exc}"', source)
 
+    def test_failed_scene_shows_safe_fallback_and_logs_scene_name(self):
+        source = _read(os.path.join(support.REPO_ROOT, "bin", "material-screensaver-ctl.py"))
+        self.assertIn('web.connect("load-failed", on_scene_load_failed)', source)
+        self.assertIn('"scene_load_failed"', source)
+        self.assertIn('scene=os.path.basename(monitor_html_path)', source)
+        self.assertIn('error=type(error).__name__', source)
+        self.assertIn('web.load_html(fallback_html, "about:blank")', source)
+        self.assertIn("Scene unavailable", source)
+        self.assertIn("Change scenes or restart the viewer", source)
+        self.assertIn('if scene_load_failed["shown"]:', source)
+
     def test_display_blanking_is_configurable_and_stops_scene_scripts(self):
         ctl = _read(os.path.join(support.REPO_ROOT, "bin", "material-screensaver-ctl.py"))
         gui = _read(os.path.join(support.REPO_ROOT, "bin", "material-screensaver-gui.py"))
