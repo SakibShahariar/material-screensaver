@@ -23,9 +23,15 @@ class SceneParser(HTMLParser):
         self.has_viewport = False
         self.has_csp = False
         self.assets: list[str] = []
+        self.css_sources: list[str] = []
+        self.style_depth = 0
 
     def handle_starttag(self, tag: str, attrs: list[tuple[str, str | None]]) -> None:
         attrs_map = dict(attrs)
+        if attrs_map.get("style"):
+            self.css_sources.append(attrs_map["style"] or "")
+        if tag == "style":
+            self.style_depth += 1
         if tag == "html":
             self.has_html = True
         elif tag == "head":
@@ -53,10 +59,14 @@ class SceneParser(HTMLParser):
     def handle_endtag(self, tag: str) -> None:
         if tag == "title" and self.title_depth:
             self.title_depth -= 1
+        elif tag == "style" and self.style_depth:
+            self.style_depth -= 1
 
     def handle_data(self, data: str) -> None:
         if self.title_depth:
             self.title += data.strip()
+        if self.style_depth:
+            self.css_sources.append(data)
 
 
 def validate_scene(path: Path) -> list[str]:
@@ -84,9 +94,18 @@ def validate_scene(path: Path) -> list[str]:
     )
     errors.extend(message for passed, message in checks if not passed)
 
+    # CSS url() references are assets too; catch missing images and fonts.
+    import re
+    css_assets = []
+    for css in parser.css_sources:
+        css_assets.extend(
+            match.group(2).strip()
+            for match in re.finditer(r"""url\(\s*(["']?)(.*?)\1\s*\)""", css, re.IGNORECASE)
+            if match.group(2).strip()
+        )
     # matugen-colors.css is intentionally generated as a per-user symlink at
     # install time; all other referenced local assets must ship with the scene.
-    for asset in parser.assets:
+    for asset in [*parser.assets, *css_assets]:
         if asset.startswith(("http:", "https:", "//")):
             errors.append(f"remote asset is not allowed: {asset}")
             continue
