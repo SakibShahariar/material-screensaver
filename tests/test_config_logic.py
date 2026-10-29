@@ -97,6 +97,13 @@ class TestNormalizeConfig(CtlTestCase):
         out = self.ctl.normalize_config({"active": 42})
         self.assertIsNone(out["active"])
 
+    def test_onboarding_dismissal_state_is_persisted_and_validated(self):
+        self.assertFalse(self.ctl.normalize_config({})["onboarding_dismissed"])
+        self.assertTrue(self.ctl.normalize_config({"onboarding_dismissed": True})["onboarding_dismissed"])
+        self.assertFalse(self.ctl.normalize_config({"onboarding_dismissed": "true"})["onboarding_dismissed"])
+        self.ctl.config_store.save_config(self.cfg_path, onboarding_dismissed=True)
+        self.assertTrue(self.ctl.load_config()["onboarding_dismissed"])
+
     def test_unknown_keys_dropped(self):
         out = self.ctl.normalize_config({"browser": "auto", "profile_root": "/tmp", "active": "flow.html"})
         self.assertNotIn("browser", out)
