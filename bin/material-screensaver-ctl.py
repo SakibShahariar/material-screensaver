@@ -2357,9 +2357,18 @@ def run_daemon():
                     _get_session_proxy(), GLib.Variant("(u)", (8,))
                 ):
                     _log_event("idle_activation_deferred", reason="session_idle_inhibited")
-                    # Re-arm after a short delay. Mutter then measures from current
+
+                    def rearm_after_inhibitor_check():
+                        # A manual start or session lock may happen during the
+                        # delay; do not arm an idle watch over an active viewer.
+                        if _session_locked or is_viewer_active():
+                            return GLib.SOURCE_REMOVE
+                        add_idle_watch()
+                        return GLib.SOURCE_REMOVE
+
+                    # Re-arm after a short delay. Mutter measures from current
                     # activity again, so activity during the delay cancels activation.
-                    GLib.timeout_add_seconds(5, add_idle_watch)
+                    GLib.timeout_add_seconds(5, rearm_after_inhibitor_check)
                     return
                 # Idle reached -> show. Arm the active watch so Super+Q/activity
                 # re-arms the idle watch for the next cycle (it never closes).
