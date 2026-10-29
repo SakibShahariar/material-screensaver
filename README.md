@@ -25,6 +25,7 @@ The built-in scenes combine animated visuals with an optional clock overlay.
 | ![An intricate maze-like line pattern in warm colors.](screenshots/shot09.png)<br><sub>An intricate maze-like line pattern in warm colors.</sub> | ![Floating circles, squares, and bars in a warm palette.](screenshots/shot10.png)<br><sub>Floating circles, squares, and bars in a warm palette.</sub> |
 | ![Autumn-colored leaves drifting across a dark background.](screenshots/shot11.png)<br><sub>Autumn-colored leaves drifting across a dark background.</sub> | ![Large faceted polygons in a warm, low-contrast palette.](screenshots/shot12.png)<br><sub>Large faceted polygons in a warm, low-contrast palette.</sub> |
 | ![A swirling, luminous particle pattern.](screenshots/shot13.png)<br><sub>A swirling, luminous particle pattern.</sub> | ![Small green and blue leaves drifting across a dark background.](screenshots/shot14.png)<br><sub>Small green and blue leaves drifting across a dark background.</sub> |
+
 ## Features
 
 - **31 animated scenes** — from space and nature to generative and geometric art.
@@ -158,7 +159,13 @@ From the repository checkout:
 bash uninstall.sh
 ```
 
-The uninstaller removes Material Screensaver's service, files, and companion extension while preserving other GNOME extensions and user settings.
+The uninstaller removes the application's service, screensaver files, cache, and companion extension. It also removes the application configuration by default. To preserve your configuration for a future reinstall, use:
+
+```sh
+bash uninstall.sh --keep-settings
+```
+
+Other GNOME extensions and unrelated user settings are preserved.
 
 ## Development
 
