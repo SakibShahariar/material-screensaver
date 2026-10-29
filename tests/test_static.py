@@ -306,6 +306,8 @@ class TestJsSyntax(unittest.TestCase):
         self.assertIn("Hook commands", gui)
         self.assertIn("lock message text", gui)
         self.assertIn("Matugen path", gui)
+        # Sensitive values are omitted from the serialized payload; their
+        # preservation is documented in the import confirmation text.
         export_start = gui.index('payload = {')
         export_end = gui.index('try:', export_start)
         exported_block = gui[export_start:export_end]
