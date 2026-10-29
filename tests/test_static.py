@@ -303,9 +303,9 @@ class TestJsSyntax(unittest.TestCase):
         self.assertIn('payload.get("settings"), dict', gui)
         self.assertIn('confirm = Adw.MessageDialog.new(', gui)
         self.assertIn('confirm.add_response("import", "Import")', gui)
-        self.assertIn('"lock_hook"', gui)  # sensitive fields are explicitly described as preserved, not exported
-        self.assertIn('"unlock_hook"', gui)
-        self.assertIn('"lock_message"', gui)
+        self.assertIn("Hook commands", gui)
+        self.assertIn("lock message text", gui)
+        self.assertIn("Matugen path", gui)
         export_start = gui.index('payload = {')
         export_end = gui.index('try:', export_start)
         exported_block = gui[export_start:export_end]
