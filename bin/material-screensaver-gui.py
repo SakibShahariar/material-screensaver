@@ -229,6 +229,41 @@ def filter_screensavers(filenames, query="", category="All categories",
     return result
 
 
+def widget_search_text(widget):
+    """Collect visible labels and tooltips from a GTK widget subtree for search."""
+    parts = []
+    for getter_name in ("get_title", "get_subtitle", "get_label", "get_text", "get_tooltip_text"):
+        getter = getattr(widget, getter_name, None)
+        if not callable(getter):
+            continue
+        try:
+            value = getter()
+        except Exception:
+            continue
+        if isinstance(value, str) and value.strip():
+            parts.append(value.strip())
+    first_child = getattr(widget, "get_first_child", None)
+    if callable(first_child):
+        try:
+            child = first_child()
+        except Exception:
+            child = None
+        while child is not None:
+            parts.append(widget_search_text(child))
+            sibling = getattr(child, "get_next_sibling", None)
+            try:
+                child = sibling() if callable(sibling) else None
+            except Exception:
+                child = None
+    return " ".join(parts).casefold()
+
+
+def settings_group_matches(group, query):
+    """Match a settings group by its own title or any descendant label."""
+    query = (query or "").strip().casefold()
+    return not query or query in widget_search_text(group)
+
+
 class ScreensaverWindow(Adw.ApplicationWindow):
     def __init__(self, app):
         super().__init__(application=app, title="Screensaver")
@@ -240,12 +275,14 @@ class ScreensaverWindow(Adw.ApplicationWindow):
         toolbar_view.add_top_bar(Adw.HeaderBar())
 
         page = Adw.PreferencesPage()
+        self._settings_search_groups = []
 
         # First-run guide stays out of the way once dismissed or setup is complete.
         self.onboarding_group = None
         if not load_config().get("onboarding_dismissed", False):
             self.onboarding_group = Adw.PreferencesGroup(title="Getting started")
             page.add(self.onboarding_group)
+            self._settings_search_groups.append(self.onboarding_group)
             self.onboarding_group.add(Adw.ActionRow(
                 title="1. Choose a scene",
                 subtitle="Pick an animated scene below, or enable Random each time.",
@@ -297,7 +334,7 @@ class ScreensaverWindow(Adw.ApplicationWindow):
         sv_group.add(random_row)
 
         self.search_entry = Gtk.SearchEntry(hexpand=True)
-        self.search_entry.set_placeholder_text("Search scenes by name")
+        self.search_entry.set_placeholder_text("Search scenes, categories, and settings")
         search_row = Adw.ActionRow(title="Search")
         search_row.add_suffix(self.search_entry)
         sv_group.add(search_row)
@@ -338,6 +375,7 @@ class ScreensaverWindow(Adw.ApplicationWindow):
 
         self.monitor_assignment_group = Adw.PreferencesGroup(title="Per-monitor screensavers")
         page.add(self.monitor_assignment_group)
+        self._settings_search_groups.append(self.monitor_assignment_group)
         self.monitor_assignment_rows = {}
 
         note = Adw.ActionRow(
@@ -350,6 +388,7 @@ class ScreensaverWindow(Adw.ApplicationWindow):
         # --- Per-scene customization ---
         self.customization_group = Adw.PreferencesGroup(title="Customize selected scene")
         page.add(self.customization_group)
+        self._settings_search_groups.append(self.customization_group)
         self.scene_option_rows = {}
         self.scene_option_specs = {}
         for scene_name, option_specs in config_store.SCENE_OPTION_SCHEMA.items():
@@ -366,6 +405,7 @@ class ScreensaverWindow(Adw.ApplicationWindow):
         if HAS_WEBKIT and self.screensaver_files:
             preview_group_live = Adw.PreferencesGroup(title="Live Preview")
             page.add(preview_group_live)
+            self._settings_search_groups.append(preview_group_live)
             frame = Gtk.Frame()
             frame.add_css_class("card")
             try:
@@ -413,6 +453,7 @@ class ScreensaverWindow(Adw.ApplicationWindow):
         # --- Timing ---
         timing_group = Adw.PreferencesGroup(title="Timing")
         page.add(timing_group)
+        self._settings_search_groups.append(timing_group)
         # Config stores seconds (idle: 1 second–24 hours; lock: 0–24 hours).
         # Use seconds in the UI so valid hand-edited values are not rounded or
         # clamped when the Settings window is opened and saved again.
@@ -453,6 +494,7 @@ class ScreensaverWindow(Adw.ApplicationWindow):
         # --- Clock format ---
         clock_group = Adw.PreferencesGroup(title="Clock")
         page.add(clock_group)
+        self._settings_search_groups.append(clock_group)
         self.ampm_switch = Gtk.Switch(valign=Gtk.Align.CENTER)
         ampm_row = Adw.ActionRow(title="Use 12-hour clock (AM/PM)")
         ampm_row.add_suffix(self.ampm_switch)
@@ -479,6 +521,7 @@ class ScreensaverWindow(Adw.ApplicationWindow):
         # --- Matugen palette ---
         matugen_group = Adw.PreferencesGroup(title="Matugen")
         page.add(matugen_group)
+        self._settings_search_groups.append(matugen_group)
         matugen_row = Adw.ActionRow(
             title="Colors stylesheet",
             subtitle="Absolute path to Matugen's generated CSS file",
@@ -495,6 +538,7 @@ class ScreensaverWindow(Adw.ApplicationWindow):
         # --- Optional lock message ---
         message_group = Adw.PreferencesGroup(title="Lock message")
         page.add(message_group)
+        self._settings_search_groups.append(message_group)
         message_row = Adw.ActionRow(
             title="Message shown over the screensaver",
             subtitle="Optional plain text, up to 160 characters; visible to anyone nearby",
@@ -514,6 +558,7 @@ class ScreensaverWindow(Adw.ApplicationWindow):
         # --- Automatic ---
         auto_group = Adw.PreferencesGroup(title="Automatic")
         page.add(auto_group)
+        self._settings_search_groups.append(auto_group)
         self.autostart_switch = Gtk.Switch(valign=Gtk.Align.CENTER)
         self.autostart_row = Adw.ActionRow(
             title="Run automatically",
@@ -527,6 +572,7 @@ class ScreensaverWindow(Adw.ApplicationWindow):
         # --- Shortcut ---
         shortcut_group = Adw.PreferencesGroup(title="Keyboard Shortcut")
         page.add(shortcut_group)
+        self._settings_search_groups.append(shortcut_group)
         self.shortcut_row = Adw.ActionRow(title="Toggle screensaver")
         change_btn = Gtk.Button(label="Change…", valign=Gtk.Align.CENTER)
         change_btn.connect("clicked", self.on_change_shortcut)
@@ -539,6 +585,7 @@ class ScreensaverWindow(Adw.ApplicationWindow):
         # --- Configuration backup and restore ---
         backup_group = Adw.PreferencesGroup(title="Configuration backup")
         page.add(backup_group)
+        self._settings_search_groups.append(backup_group)
         backup_row = Adw.ActionRow(
             title="Export settings",
             subtitle="Save preferences, favorites, scene options, and monitor assignments",
@@ -792,6 +839,9 @@ class ScreensaverWindow(Adw.ApplicationWindow):
 
     def on_picker_filter_changed(self, *_args):
         self._rebuild_screensaver_picker(self.selected_scene)
+        query = self.search_entry.get_text()
+        for group in self._settings_search_groups:
+            group.set_visible(settings_group_matches(group, query))
 
     def _refresh_favorite_button(self):
         favorites = load_config().get("favorites", [])
