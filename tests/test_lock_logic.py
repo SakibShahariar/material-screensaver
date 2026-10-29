@@ -178,7 +178,11 @@ class TestExternalLockHandling(unittest.TestCase):
 
     def tearDown(self):
         for name, fn in self._orig.items():
-            setattr(self.ctl, name, fn)
+            if name == "_daemon_switch_to_idle_watch" and fn is None:
+                if hasattr(self.ctl, name):
+                    delattr(self.ctl, name)
+            else:
+                setattr(self.ctl, name, fn)
 
     def test_external_lock_hides_viewer_and_marks_session_locked(self):
         self.active = True
