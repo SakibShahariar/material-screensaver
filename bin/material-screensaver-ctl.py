@@ -643,6 +643,42 @@ if (document.readyState === 'loading') document.addEventListener('DOMContentLoad
                 ucm.add_style_sheet(sheet)
             except Exception as exc:
                 _dbg(f"Suppressed non-fatal exception in _create_viewer_windows: {exc}")
+        # A broken scene should never leave a fullscreen blank page. Install a
+        # one-shot fallback before navigation so load failures are caught even
+        # when the initial local file cannot be opened.
+        scene_load_failed = {"shown": False}
+
+        def on_scene_load_failed(_web, _event, _failing_uri, error):
+            if scene_load_failed["shown"]:
+                return False
+            scene_load_failed["shown"] = True
+            try:
+                _log_event(
+                    "scene_load_failed",
+                    scene=os.path.basename(monitor_html_path),
+                    error=type(error).__name__,
+                )
+            except Exception as exc:
+                _dbg(f"Could not log scene load failure: {type(exc).__name__}")
+            try:
+                fallback_html = """<!doctype html><html><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src 'unsafe-inline';">
+<title>Material Screensaver</title>
+<style>
+html,body{margin:0;width:100%;height:100%;background:#101116;color:#e6e1e9;
+font:16px system-ui,sans-serif}body{display:grid;place-items:center;text-align:center}
+main{padding:2rem;max-width:32rem}h1{font-size:1.5rem;font-weight:500}
+p{color:#c4c0ca;line-height:1.5}
+</style></head><body><main><h1>Scene unavailable</h1>
+<p>This screensaver scene could not be loaded. Change scenes or restart the viewer to try again.</p>
+</main></body></html>"""
+                _web.load_html(fallback_html, "about:blank")
+            except Exception as exc:
+                _dbg(f"Could not show scene fallback: {type(exc).__name__}")
+            return True
+
+        web.connect("load-failed", on_scene_load_failed)
         web.load_uri(uri)
         win.set_child(web)
 
