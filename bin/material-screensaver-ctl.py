@@ -726,7 +726,7 @@ p{color:#c4c0ca;line-height:1.5}
             countdown.set_can_target(False)
             countdown.set_visible(False)
             viewer_content.add_overlay(countdown)
-            remaining = {"seconds": lock_seconds}
+            remaining = {"seconds": min(lock_seconds, 10)}
             def update_countdown(label=countdown, state=remaining):
                 state["seconds"] -= 1
                 if 0 < state["seconds"] <= 10:
@@ -736,10 +736,15 @@ p{color:#c4c0ca;line-height:1.5}
                     label.set_visible(False)
                     return False
                 return True
-            GLib.timeout_add_seconds(max(1, lock_seconds - 10), update_countdown)
+            def start_countdown(label=countdown, state=remaining):
+                label.set_label(f"Locking in {state['seconds']} seconds")
+                label.set_visible(True)
+                GLib.timeout_add_seconds(1, update_countdown)
+                return False
             if lock_seconds <= 10:
-                countdown.set_label(f"Locking in {lock_seconds} seconds")
-                countdown.set_visible(True)
+                start_countdown()
+            else:
+                GLib.timeout_add_seconds(lock_seconds - 10, start_countdown)
         win.set_child(viewer_content)
 
         def on_key(ctrl, keyval, keycode, state, _win=win):
