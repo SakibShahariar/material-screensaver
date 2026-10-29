@@ -727,27 +727,61 @@ p{color:#c4c0ca;line-height:1.5}
             countdown.set_visible(False)
             viewer_content.add_overlay(countdown)
             remaining = {"seconds": min(lock_seconds, 10)}
-            def update_countdown(label=countdown, state=remaining):
+            countdown_sources = {"delay": None, "tick": None, "cancelled": False}
+
+            def cancel_countdown(label=countdown, sources=countdown_sources):
+                """Stop both the delayed start and repeating tick on user activity."""
+                if sources["cancelled"]:
+                    return
+                sources["cancelled"] = True
+                for key in ("delay", "tick"):
+                    source_id = sources[key]
+                    if source_id is not None:
+                        try:
+                            GLib.source_remove(source_id)
+                        except Exception as exc:
+                            _dbg(f"Suppressed non-fatal exception cancelling countdown: {exc}")
+                        sources[key] = None
+                label.set_visible(False)
+
+            def update_countdown(label=countdown, state=remaining,
+                                 sources=countdown_sources):
+                if sources["cancelled"]:
+                    sources["tick"] = None
+                    return False
                 state["seconds"] -= 1
                 if 0 < state["seconds"] <= 10:
                     label.set_label(f"Locking in {state['seconds']} seconds")
                     label.set_visible(True)
                 elif state["seconds"] <= 0:
                     label.set_visible(False)
+                    sources["tick"] = None
                     return False
                 return True
-            def start_countdown(label=countdown, state=remaining):
+
+            def start_countdown(label=countdown, state=remaining,
+                                sources=countdown_sources):
+                sources["delay"] = None
+                if sources["cancelled"]:
+                    return False
                 label.set_label(f"Locking in {state['seconds']} seconds")
                 label.set_visible(True)
-                GLib.timeout_add_seconds(1, update_countdown)
+                sources["tick"] = GLib.timeout_add_seconds(1, update_countdown)
                 return False
+
             if lock_seconds <= 10:
                 start_countdown()
             else:
-                GLib.timeout_add_seconds(lock_seconds - 10, start_countdown)
+                countdown_sources["delay"] = GLib.timeout_add_seconds(
+                    lock_seconds - 10, start_countdown
+                )
         win.set_child(viewer_content)
 
         def on_key(ctrl, keyval, keycode, state, _win=win):
+            try:
+                cancel_countdown()
+            except NameError:
+                pass
             # Only Super+Q closes, Super alone is consumed (no overview, no close)
             try:
                 from gi.repository import Gdk
@@ -775,12 +809,18 @@ p{color:#c4c0ca;line-height:1.5}
                     _dbg(f"Suppressed non-fatal exception in on_key: {exc}")
                 return False
         def on_click(ctrl, n_press, x, y, _win=win, _web=web):
-            # Clicks never dismiss — only Super+Q does. Do not consume, so
-            # interactive styles (solar-system) still receive them.
+            # Clicks cancel the lock warning but never dismiss the viewer.
+            try:
+                cancel_countdown()
+            except NameError:
+                pass
             return False
         def on_motion(ctrl, x, y, _win=win, _web=web):
-            # Mouse movement never dismisses. Non-interactive styles keep the
-            # cursor hidden; interactive styles manage their own pointer.
+            # Pointer activity cancels the lock warning without dismissing.
+            try:
+                cancel_countdown()
+            except NameError:
+                pass
             return False
         # cursor helpers — permanently hidden for non-interactive styles
         # (solar-system is interactive and manages cursor via body.show-cursor CSS)
@@ -2428,8 +2468,8 @@ def run_daemon():
                 show_viewer()
                 add_active_watch()
             elif fired_id == _idle_watch_ids["active"]:
-                # Activity after showing (e.g. Super+Q in the child) -> re-arm
-                # the idle watch for next time. Never dismisses here.
+                # Activity cancels the pending lock before re-arming normal idle.
+                _cancel_lock()
                 add_idle_watch()
 
         try:
