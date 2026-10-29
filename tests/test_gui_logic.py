@@ -84,6 +84,22 @@ class TestGuiLogic(unittest.TestCase):
         finally:
             self.gui.subprocess.run = original
 
+    def test_query_battery_unknown_and_missing_command_are_unavailable(self):
+        original = self.gui.subprocess.run
+        try:
+            class Result:
+                returncode = 0
+                stdout = "state: unknown\\n"
+
+            self.gui.subprocess.run = lambda *_args, **_kwargs: Result()
+            self.assertIsNone(self.gui.query_battery_discharging())
+            Result.stdout = ""
+            self.assertIsNone(self.gui.query_battery_discharging())
+            self.gui.subprocess.run = lambda *_args, **_kwargs: (_ for _ in ()).throw(FileNotFoundError())
+            self.assertIsNone(self.gui.query_battery_discharging())
+        finally:
+            self.gui.subprocess.run = original
+
     def test_display_name(self):
         cases = {
             "blob.html": "Blob",
