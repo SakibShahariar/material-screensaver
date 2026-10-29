@@ -72,10 +72,10 @@ class TestGuiLogic(unittest.TestCase):
         try:
             class Result:
                 returncode = 0
-                stdout = "state: discharging\\n"
+                stdout = "state: discharging\n"
             self.gui.subprocess.run = lambda *_args, **_kwargs: Result()
             self.assertIs(self.gui.query_battery_discharging(), True)
-            Result.stdout = "state: fully-charged\\n"
+            Result.stdout = "state: fully-charged\n"
             self.assertIs(self.gui.query_battery_discharging(), False)
             Result.returncode = 1
             self.assertIsNone(self.gui.query_battery_discharging())
