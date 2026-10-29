@@ -87,7 +87,10 @@ def validate_scene(path: Path) -> list[str]:
     # matugen-colors.css is intentionally generated as a per-user symlink at
     # install time; all other referenced local assets must ship with the scene.
     for asset in parser.assets:
-        if asset.startswith(("#", "data:", "https:", "http:", "//")):
+        if asset.startswith(("http:", "https:", "//")):
+            errors.append(f"remote asset is not allowed: {asset}")
+            continue
+        if asset.startswith(("#", "data:")):
             continue
         asset_path = asset.split("#", 1)[0].split("?", 1)[0]
         if not asset_path or asset_path == "matugen-colors.css":
