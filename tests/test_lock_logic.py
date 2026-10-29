@@ -26,6 +26,43 @@ class _Result:
         self.stderr = b""
 
 
+class TestSessionIdleInhibition(unittest.TestCase):
+    @classmethod
+    def setUpClass(cls):
+        cls.ctl = support.load_ctl()
+
+    def test_reports_session_idle_inhibitor(self):
+        class Result:
+            def unpack(self):
+                return (True,)
+
+        class Proxy:
+            def call_sync(self, *_args):
+                return Result()
+
+        self.assertTrue(self.ctl._session_idle_is_inhibited(Proxy(), object()))
+
+    def test_reports_no_session_idle_inhibitor(self):
+        class Result:
+            def unpack(self):
+                return (False,)
+
+        class Proxy:
+            def call_sync(self, *_args):
+                return Result()
+
+        self.assertFalse(self.ctl._session_idle_is_inhibited(Proxy(), object()))
+
+    def test_unavailable_session_manager_fails_open(self):
+        self.assertFalse(self.ctl._session_idle_is_inhibited(None, object()))
+
+        class Proxy:
+            def call_sync(self, *_args):
+                raise OSError("session manager unavailable")
+
+        self.assertFalse(self.ctl._session_idle_is_inhibited(Proxy(), object()))
+
+
 class TestLockCommandChain(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
