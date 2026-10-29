@@ -71,6 +71,23 @@ class TestValidIntEdgeCases(CtlTestCase):
         self.assertEqual(self.ctl._valid_int("60", 1, 100), 60)
 
 
+class TestBatteryPolicyLabel(CtlTestCase):
+    def test_label_only_appears_when_battery_saving_is_active(self):
+        self.assertIsNone(self.ctl._battery_policy_label({"fps_limit": 30}, False))
+        self.assertEqual(
+            self.ctl._battery_policy_label({"fps_limit": 30}, True),
+            "Battery saver active · FPS cap 15",
+        )
+        self.assertEqual(
+            self.ctl._battery_policy_label({"fps_limit": 10}, True),
+            "Battery saver active · FPS cap 10",
+        )
+        self.assertEqual(
+            self.ctl._battery_policy_label({"fps_limit": True}, True),
+            "Battery saver active · FPS cap 15",
+        )
+
+
 class TestNormalizeConfig(CtlTestCase):
     def test_none_gives_defaults(self):
         self.assertEqual(self.ctl.normalize_config(None), self.defaults)
