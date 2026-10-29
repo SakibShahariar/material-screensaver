@@ -103,6 +103,9 @@ jobs:
       - name: Validate built-in scene packages
         run: python3 scripts/validate-scenes.py
 
+      - name: Enforce scene payload budget
+        run: python3 scripts/check-scene-payload-budget.py
+
       - name: Run test suite (static, theme, JS syntax, config edge cases)
         run: |
           # Use Ubuntu's system Python so apt-installed PyGObject is importable;
