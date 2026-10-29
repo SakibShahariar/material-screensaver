@@ -467,6 +467,14 @@ class ScreensaverWindow(Adw.ApplicationWindow):
         self.lock_row.set_title("Lock after")
         self.lock_row.set_subtitle("Seconds on screensaver before lock (0 = never; max 86,400)")
         timing_group.add(self.lock_row)
+        self.lock_countdown_switch = Gtk.Switch(valign=Gtk.Align.CENTER)
+        lock_countdown_row = Adw.ActionRow(
+            title="Show lock countdown",
+            subtitle="Display a subtle warning during the final seconds before locking",
+        )
+        lock_countdown_row.add_suffix(self.lock_countdown_switch)
+        lock_countdown_row.set_activatable_widget(self.lock_countdown_switch)
+        timing_group.add(lock_countdown_row)
         self.fps_row = Adw.SpinRow.new_with_range(10, 60, 5)
         self.fps_row.set_digits(0)
         self.fps_row.set_title("Animation frame-rate cap")
@@ -616,6 +624,7 @@ class ScreensaverWindow(Adw.ApplicationWindow):
         self.combo_row.connect("notify::selected", self.on_screensaver_changed)
         self.idle_row.connect("notify::value", self.on_idle_changed)
         self.lock_row.connect("notify::value", self.on_lock_changed)
+        self.lock_countdown_switch.connect("notify::active", self.on_lock_countdown_toggled)
         self.fps_row.connect("notify::value", self.on_fps_changed)
         self.blank_display_row.connect("notify::value", self.on_blank_display_changed)
         self.battery_saver_switch.connect("notify::active", self.on_battery_saver_toggled)
@@ -683,6 +692,7 @@ class ScreensaverWindow(Adw.ApplicationWindow):
 
         self.idle_row.set_value(cfg.get("idle_seconds", 300))
         self.lock_row.set_value(cfg.get("lock_after_seconds", 300))
+        self.lock_countdown_switch.set_active(cfg.get("lock_countdown", False))
         self.fps_row.set_value(cfg.get("fps_limit", 30))
         self.blank_display_row.set_value(cfg.get("blank_display_after_minutes", 0))
         self.battery_saver_switch.set_active(cfg.get("reduce_fps_on_battery", True))
@@ -926,7 +936,7 @@ class ScreensaverWindow(Adw.ApplicationWindow):
                 "active", "idle_seconds", "fps_limit", "blank_display_after_minutes",
                 "reduce_fps_on_battery", "clock_format", "clock_overlay",
                 "clock_overlay_position", "clock_overlay_opacity", "random",
-                "lock_after_seconds", "favorites", "screensaver_options",
+                "lock_after_seconds", "lock_countdown", "favorites", "screensaver_options",
                 "monitor_screensavers",
             )
             payload = {
@@ -977,7 +987,7 @@ class ScreensaverWindow(Adw.ApplicationWindow):
                     "active", "idle_seconds", "fps_limit", "blank_display_after_minutes",
                     "reduce_fps_on_battery", "clock_format", "clock_overlay",
                     "clock_overlay_position", "clock_overlay_opacity", "random",
-                    "lock_after_seconds", "favorites", "screensaver_options",
+                    "lock_after_seconds", "lock_countdown", "favorites", "screensaver_options",
                     "monitor_screensavers",
                 }
                 if not settings or not set(settings).issubset(safe_keys):
@@ -1144,6 +1154,9 @@ class ScreensaverWindow(Adw.ApplicationWindow):
 
     def on_lock_changed(self, row, _pspec):
         self._save_config(lock_after_seconds=int(row.get_value()))
+
+    def on_lock_countdown_toggled(self, switch, _pspec):
+        self._save_config(lock_countdown=switch.get_active())
 
     def on_fps_changed(self, row, _pspec):
         if self._save_config(fps_limit=int(row.get_value())):
