@@ -402,6 +402,48 @@ window.cancelAnimationFrame(firstId);
             except OSError:
                 pass
 
+    def test_fps_throttle_cancels_callbacks_queued_in_same_frame(self):
+        source = _read(os.path.join(support.REPO_ROOT, "bin", "material-screensaver-ctl.py"))
+        match = re.search(
+            r'fps_script = """(.*?)""".replace\\("__FPS_LIMIT__", str\\(fps_limit\\)\\)',
+            source,
+            re.S,
+        )
+        self.assertIsNotNone(match, "viewer FPS throttle script missing")
+        throttle = match.group(1).replace("__FPS_LIMIT__", "30")
+        harness = r"""
+const nativeFrames = [];
+global.window = {
+  requestAnimationFrame(callback) { nativeFrames.push(callback); return nativeFrames.length; },
+  cancelAnimationFrame() {},
+};
+""" + throttle + r"""
+const delivered = [];
+let secondId;
+window.requestAnimationFrame(() => {
+  delivered.push("first");
+  window.cancelAnimationFrame(secondId);
+});
+secondId = window.requestAnimationFrame(() => delivered.push("cancelled"));
+window.requestAnimationFrame(() => delivered.push("third"));
+if (nativeFrames.length !== 1) throw new Error("callbacks did not share one native frame");
+nativeFrames.shift()(0);
+if (delivered.join(",") !== "first,third") {
+  throw new Error("cancellation during dispatch did not suppress queued callback: " + delivered);
+}
+"""
+        fd, tmp = tempfile.mkstemp(suffix=".js")
+        try:
+            with os.fdopen(fd, "w") as handle:
+                handle.write(harness)
+            result = subprocess.run([self.NODE, tmp], capture_output=True, text=True)
+            self.assertEqual(result.returncode, 0, result.stderr.strip())
+        finally:
+            try:
+                os.remove(tmp)
+            except OSError:
+                pass
+
     def test_viewer_disables_cross_origin_file_url_access(self):
         source = _read(os.path.join(support.REPO_ROOT, "bin", "material-screensaver-ctl.py"))
         self.assertIn("set_allow_universal_access_from_file_urls(False)", source)
