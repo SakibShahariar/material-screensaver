@@ -243,6 +243,16 @@ class TestExternalLockHandling(unittest.TestCase):
         self.ctl._on_screen_saver_active_changed(False)
         self.assertEqual(self.hidden, 0)
 
+    def test_external_lock_hides_viewer_during_spawn_race(self):
+        # The child process may not yet be observable as active when GNOME
+        # reports a lock. _is_showing must still trigger teardown.
+        self.active = False
+        self.ctl._is_showing = True
+        self.ctl._on_screen_saver_active_changed(True)
+        self.assertEqual(self.hidden, 1)
+        self.assertTrue(self.ctl._session_locked)
+        self.assertEqual(self.rearm_calls, 0)
+
     def test_lock_when_inactive_is_noop(self):
         self.active = False
         self.ctl._on_screen_saver_active_changed(True)
