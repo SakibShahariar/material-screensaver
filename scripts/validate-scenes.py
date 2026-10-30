@@ -47,12 +47,25 @@ class SceneParser(HTMLParser):
                 self.has_viewport = True
             if http_equiv == "content-security-policy":
                 self.has_csp = True
-        elif tag in ("script", "img", "audio", "video", "source"):
+        elif tag in ("script", "img", "audio", "video", "source", "track", "embed", "input"):
             value = attrs_map.get("src")
             if value:
                 self.assets.append(value)
-        elif tag in ("link", "iframe"):
-            value = attrs_map.get("href") if tag == "link" else attrs_map.get("src")
+            # srcset is a comma-separated list of URL/descriptor candidates.
+            # Capture each URL token (including the comma inside data URLs).
+            srcset = attrs_map.get("srcset")
+            if srcset:
+                import re
+                self.assets.extend(
+                    match.group(1)
+                    for match in re.finditer(r"(?:^|,)\\s*(\\S+)", srcset)
+                )
+            if tag == "video" and attrs_map.get("poster"):
+                self.assets.append(attrs_map["poster"])
+        elif tag in ("link", "iframe", "object"):
+            value = attrs_map.get("href") if tag == "link" else (
+                attrs_map.get("data") if tag == "object" else attrs_map.get("src")
+            )
             if value:
                 self.assets.append(value)
 
