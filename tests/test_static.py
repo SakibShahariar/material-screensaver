@@ -444,6 +444,45 @@ if (delivered.join(",") !== "first,third") {
             except OSError:
                 pass
 
+    def test_fps_throttle_honors_fifteen_fps(self):
+        source = _read(os.path.join(support.REPO_ROOT, "bin", "material-screensaver-ctl.py"))
+        match = re.search(
+            r'fps_script = """(.*?)""".replace\\("__FPS_LIMIT__", str\\(fps_limit\\)\\)',
+            source,
+            re.S,
+        )
+        self.assertIsNotNone(match, "viewer FPS throttle script missing")
+        throttle = match.group(1).replace("__FPS_LIMIT__", "15")
+        harness = r"""
+const nativeFrames = [];
+global.window = {
+  requestAnimationFrame(callback) { nativeFrames.push(callback); return nativeFrames.length; },
+  cancelAnimationFrame() {},
+};
+""" + throttle + r"""
+const delivered = [];
+window.requestAnimationFrame(timestamp => delivered.push(timestamp));
+nativeFrames.shift()(0);
+window.requestAnimationFrame(timestamp => delivered.push(timestamp));
+nativeFrames.shift()(60);
+if (delivered.length !== 1) throw new Error("15 FPS cap delivered a frame before 66.7ms");
+nativeFrames.shift()(67);
+if (delivered.length !== 2 || delivered[1] !== 67) {
+  throw new Error("15 FPS cap did not deliver the next eligible frame");
+}
+"""
+        fd, tmp = tempfile.mkstemp(suffix=".js")
+        try:
+            with os.fdopen(fd, "w") as handle:
+                handle.write(harness)
+            result = subprocess.run([self.NODE, tmp], capture_output=True, text=True)
+            self.assertEqual(result.returncode, 0, result.stderr.strip())
+        finally:
+            try:
+                os.remove(tmp)
+            except OSError:
+                pass
+
     def test_viewer_disables_cross_origin_file_url_access(self):
         source = _read(os.path.join(support.REPO_ROOT, "bin", "material-screensaver-ctl.py"))
         self.assertIn("set_allow_universal_access_from_file_urls(False)", source)
