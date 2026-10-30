@@ -157,5 +157,37 @@ class TestSceneValidator(unittest.TestCase):
         self.assertIn("asset escapes scene directory: ../secret.png", errors)
 
 
+    def test_checks_each_srcset_candidate(self):
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp)
+            (root / "small.png").write_bytes(b"small")
+            scene = root / "scene.html"
+            scene.write_text(
+                '<!doctype html><html><head><title>Test</title>'
+                '<meta name="viewport" content="width=device-width, initial-scale=1">'
+                '<meta http-equiv="Content-Security-Policy" content="default-src \'none\'">'
+                '</head><body><img srcset="small.png 1x, missing-large.png 2x"></body></html>',
+                encoding="utf-8",
+            )
+            errors = validator.validate_scene(scene)
+        self.assertIn("missing local asset: missing-large.png", errors)
+
+    def test_checks_video_poster_and_track_assets(self):
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp)
+            scene = root / "scene.html"
+            scene.write_text(
+                '<!doctype html><html><head><title>Test</title>'
+                '<meta name="viewport" content="width=device-width, initial-scale=1">'
+                '<meta http-equiv="Content-Security-Policy" content="default-src \'none\'">'
+                '</head><body><video poster="missing-poster.png">'
+                '<track src="missing-captions.vtt"></video></body></html>',
+                encoding="utf-8",
+            )
+            errors = validator.validate_scene(scene)
+        self.assertIn("missing local asset: missing-poster.png", errors)
+        self.assertIn("missing local asset: missing-captions.vtt", errors)
+
+
 if __name__ == "__main__":
     unittest.main(verbosity=2)
