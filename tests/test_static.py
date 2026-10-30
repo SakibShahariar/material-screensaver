@@ -447,7 +447,7 @@ if (delivered.join(",") !== "first,third") {
     def test_fps_throttle_honors_fifteen_fps(self):
         source = _read(os.path.join(support.REPO_ROOT, "bin", "material-screensaver-ctl.py"))
         match = re.search(
-            r'fps_script = """(.*?)""".replace\\("__FPS_LIMIT__", str\\(fps_limit\\)\\)',
+            r'fps_script = """(.*?)""".replace\("__FPS_LIMIT__", str\(fps_limit\)\)',
             source,
             re.S,
         )
