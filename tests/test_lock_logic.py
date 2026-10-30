@@ -257,5 +257,40 @@ class TestExternalLockHandling(unittest.TestCase):
         self.assertEqual(self.hidden, 1)
 
 
+
+class TestViewerSuppressedDuringSessionLock(unittest.TestCase):
+    @classmethod
+    def setUpClass(cls):
+        cls.ctl = support.load_ctl()
+
+    def setUp(self):
+        self.original = {
+            "_session_locked": self.ctl._session_locked,
+            "_is_showing": self.ctl._is_showing,
+            "_viewer_process": self.ctl._viewer_process,
+            "is_viewer_active": self.ctl.is_viewer_active,
+        }
+        self.ctl._session_locked = True
+        self.ctl._is_showing = False
+        self.ctl._viewer_process = None
+        self.active_checks = 0
+
+        def active():
+            self.active_checks += 1
+            return False
+
+        self.ctl.is_viewer_active = active
+
+    def tearDown(self):
+        for name, value in self.original.items():
+            setattr(self.ctl, name, value)
+
+    def test_show_is_refused_before_viewer_startup(self):
+        self.assertFalse(self.ctl.show_viewer())
+        self.assertEqual(self.active_checks, 0)
+        self.assertFalse(self.ctl._is_showing)
+        self.assertIsNone(self.ctl._viewer_process)
+
+
 if __name__ == "__main__":
     unittest.main(verbosity=2)
