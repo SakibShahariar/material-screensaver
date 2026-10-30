@@ -730,19 +730,7 @@ p{color:#c4c0ca;line-height:1.5}
             countdown_sources = {"delay": None, "tick": None, "cancelled": False}
 
             def cancel_countdown(label=countdown, sources=countdown_sources):
-                """Stop both the delayed start and repeating tick on user activity."""
-                if sources["cancelled"]:
-                    return
-                sources["cancelled"] = True
-                for key in ("delay", "tick"):
-                    source_id = sources[key]
-                    if source_id is not None:
-                        try:
-                            GLib.source_remove(source_id)
-                        except Exception as exc:
-                            _dbg(f"Suppressed non-fatal exception cancelling countdown: {exc}")
-                        sources[key] = None
-                label.set_visible(False)
+                _cancel_countdown_sources(label, sources, GLib.source_remove)
 
             def update_countdown(label=countdown, state=remaining,
                                  sources=countdown_sources):
@@ -1344,6 +1332,22 @@ def _schedule_lock():
         _lock_timeout_id = GLib.timeout_add_seconds(secs, _do_lock)
     except Exception as exc:
         _dbg(f"Suppressed non-fatal exception in _schedule_lock: {exc}")
+
+def _cancel_countdown_sources(label, sources, source_remove):
+    """Cancel pending countdown callbacks and hide the warning label."""
+    if sources.get("cancelled"):
+        return
+    sources["cancelled"] = True
+    for key in ("delay", "tick"):
+        source_id = sources.get(key)
+        if source_id is not None:
+            try:
+                source_remove(source_id)
+            except Exception as exc:
+                _dbg(f"Suppressed non-fatal exception cancelling countdown: {exc}")
+            sources[key] = None
+    label.set_visible(False)
+
 
 def _cancel_lock():
     global _lock_timeout_id

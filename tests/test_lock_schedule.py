@@ -124,5 +124,47 @@ class TestScheduleLock(unittest.TestCase):
         self.assertEqual(self.calls, [], "locked/hid even though viewer was not active")
 
 
+
+class TestCountdownCancellation(unittest.TestCase):
+    @classmethod
+    def setUpClass(cls):
+        cls.ctl = support.load_ctl()
+
+    class Label:
+        def __init__(self):
+            self.visible = True
+
+        def set_visible(self, visible):
+            self.visible = visible
+
+    def test_cancels_both_delayed_start_and_repeating_tick(self):
+        label = self.Label()
+        sources = {"delay": 11, "tick": 12, "cancelled": False}
+        removed = []
+        self.ctl._cancel_countdown_sources(label, sources, removed.append)
+        self.assertEqual(removed, [11, 12])
+        self.assertEqual(sources, {"delay": None, "tick": None, "cancelled": True})
+        self.assertFalse(label.visible)
+
+    def test_cancellation_is_idempotent(self):
+        label = self.Label()
+        sources = {"delay": 21, "tick": 22, "cancelled": False}
+        removed = []
+        self.ctl._cancel_countdown_sources(label, sources, removed.append)
+        self.ctl._cancel_countdown_sources(label, sources, removed.append)
+        self.assertEqual(removed, [21, 22])
+
+    def test_source_removal_failure_still_hides_and_clears_timer(self):
+        label = self.Label()
+        sources = {"delay": 31, "tick": 32, "cancelled": False}
+
+        def fail(_source_id):
+            raise RuntimeError("source already finished")
+
+        self.ctl._cancel_countdown_sources(label, sources, fail)
+        self.assertEqual(sources, {"delay": None, "tick": None, "cancelled": True})
+        self.assertFalse(label.visible)
+
+
 if __name__ == "__main__":
     unittest.main(verbosity=2)
