@@ -405,7 +405,7 @@ window.cancelAnimationFrame(firstId);
     def test_fps_throttle_cancels_callbacks_queued_in_same_frame(self):
         source = _read(os.path.join(support.REPO_ROOT, "bin", "material-screensaver-ctl.py"))
         match = re.search(
-            r'fps_script = """(.*?)""".replace\\("__FPS_LIMIT__", str\\(fps_limit\\)\\)',
+            r'fps_script = """(.*?)""".replace\("__FPS_LIMIT__", str\(fps_limit\)\)',
             source,
             re.S,
         )
