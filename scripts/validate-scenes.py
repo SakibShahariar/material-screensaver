@@ -58,7 +58,7 @@ class SceneParser(HTMLParser):
                 import re
                 self.assets.extend(
                     match.group(1)
-                    for match in re.finditer(r"(?:^|,)\\s*(\\S+)", srcset)
+                    for match in re.finditer(r"(?:^|,)\s*(data:[^,\s]+,[^\s]+|[^,\s]+)", srcset)
                 )
             if tag == "video" and attrs_map.get("poster"):
                 self.assets.append(attrs_map["poster"])
