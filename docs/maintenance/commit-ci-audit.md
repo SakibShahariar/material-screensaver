@@ -24,10 +24,10 @@ Persistent repository-specific record of commit-level CI checks and red-cross in
 
 - Repository: `SakibShahariar/material-screensaver`
 - Default branch: `master`
-- Checkpoint SHA: `e4e71e2e07511d2cee4e63ee34bae7ff5e5744b6`
+- Checkpoint SHA: `816826d5f0e96f470a19d8653aa638bf70855b9e`
 - Initialized: 2026-11-02
 - Baseline correction: a workflow run for the checkpoint commit was later found and inspected; it failed in the test-suite step. The failure is recorded below rather than treating the earlier empty combined-status response as authoritative.
-- Next session: review commits after `e4e71e2e07511d2cee4e63ee34bae7ff5e5744b6`; retain the historical failures below for audit context.
+- Next session: review commits after `816826d5f0e96f470a19d8653aa638bf70855b9e`; retain the historical failures below for audit context.
 
 ## Initial baseline
 
@@ -79,6 +79,9 @@ The lock-test fixture failure was resolved by `423eebf`; the GUI title-regex fai
 
 | `e4e71e2e07511d2cee4e63ee34bae7ff5e5744b6` | fix(ctl): reset lock timer on viewer activity (#47) | green | [41652543288](https://github.com/SakibShahariar/material-screensaver/actions/runs/41652543288) | Added the daemon Activity D-Bus method and rate-limited viewer input notifications; tests and lint passed. |
 | `2295a9dc94f828b804b89531fe57ad1665ad8572` | fix(ctl): throttle activity resets for short lock delays (#47) | pending | [41652880519](https://github.com/SakibShahariar/material-screensaver/actions/runs/41652880519) | Adjusted the activity notification interval to 250 ms; syntax/CI verification pending. |
+
+| `2295a9dc94f828b804b89531fe57ad1665ad8572` | fix(ctl): throttle activity resets for short lock delays (#47) | red | [41652880519](https://github.com/SakibShahariar/material-screensaver/actions/runs/41652880519) | Tests and lint failed because a literal `\\n` was inserted into a Python condition; syntax error. |
+| `816826d5f0e96f470a19d8653aa638bf70855b9e` | fix(ctl): correct activity throttle condition syntax (#47) | green | [41653026291](https://github.com/SakibShahariar/material-screensaver/actions/runs/41653026291) | Replaced the escaped sequence with a real multiline condition; tests and lint passed. |
 
 ### Failure record template
 

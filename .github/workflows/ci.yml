@@ -121,3 +121,20 @@ jobs:
           GTK_A11Y: "none"
         run: |
           xvfb-run -a /usr/bin/python3 -m unittest discover -s tests -p test_webkit_csp.py -v
+
+      - name: Measure representative scene performance
+        env:
+          WEBKIT_DISABLE_SANDBOX_THIS_IS_DANGEROUS: "1"
+          GTK_A11Y: "none"
+          LIBGL_ALWAYS_SOFTWARE: "1"
+        run: |
+          xvfb-run -a /usr/bin/python3 scripts/measure-scene-performance.py \
+            --fps 30,15 --warmup 1 --duration 4 --output scene-performance.json
+
+      - name: Upload scene performance measurements
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: scene-performance-metrics
+          path: scene-performance.json
+          if-no-files-found: warn
