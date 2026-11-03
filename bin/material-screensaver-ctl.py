@@ -343,8 +343,10 @@ def _battery_is_discharging():
     return None
 
 
-def _create_viewer_windows(html_path, clock_format="24h", scene_options=None):
+def _create_viewer_windows(html_path, clock_format="24h", scene_options=None, viewer_cfg=None):
     """Create one fullscreen Gtk.Window per monitor with WebKit WebView."""
+    if not isinstance(viewer_cfg, dict):
+        viewer_cfg = load_config()
     import gi
     gi.require_version("Gtk", "4.0")
     gi.require_version("Gdk", "4.0")
@@ -386,7 +388,6 @@ def _create_viewer_windows(html_path, clock_format="24h", scene_options=None):
         monitors = [None]
 
     # Assignments are keyed by connector where available; new displays use the global scene.
-    viewer_cfg = load_config()
     monitor_assignments = viewer_cfg.get("monitor_screensavers", {})
     battery_saving = (
         viewer_cfg.get("reduce_fps_on_battery", True) and _battery_is_discharging() is True
@@ -471,8 +472,7 @@ def _create_viewer_windows(html_path, clock_format="24h", scene_options=None):
         # Cap requestAnimationFrame-driven scenes to reduce CPU/GPU use.
         # Timer-driven scenes are unaffected by this cap.
         try:
-            cfg = load_config()
-            fps_limit = cfg.get("fps_limit", 30)
+            fps_limit = viewer_cfg.get("fps_limit", 30)
             if battery_saving:
                 fps_limit = min(fps_limit, 15)
             fps_script = """(() => {
@@ -541,8 +541,7 @@ window.cancelAnimationFrame = id => {
         # Blank the display after the configured interval. Replacing the document
         # stops scene scripts rather than merely covering their animation with CSS.
         try:
-            cfg = load_config()
-            blank_minutes = cfg.get("blank_display_after_minutes", 0)
+            blank_minutes = viewer_cfg.get("blank_display_after_minutes", 0)
             if blank_minutes > 0:
                 blank_script = """(() => {
 const delay = __BLANK_DELAY_MS__;
@@ -567,16 +566,15 @@ window.setTimeout(() => {
         # Optional shared clock/date overlay. Built-in scenes use clock-shared.js,
         # so never layer a second clock over their canvas-rendered clocks.
         try:
-            cfg = load_config()
             # Decide whether to add the overlay from the rendered DOM, not
             # from a source-file helper reference: scenes may load clock-shared.js
             # without actually rendering a clock, and source inspection can be
             # stale when scenes build their HUD dynamically.
-            if cfg.get("clock_overlay", False):
+            if viewer_cfg.get("clock_overlay", False):
                 overlay_config = json.dumps({
-                    "position": cfg.get("clock_overlay_position", "bottom-right"),
-                    "opacity": cfg.get("clock_overlay_opacity", 80) / 100,
-                    "format": cfg.get("clock_format", "24h"),
+                    "position": viewer_cfg.get("clock_overlay_position", "bottom-right"),
+                    "opacity": viewer_cfg.get("clock_overlay_opacity", 80) / 100,
+                    "format": viewer_cfg.get("clock_format", clock_format),
                 })
                 script = """(() => {
 const config = __CLOCK_OVERLAY_CONFIG__;
@@ -619,7 +617,7 @@ if (document.readyState === 'loading') document.addEventListener('DOMContentLoad
         # Optional plain-text message overlay. JSON serialization and textContent
         # prevent the configured message from becoming executable HTML or JS.
         try:
-            message = load_config().get("lock_message", "")
+            message = viewer_cfg.get("lock_message", "")
             if message:
                 script = (
                     "(() => { const add = () => { if (!document.body || "
@@ -1638,13 +1636,15 @@ def _daemon_switch_to_idle_watch():
     except Exception as exc:
         _dbg(f"Suppressed non-fatal exception in _daemon_switch_to_idle_watch: {exc}")
 
-def run_viewer(html_path, clock_format="24h", scene_options=None):
+def run_viewer(html_path, clock_format="24h", scene_options=None, viewer_cfg=None):
     """Viewer subprocess entry point — isolated WebKit, daemon stays 30M flat."""
     global _is_viewer_mode, _viewer_loop, _viewer_windows
     if not has_graphical_session():
         print("No graphical session available; cannot start screensaver viewer.", file=sys.stderr)
         return False
     _is_viewer_mode = True
+    if not isinstance(viewer_cfg, dict):
+        viewer_cfg = load_config()
     # Viewer handles its own SIGTERM/SIGINT to exit cleanly when daemon Hide kills it
     try:
         import gi
@@ -1655,7 +1655,7 @@ def run_viewer(html_path, clock_format="24h", scene_options=None):
         scene_options = config_store.get_scene_options(
             {"screensaver_options": {scene_name: scene_options or {}}}, scene_name
         )
-        _viewer_windows = _create_viewer_windows(html_path, clock_format, scene_options)
+        _viewer_windows = _create_viewer_windows(html_path, clock_format, scene_options, viewer_cfg)
         loop = GLib.MainLoop()
         _viewer_loop = loop
         def _viewer_sig(*_a):
@@ -1781,7 +1781,7 @@ def show_viewer():
             _log_event("viewer_spawn_failed", error=type(e).__name__)
             print(f"Failed to spawn viewer subprocess: {e}", file=sys.stderr)
             # fallback to in-process (old path) if spawn fails
-            _viewer_windows = _create_viewer_windows(html_path, clock_format, scene_options)
+            _viewer_windows = _create_viewer_windows(html_path, clock_format, scene_options, cfg)
             _viewer_process = None
         _daemon_switch_to_active_watch()
         _schedule_lock()
@@ -2252,6 +2252,7 @@ def start():
         _viewer_windows = _create_viewer_windows(
             html_path, clock_format,
             config_store.get_scene_options(cfg, os.path.basename(html_path)),
+            cfg,
         )
         _schedule_lock()
         # For standalone, run main loop until windows closed

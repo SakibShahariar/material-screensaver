@@ -483,6 +483,25 @@ if (delivered.length !== 2 || delivered[1] !== 67) {
             except OSError:
                 pass
 
+    def test_viewer_window_setup_uses_one_config_snapshot(self):
+        source = _read(os.path.join(support.REPO_ROOT, "bin", "material-screensaver-ctl.py"))
+        start = source.index("def _create_viewer_windows(")
+        end = source.index("\ndef ", start + 5)
+        create_fn = source[start:end]
+        self.assertEqual(create_fn.count("load_config()"), 1)
+        self.assertIn('viewer_cfg.get("fps_limit", 30)', create_fn)
+        self.assertIn('viewer_cfg.get("blank_display_after_minutes", 0)', create_fn)
+        self.assertIn('viewer_cfg.get("clock_overlay", False)', create_fn)
+        self.assertIn('viewer_cfg.get("lock_message", "")', create_fn)
+        self.assertNotIn("cfg.get(", create_fn)
+        run_start = source.index("def run_viewer(")
+        run_end = source.index("\ndef ", run_start + 5)
+        run_fn = source[run_start:run_end]
+        self.assertEqual(run_fn.count("load_config()"), 1)
+        self.assertIn("_create_viewer_windows(html_path, clock_format, scene_options, viewer_cfg)", run_fn)
+        self.assertIn("_create_viewer_windows(html_path, clock_format, scene_options, cfg)", source)
+        self.assertIn("config_store.get_scene_options(cfg, os.path.basename(html_path))", source)
+
     def test_viewer_disables_cross_origin_file_url_access(self):
         source = _read(os.path.join(support.REPO_ROOT, "bin", "material-screensaver-ctl.py"))
         self.assertIn("set_allow_universal_access_from_file_urls(False)", source)
