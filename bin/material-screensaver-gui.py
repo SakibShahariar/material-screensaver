@@ -72,26 +72,50 @@ def sync_matugen_colors_link(cfg=None):
     return config_store.sync_matugen_colors_link(SCREENSAVER_DIR, cfg)
 
 
+_DISPLAY_NAME_CACHE = {}
+
+
 def display_name(filename):
-    """Prefer the scene's own title; retain a filename fallback for user scenes."""
+    """Prefer a cached scene title; refresh it when the underlying file changes."""
     stem = os.path.splitext(filename)[0]
+    fallback = stem.replace("-", " ").replace("_", " ").title()
     scene_path = os.path.join(SCREENSAVER_DIR, filename)
+    try:
+        stat = os.stat(scene_path)
+    except OSError:
+        _DISPLAY_NAME_CACHE.pop(scene_path, None)
+        return fallback
+
+    signature = (
+        stat.st_mtime_ns,
+        stat.st_size,
+        stat.st_ino,
+        stat.st_ctime_ns,
+    )
+    cached = _DISPLAY_NAME_CACHE.get(scene_path)
+    if cached is not None and cached[0] == signature:
+        return cached[1]
+
     try:
         with open(scene_path, encoding="utf-8") as f:
             source = f.read()
-        match = re.search(r"<title\b[^>]*>(.*?)</title\s*>", source, re.IGNORECASE | re.DOTALL)
-        if match:
-            title = html_lib.unescape(re.sub(r"<[^>]*>", "", match.group(1))).strip()
-            prefix = "Material Screensaver — "
-            if title.lower().startswith(prefix.lower()):
-                title = title[len(prefix):].strip()
-            # Some older scenes use the filename itself as their HTML title.
-            if title and title.casefold() != stem.casefold():
-                return title
     except (OSError, UnicodeError):
-        pass
-    return stem.replace("-", " ").replace("_", " ").title()
+        _DISPLAY_NAME_CACHE.pop(scene_path, None)
+        return fallback
 
+    title = fallback
+    match = re.search(r"<title\\b[^>]*>(.*?)</title\\s*>", source, re.IGNORECASE | re.DOTALL)
+    if match:
+        candidate = html_lib.unescape(re.sub(r"<[^>]*>", "", match.group(1))).strip()
+        prefix = "Material Screensaver — "
+        if candidate.lower().startswith(prefix.lower()):
+            candidate = candidate[len(prefix):].strip()
+        # Some older scenes use the filename itself as their HTML title.
+        if candidate and candidate.casefold() != stem.casefold():
+            title = candidate
+
+    _DISPLAY_NAME_CACHE[scene_path] = (signature, title)
+    return title
 
 def query_battery_discharging():
     """Return True/False from UPower, or None when power state is unavailable."""

@@ -7,6 +7,7 @@ import json
 import os
 import tempfile
 import unittest
+from unittest import mock
 
 import support
 
@@ -176,6 +177,25 @@ class TestGuiLogic(unittest.TestCase):
             self.assertEqual(child.values["command"], f"{self.gui.CTL_SCRIPT} toggle")
         finally:
             self.gui.Gio.Settings = original
+
+    def test_display_name_caches_unchanged_scene_file(self):
+        path = os.path.join(self.gui.SCREENSAVER_DIR, "gameoflife.html")
+        with open(path, "w", encoding="utf-8") as f:
+            f.write("<html><head><title>Material Screensaver — Game of Life</title></head></html>")
+        with mock.patch("builtins.open", wraps=open) as open_file:
+            self.assertEqual(self.gui.display_name("gameoflife.html"), "Game of Life")
+            self.assertEqual(self.gui.display_name("gameoflife.html"), "Game of Life")
+        self.assertEqual(open_file.call_count, 1)
+
+    def test_display_name_cache_invalidates_when_scene_changes(self):
+        path = os.path.join(self.gui.SCREENSAVER_DIR, "gameoflife.html")
+        with open(path, "w", encoding="utf-8") as f:
+            f.write("<html><head><title>Game of Life</title></head></html>")
+        self.assertEqual(self.gui.display_name("gameoflife.html"), "Game of Life")
+        with open(path, "w", encoding="utf-8") as f:
+            f.write("<html><head><title>New Game of Life Scene</title></head></html>")
+        self.assertEqual(self.gui.display_name("gameoflife.html"), "New Game of Life Scene")
+        self.assertEqual(self.gui.display_name("gameoflife.html"), "New Game of Life Scene")
 
     def test_display_name_reads_scene_title(self):
         path = os.path.join(self.gui.SCREENSAVER_DIR, "gameoflife.html")
