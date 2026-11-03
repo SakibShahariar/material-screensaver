@@ -71,7 +71,8 @@ The lock-test fixture failure was resolved by `423eebf`; the GUI title-regex fai
 
 ### Issue #60 — descendant-only WebKit cleanup
 
-| `abf6091025dcd9d69700c22e817787e9f8c333d6` | perf(ctl): walk WebKit descendants without global proc scan (#60) | pending | [41650565668](https://github.com/SakibShahariar/material-screensaver/actions/runs/41650565668) | CI was still running when this follow-up review was recorded. |
+| `abf6091025dcd9d69700c22e817787e9f8c333d6` | perf(ctl): walk WebKit descendants without global proc scan (#60) | red | [41650565668](https://github.com/SakibShahariar/material-screensaver/actions/runs/41650565668) | Tests failed: the PID-reuse test altered the synthetic process identity during descendant discovery rather than immediately before SIGTERM; other cleanup tests passed. |
+| `2fc1ef9191dc630527d3a90d456fa57598db0bc9` | fix(ctl): preserve null-separated proc cmdlines (#60) | pending | [workflow pending](https://github.com/SakibShahariar/material-screensaver/actions) | Corrected proc cmdline NUL-byte normalization; CI result not yet observed. |
 
 ### Failure record template
 

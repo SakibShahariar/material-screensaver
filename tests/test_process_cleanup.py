@@ -105,7 +105,7 @@ class TestWebKitProcessCleanup(unittest.TestCase):
             info = read_process(proc_root, pid)
             if pid == 101:
                 child_reads += 1
-                if child_reads == 2:
+                if child_reads == 4:
                     return info[0], "unrelated-browser", "9001"
             return info
 
