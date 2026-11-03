@@ -337,7 +337,7 @@ class TestJsSyntax(unittest.TestCase):
     def test_display_blanking_is_configurable_and_stops_scene_scripts(self):
         ctl = _read(os.path.join(support.REPO_ROOT, "bin", "material-screensaver-ctl.py"))
         gui = _read(os.path.join(support.REPO_ROOT, "bin", "material-screensaver-gui.py"))
-        self.assertIn('blank_minutes = cfg.get("blank_display_after_minutes", 0)', ctl)
+        self.assertIn('blank_minutes = viewer_cfg.get("blank_display_after_minutes", 0)', ctl)
         self.assertIn("if blank_minutes > 0:", ctl)
         self.assertIn("window.setTimeout(() => {", ctl)
         self.assertIn("document.open();", ctl)
@@ -493,7 +493,6 @@ if (delivered.length !== 2 || delivered[1] !== 67) {
         self.assertIn('viewer_cfg.get("blank_display_after_minutes", 0)', create_fn)
         self.assertIn('viewer_cfg.get("clock_overlay", False)', create_fn)
         self.assertIn('viewer_cfg.get("lock_message", "")', create_fn)
-        self.assertNotIn("cfg.get(", create_fn)
         run_start = source.index("def run_viewer(")
         run_end = source.index("\ndef ", run_start + 5)
         run_fn = source[run_start:run_end]
