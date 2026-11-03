@@ -101,15 +101,17 @@ class TestGuiLogic(unittest.TestCase):
             matches.append(query)
             return query == "fps"
 
+        FakeWindow._apply_picker_filter_change = self.gui.ScreensaverWindow._apply_picker_filter_change
+        window = FakeWindow()
         self.gui.GLib = FakeGLib
         self.gui.settings_group_matches = match
         try:
             search.value = "f"
-            self.gui.ScreensaverWindow.on_picker_filter_changed(FakeWindow)
-            first_id = FakeWindow._settings_search_timeout_id
+            self.gui.ScreensaverWindow.on_picker_filter_changed(window)
+            first_id = window._settings_search_timeout_id
             search.value = "fps"
-            self.gui.ScreensaverWindow.on_picker_filter_changed(FakeWindow)
-            second_id = FakeWindow._settings_search_timeout_id
+            self.gui.ScreensaverWindow.on_picker_filter_changed(window)
+            second_id = window._settings_search_timeout_id
 
             self.assertNotEqual(first_id, second_id)
             self.assertEqual(FakeGLib.removed, [first_id])
@@ -121,7 +123,7 @@ class TestGuiLogic(unittest.TestCase):
             self.assertEqual(rebuilds, ["scene.html"])
             self.assertEqual(matches, ["fps"])
             self.assertTrue(group.visible)
-            self.assertIsNone(FakeWindow._settings_search_timeout_id)
+            self.assertIsNone(window._settings_search_timeout_id)
         finally:
             self.gui.GLib = original_glib
             self.gui.settings_group_matches = original_match
