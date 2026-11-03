@@ -24,10 +24,10 @@ Persistent repository-specific record of commit-level CI checks and red-cross in
 
 - Repository: `SakibShahariar/material-screensaver`
 - Default branch: `master`
-- Checkpoint SHA: `e2b5cd0facd475e945f847d84f61e638ccb7f07c`
+- Checkpoint SHA: `d5b1c33ac47226570555a11c0be41ba5de0d1c55`
 - Initialized: 2026-11-02
 - Baseline correction: a workflow run for the checkpoint commit was later found and inspected; it failed in the test-suite step. The failure is recorded below rather than treating the earlier empty combined-status response as authoritative.
-- Next session: review commits after `e2b5cd0facd475e945f847d84f61e638ccb7f07c`; retain the historical failures below for audit context.
+- Next session: review commits after `d5b1c33ac47226570555a11c0be41ba5de0d1c55`; retain the historical failures below for audit context.
 
 ## Initial baseline
 
@@ -90,7 +90,9 @@ The lock-test fixture failure was resolved by `423eebf`; the GUI title-regex fai
 | `675a0fcf80498f792b57f273f50d43d7271c194c` | fix(perf): use WebKit load events and viewer teardown (#44) | green | [41654457749](https://github.com/SakibShahariar/material-screensaver/actions/runs/41654457749) | Used the WebKit load-finished enum and the application's teardown path; tests, lint, benchmark, and artifact upload passed. |
 | `e2b5cd0facd475e945f847d84f61e638ccb7f07c` | perf(ci): repeat scene samples and report medians (#44) | green | [41655018836](https://github.com/SakibShahariar/material-screensaver/actions/runs/41655018836) | Three samples per scene/FPS pair; median startup, CPU, and RSS metrics reported and uploaded as an artifact. Tests, lint, and benchmark passed. |
 
-| `d422454238068f55f3f457c6a90f6cabb34e6dab` | perf(ctl): avoid display-rate polling in FPS throttle (#38) | pending | [workflow pending](https://github.com/SakibShahariar/material-screensaver/actions) | Replaced repeated native RAF polling with interval-based timer pacing; automated test verification pending. |
+| `d422454238068f55f3f457c6a90f6cabb34e6dab` | perf(ctl): avoid display-rate polling in FPS throttle (#38) | red | [41656115584](https://github.com/SakibShahariar/material-screensaver/actions/runs/41656115584) | The three Node harness tests could not extract the embedded script because the regex was over-escaped; the wrapper itself parsed. |
+
+| `d5b1c33ac47226570555a11c0be41ba5de0d1c55` | test(perf): verify timer-paced frame scheduling (#38) | green | [41656290095](https://github.com/SakibShahariar/material-screensaver/actions/runs/41656290095) | Corrected the extraction regex and added deterministic timer/native-RAF harnesses; tests, lint, and repeated scene benchmark passed. |
 
 ### Failure record template
 

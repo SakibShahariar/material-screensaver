@@ -253,7 +253,7 @@ def main(argv=None) -> int:
     ctl = _load_ctl()
     Gtk.init()
     samples = []
-    for scene_name in ("solar-system.html", "organic-harmonic-field.html"):
+    for scene_name in ("flow.html", "organic-harmonic-field.html"):
         scene_path = ROOT / "screensavers" / scene_name
         if not scene_path.is_file():
             print(f"error: required benchmark scene missing: {scene_path}", file=sys.stderr)

@@ -2,7 +2,7 @@
 
 The CI workflow collects repeatable **headless** startup, CPU, and memory samples for two representative scenes:
 
-- `solar-system.html` — Canvas 2D
+- `flow.html` — Canvas 2D
 - `organic-harmonic-field.html` — WebGL
 
 Each scene is measured three times at 30 FPS and 15 FPS using the same viewer setup and its injected frame-rate wrapper. The report includes every sample plus per-scene/FPS medians to reduce the influence of one-off runner noise. CI uploads the JSON report as the `scene-performance-metrics` artifact.
