@@ -69,12 +69,9 @@ The lock-test fixture failure was resolved by `423eebf`; the GUI title-regex fai
 | `eb19a5567b1b03918d45cbdb508a4896f32c758b` | docs: streamline README and move troubleshooting details | red | [41649597941](https://github.com/SakibShahariar/material-screensaver/actions/runs/41649597941) | Lint passed; tests failed because the shortened README omitted the reduced-motion cap description expected by an existing test. |
 | `14bcaaba2f45acb3d97865e4b624f36e132262e4` | docs: restore reduced-motion detail and audit CI failure | green | [41650136466](https://github.com/SakibShahariar/material-screensaver/actions/runs/41650136466) | Restored the 10 FPS detail; tests and lint passed. |
 
-| `ca24a0968bd42f6ec721badcaa8f129ba80974da` | perf(ctl): cache UPower state for viewer setup (#63) | red | [41646623211](https://github.com/SakibShahariar/material-screensaver/actions/runs/41646623211) | Tests failed because a mock command result used a literal escaped newline, so the parser did not see a state line. |
-| `3540595a6b72aad4a12f3cea79dab1d2c3c89519` | test(ctl): provide realistic UPower output (#63) | green | [41646860228](https://github.com/SakibShahariar/material-screensaver/actions/runs/41646860228) | Corrected mock stdout; tests and lint passed. |
+### Issue #60 — descendant-only WebKit cleanup
 
-### README streamlining follow-up
-
-| `eb19a5567b1b03918d45cbdb508a4896f32c758b` | docs: streamline README and move troubleshooting details | red | [41649597941](https://github.com/SakibShahariar/material-screensaver/actions/runs/41649597941) | Lint passed; test suite failed because the shortened README omitted the documented reduced-motion cap assertion (`requestAnimationFrame-driven scenes at **10 FPS**`). Documentation regression; fix is being committed separately. |
+| `abf6091025dcd9d69700c22e817787e9f8c333d6` | perf(ctl): walk WebKit descendants without global proc scan (#60) | pending | [41650565668](https://github.com/SakibShahariar/material-screensaver/actions/runs/41650565668) | CI was still running when this follow-up review was recorded. |
 
 ### Failure record template
 

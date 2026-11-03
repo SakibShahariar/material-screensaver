@@ -228,7 +228,7 @@ def _read_proc_process(proc_root, pid):
         start_time = tail[19]
         with open(os.path.join(proc_root, str(pid), "cmdline"), "rb") as stream:
             raw_cmd = stream.read()
-        cmd = raw_cmd.replace(b"\\0", b" ").decode(errors="replace").strip()
+        cmd = raw_cmd.replace(b"\0", b" ").decode(errors="replace").strip()
         return ppid, cmd, start_time
     except (OSError, ValueError, IndexError):
         return None
@@ -363,6 +363,8 @@ def _kill_orphan_webkit(proc_root="/proc", root_pid=None, kill_process=None,
                 pass
 
     return len(to_reap)
+
+
 def _battery_policy_label(cfg, battery_saving):
     """Return a concise overlay label only when battery FPS reduction is active."""
     if not battery_saving:
