@@ -202,9 +202,11 @@ class TestExternalLockHandling(unittest.TestCase):
             "hide_viewer": self.ctl.hide_viewer,
             "_daemon_switch_to_idle_watch": getattr(self.ctl, "_daemon_switch_to_idle_watch", None),
             "_session_locked": self.ctl._session_locked,
+            "_is_showing": self.ctl._is_showing,
         }
         self.rearm_calls = 0
         self.ctl._session_locked = False
+        self.ctl._is_showing = False
         self.ctl.is_viewer_active = lambda: self.active
         self.ctl.hide_viewer = lambda: self._bump()
         self.ctl._daemon_switch_to_idle_watch = lambda: self._rearm()
@@ -215,6 +217,7 @@ class TestExternalLockHandling(unittest.TestCase):
     def _bump(self):
         self.hidden += 1
         self.active = False  # hiding the viewer deactivates it (real hide_viewer does this)
+        self.ctl._is_showing = False
 
     def tearDown(self):
         for name, fn in self._orig.items():
