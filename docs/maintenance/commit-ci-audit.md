@@ -78,6 +78,7 @@ The lock-test fixture failure was resolved by `423eebf`; the GUI title-regex fai
 | `a3aab7ea1cbbd3e14bdd1b841de90c04c77d9739` | test(ctl): cover large unrelated process tables (#60) | green | [41651797696](https://github.com/SakibShahariar/material-screensaver/actions/runs/41651797696) | Added a 300-process synthetic table check proving unrelated PIDs are not read; tests and lint passed. |
 
 | `e4e71e2e07511d2cee4e63ee34bae7ff5e5744b6` | fix(ctl): reset lock timer on viewer activity (#47) | green | [41652543288](https://github.com/SakibShahariar/material-screensaver/actions/runs/41652543288) | Added the daemon Activity D-Bus method and rate-limited viewer input notifications; tests and lint passed. |
+| `2295a9dc94f828b804b89531fe57ad1665ad8572` | fix(ctl): throttle activity resets for short lock delays (#47) | pending | [41652880519](https://github.com/SakibShahariar/material-screensaver/actions/runs/41652880519) | Adjusted the activity notification interval to 250 ms; syntax/CI verification pending. |
 
 ### Failure record template
 

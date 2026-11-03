@@ -1415,7 +1415,10 @@ def _notify_lock_activity():
     """Reset the daemon lock timer at most once per second during input activity."""
     global _activity_reset_last
     now = time.monotonic()
-    if (_activity_reset_last is not None\n            and now - _activity_reset_last < _ACTIVITY_RESET_INTERVAL):
+    if (
+        _activity_reset_last is not None
+        and now - _activity_reset_last < _ACTIVITY_RESET_INTERVAL
+    ):
         return False
     _activity_reset_last = now
     if _is_viewer_mode:
