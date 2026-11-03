@@ -552,22 +552,34 @@ const reducedMotion = window.matchMedia &&
   window.matchMedia("(prefers-reduced-motion: reduce)").matches;
 const limit = reducedMotion ? Math.min(requestedLimit, 10) : requestedLimit;
 const nativeRAF = window.requestAnimationFrame.bind(window);
+const nativeCAF = window.cancelAnimationFrame.bind(window);
 const interval = 1000 / limit;
 const callbacks = new Map();
 const activeIds = new Set();
 let nextId = 1;
 let framePending = false;
+let nativeFrameId = null;
+let frameTimer = null;
 let lastFrame = -Infinity;
 
 function scheduleFrame() {
-  if (!framePending && callbacks.size > 0) {
-    framePending = true;
-    nativeRAF(dispatchFrame);
+  if (framePending || callbacks.size === 0) return;
+  framePending = true;
+  const elapsed = performance.now() - lastFrame;
+  const delay = Math.max(0, interval - elapsed);
+  if (delay > 1) {
+    frameTimer = window.setTimeout(() => {
+      frameTimer = null;
+      nativeFrameId = nativeRAF(dispatchFrame);
+    }, delay);
+  } else {
+    nativeFrameId = nativeRAF(dispatchFrame);
   }
 }
 
 function dispatchFrame(timestamp) {
   framePending = false;
+  nativeFrameId = null;
   if (timestamp - lastFrame < interval) {
     scheduleFrame();
     return;
@@ -595,6 +607,17 @@ window.cancelAnimationFrame = id => {
   if (!activeIds.has(id)) return;
   activeIds.delete(id);
   callbacks.delete(id);
+  if (callbacks.size === 0) {
+    if (frameTimer !== null) {
+      window.clearTimeout(frameTimer);
+      frameTimer = null;
+    }
+    if (nativeFrameId !== null) {
+      nativeCAF(nativeFrameId);
+      nativeFrameId = null;
+    }
+    framePending = false;
+  }
 };
 })();""".replace("__FPS_LIMIT__", str(fps_limit))
             ucm = web.get_user_content_manager()

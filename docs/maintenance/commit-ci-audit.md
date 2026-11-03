@@ -24,10 +24,10 @@ Persistent repository-specific record of commit-level CI checks and red-cross in
 
 - Repository: `SakibShahariar/material-screensaver`
 - Default branch: `master`
-- Checkpoint SHA: `816826d5f0e96f470a19d8653aa638bf70855b9e`
+- Checkpoint SHA: `e2b5cd0facd475e945f847d84f61e638ccb7f07c`
 - Initialized: 2026-11-02
 - Baseline correction: a workflow run for the checkpoint commit was later found and inspected; it failed in the test-suite step. The failure is recorded below rather than treating the earlier empty combined-status response as authoritative.
-- Next session: review commits after `816826d5f0e96f470a19d8653aa638bf70855b9e`; retain the historical failures below for audit context.
+- Next session: review commits after `e2b5cd0facd475e945f847d84f61e638ccb7f07c`; retain the historical failures below for audit context.
 
 ## Initial baseline
 
@@ -86,8 +86,9 @@ The lock-test fixture failure was resolved by `423eebf`; the GUI title-regex fai
 | `419563f6116c2449263c9e272ab43889b1cc7f4c` | perf(ci): collect scene startup CPU and memory baselines (#44) | pending | [41654229895](https://github.com/SakibShahariar/material-screensaver/actions/runs/41654229895) | Added a headless WebKit performance sampler and CI artifact; first workflow run is still in progress. |
 
 
-| `419563f6116c2449263c9e272ab43889b1cc7f4c` | perf(ci): collect scene startup CPU and memory baselines (#44) | red | [41654229895](https://github.com/SakibShahariar/material-screensaver/actions/runs/41654229895) | The first benchmark implementation used a nonexistent load-event constant and did not complete; corrected in the next commit. |
+| `419563f6116c2449263c9e272ab43889b1cc7f4c` | perf(ci): collect scene startup CPU and memory baselines (#44) | pending | [41654229895](https://github.com/SakibShahariar/material-screensaver/actions/runs/41654229895) | The first benchmark implementation used a nonexistent load-event constant; run remained in progress when checked. Corrected in the next commit. |
 | `675a0fcf80498f792b57f273f50d43d7271c194c` | fix(perf): use WebKit load events and viewer teardown (#44) | green | [41654457749](https://github.com/SakibShahariar/material-screensaver/actions/runs/41654457749) | Used the WebKit load-finished enum and the application's teardown path; tests, lint, benchmark, and artifact upload passed. |
+| `e2b5cd0facd475e945f847d84f61e638ccb7f07c` | perf(ci): repeat scene samples and report medians (#44) | green | [41655018836](https://github.com/SakibShahariar/material-screensaver/actions/runs/41655018836) | Three samples per scene/FPS pair; median startup, CPU, and RSS metrics reported and uploaded as an artifact. Tests, lint, and benchmark passed. |
 
 ### Failure record template
 

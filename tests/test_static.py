@@ -360,36 +360,51 @@ class TestJsSyntax(unittest.TestCase):
         readme = _read(os.path.join(support.REPO_ROOT, "README.md"))
         self.assertIn("requestAnimationFrame-driven scenes at **10 FPS**", readme)
 
-    def test_fps_throttle_preserves_cancel_and_limits_callbacks(self):
+    def _fps_throttle_harness(self, fps, assertions):
         source = _read(os.path.join(support.REPO_ROOT, "bin", "material-screensaver-ctl.py"))
         match = re.search(
-            r'fps_script = """(.*?)""".replace\("__FPS_LIMIT__", str\(fps_limit\)\)',
+            r'fps_script = """(.*?)""".replace\\("__FPS_LIMIT__", str\\(fps_limit\\)\\)',
             source,
             re.S,
         )
         self.assertIsNotNone(match, "viewer FPS throttle script missing")
-        throttle = match.group(1).replace("__FPS_LIMIT__", "30")
+        throttle = match.group(1).replace("__FPS_LIMIT__", str(fps))
         harness = r"""
-const nativeFrames = [];
+let now = 0;
+let nextFrameId = 1;
+let nextTimerId = 1;
+const nativeFrames = new Map();
+const timers = new Map();
 global.window = {
-  requestAnimationFrame(callback) { nativeFrames.push(callback); return nativeFrames.length; },
-  cancelAnimationFrame() {},
+  performance: { now: () => now },
+  requestAnimationFrame(callback) {
+    const id = nextFrameId++;
+    nativeFrames.set(id, callback);
+    return id;
+  },
+  cancelAnimationFrame(id) { nativeFrames.delete(id); },
+  setTimeout(callback, delay) {
+    const id = nextTimerId++;
+    timers.set(id, {callback, delay});
+    return id;
+  },
+  clearTimeout(id) { timers.delete(id); },
 };
-""" + throttle + r"""
-const delivered = [];
-const cancelledId = window.requestAnimationFrame(() => delivered.push("cancelled"));
-window.cancelAnimationFrame(cancelledId);
-const firstId = window.requestAnimationFrame(timestamp => delivered.push(timestamp));
-if (nativeFrames.length !== 1) throw new Error("scheduler did not coalesce native frames");
-nativeFrames.shift()(0);
-if (delivered.length !== 1 || delivered[0] !== 0) throw new Error("first frame was not delivered");
-window.requestAnimationFrame(timestamp => delivered.push(timestamp));
-nativeFrames.shift()(10);
-if (delivered.length !== 1) throw new Error("frame cap did not defer an early callback");
-nativeFrames.shift()(34);
-if (delivered.length !== 2 || delivered[1] !== 34) throw new Error("deferred callback was not delivered");
-window.cancelAnimationFrame(firstId);
-"""
+function runFrame(timestamp = now) {
+  const next = nativeFrames.entries().next().value;
+  if (!next) throw new Error("no native animation frame was scheduled");
+  nativeFrames.delete(next[0]);
+  now = timestamp;
+  next[1](timestamp);
+}
+function runTimer() {
+  const next = timers.entries().next().value;
+  if (!next) throw new Error("no frame pacing timer was scheduled");
+  timers.delete(next[0]);
+  now += next[1].delay;
+  next[1].callback();
+}
+""" + throttle + "\n" + assertions;
         fd, tmp = tempfile.mkstemp(suffix=".js")
         try:
             with os.fdopen(fd, "w") as handle:
@@ -402,22 +417,33 @@ window.cancelAnimationFrame(firstId);
             except OSError:
                 pass
 
+    def test_fps_throttle_paces_frames_with_timers_and_preserves_cancel(self):
+        self._fps_throttle_harness(30, r"""
+const delivered = [];
+const cancelledId = window.requestAnimationFrame(() => delivered.push("cancelled"));
+window.cancelAnimationFrame(cancelledId);
+if (nativeFrames.size !== 0 || timers.size !== 0) {
+  throw new Error("cancelling the final callback left a scheduled frame");
+}
+window.requestAnimationFrame(timestamp => delivered.push(timestamp));
+if (nativeFrames.size !== 1) throw new Error("first frame was not scheduled immediately");
+runFrame(0);
+if (delivered.length !== 1 || delivered[0] !== 0) throw new Error("first frame was not delivered");
+window.requestAnimationFrame(timestamp => delivered.push(timestamp));
+if (nativeFrames.size !== 0 || timers.size !== 1) {
+  throw new Error("capped scheduler kept requesting native 60 Hz frames instead of waiting");
+}
+const delay = timers.values().next().value.delay;
+if (delay < 33) throw new Error("30 FPS pacing delay was too short: " + delay);
+runTimer();
+runFrame(now);
+if (delivered.length !== 2 || delivered[1] < 33) {
+  throw new Error("30 FPS callback was not delivered after the pacing delay");
+}
+""")
+
     def test_fps_throttle_cancels_callbacks_queued_in_same_frame(self):
-        source = _read(os.path.join(support.REPO_ROOT, "bin", "material-screensaver-ctl.py"))
-        match = re.search(
-            r'fps_script = """(.*?)""".replace\("__FPS_LIMIT__", str\(fps_limit\)\)',
-            source,
-            re.S,
-        )
-        self.assertIsNotNone(match, "viewer FPS throttle script missing")
-        throttle = match.group(1).replace("__FPS_LIMIT__", "30")
-        harness = r"""
-const nativeFrames = [];
-global.window = {
-  requestAnimationFrame(callback) { nativeFrames.push(callback); return nativeFrames.length; },
-  cancelAnimationFrame() {},
-};
-""" + throttle + r"""
+        self._fps_throttle_harness(30, r"""
 const delivered = [];
 let secondId;
 window.requestAnimationFrame(() => {
@@ -426,62 +452,29 @@ window.requestAnimationFrame(() => {
 });
 secondId = window.requestAnimationFrame(() => delivered.push("cancelled"));
 window.requestAnimationFrame(() => delivered.push("third"));
-if (nativeFrames.length !== 1) throw new Error("callbacks did not share one native frame");
-nativeFrames.shift()(0);
+runFrame(0);
 if (delivered.join(",") !== "first,third") {
   throw new Error("cancellation during dispatch did not suppress queued callback: " + delivered);
 }
-"""
-        fd, tmp = tempfile.mkstemp(suffix=".js")
-        try:
-            with os.fdopen(fd, "w") as handle:
-                handle.write(harness)
-            result = subprocess.run([self.NODE, tmp], capture_output=True, text=True)
-            self.assertEqual(result.returncode, 0, result.stderr.strip())
-        finally:
-            try:
-                os.remove(tmp)
-            except OSError:
-                pass
+""")
 
-    def test_fps_throttle_honors_fifteen_fps(self):
-        source = _read(os.path.join(support.REPO_ROOT, "bin", "material-screensaver-ctl.py"))
-        match = re.search(
-            r'fps_script = """(.*?)""".replace\("__FPS_LIMIT__", str\(fps_limit\)\)',
-            source,
-            re.S,
-        )
-        self.assertIsNotNone(match, "viewer FPS throttle script missing")
-        throttle = match.group(1).replace("__FPS_LIMIT__", "15")
-        harness = r"""
-const nativeFrames = [];
-global.window = {
-  requestAnimationFrame(callback) { nativeFrames.push(callback); return nativeFrames.length; },
-  cancelAnimationFrame() {},
-};
-""" + throttle + r"""
+    def test_fps_throttle_honors_fifteen_fps_without_60hz_polling(self):
+        self._fps_throttle_harness(15, r"""
 const delivered = [];
 window.requestAnimationFrame(timestamp => delivered.push(timestamp));
-nativeFrames.shift()(0);
+runFrame(0);
 window.requestAnimationFrame(timestamp => delivered.push(timestamp));
-nativeFrames.shift()(60);
-if (delivered.length !== 1) throw new Error("15 FPS cap delivered a frame before 66.7ms");
-nativeFrames.shift()(67);
-if (delivered.length !== 2 || delivered[1] !== 67) {
+if (nativeFrames.size !== 0 || timers.size !== 1) {
+  throw new Error("15 FPS cap should wait on a timer instead of polling native RAF");
+}
+const delay = timers.values().next().value.delay;
+if (delay < 66) throw new Error("15 FPS pacing delay was shorter than 66.7ms: " + delay);
+runTimer();
+runFrame(now);
+if (delivered.length !== 2 || delivered[1] < 66) {
   throw new Error("15 FPS cap did not deliver the next eligible frame");
 }
-"""
-        fd, tmp = tempfile.mkstemp(suffix=".js")
-        try:
-            with os.fdopen(fd, "w") as handle:
-                handle.write(harness)
-            result = subprocess.run([self.NODE, tmp], capture_output=True, text=True)
-            self.assertEqual(result.returncode, 0, result.stderr.strip())
-        finally:
-            try:
-                os.remove(tmp)
-            except OSError:
-                pass
+""")
 
     def test_viewer_window_setup_uses_one_config_snapshot(self):
         source = _read(os.path.join(support.REPO_ROOT, "bin", "material-screensaver-ctl.py"))
