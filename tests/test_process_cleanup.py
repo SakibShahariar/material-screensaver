@@ -102,12 +102,13 @@ class TestWebKitProcessCleanup(unittest.TestCase):
 
         def reuse_before_signal(proc_root, pid):
             nonlocal child_reads
-            info = read_process(proc_root, pid)
             if pid == 101:
                 child_reads += 1
                 if child_reads == 4:
-                    return info[0], "unrelated-browser", "9001"
-            return info
+                    # Persist the reused PID so checks for its own child also
+                    # observe that the original parent process has disappeared.
+                    self._write_process(101, 100, "unrelated-browser", 9001)
+            return read_process(proc_root, pid)
 
         with mock.patch.object(self.ctl, "_read_proc_process", side_effect=reuse_before_signal):
             self._run_cleanup()
