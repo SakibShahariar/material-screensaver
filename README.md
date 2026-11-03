@@ -28,7 +28,7 @@ A few scenes from the collection:
 - **Settings app** with search, categories, favorites, random selection, per-scene options, and a clock overlay.
 - **Quick controls** including a configurable shortcut and `Super+Q` to dismiss the viewer.
 - **Power options** including a configurable frame-rate cap, battery saver, and display blanking.
-- **Reduced motion** support for the system preference.
+- **Reduced motion** support for the system preference, capping requestAnimationFrame-driven scenes at **10 FPS**.
 - **Offline by default:** bundled scenes do not need a network connection.
 
 > Material Screensaver is not a secure lock screen. Use GNOME's normal session-lock mechanism to lock your computer.
