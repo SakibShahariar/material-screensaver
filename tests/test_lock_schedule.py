@@ -175,7 +175,7 @@ class TestActivityLockReset(unittest.TestCase):
     def setUp(self):
         self.original_mode = self.ctl._is_viewer_mode
         self.original_last = self.ctl._activity_reset_last
-        self.ctl._activity_reset_last = 0.0
+        self.ctl._activity_reset_last = None
 
     def tearDown(self):
         self.ctl._is_viewer_mode = self.original_mode
@@ -185,7 +185,7 @@ class TestActivityLockReset(unittest.TestCase):
         calls = []
         self.ctl._is_viewer_mode = True
         with unittest.mock.patch.object(
-            self.ctl.time, "monotonic", side_effect=[10.0, 10.5, 11.0]
+            self.ctl.time, "monotonic", side_effect=[10.0, 10.1, 10.25]
         ), unittest.mock.patch.object(
             self.ctl, "_call_daemon", side_effect=lambda method: (calls.append(method) or True, None)
         ):

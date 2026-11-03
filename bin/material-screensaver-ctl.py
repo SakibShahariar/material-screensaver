@@ -63,7 +63,8 @@ _is_viewer_mode = False  # True in viewer subprocess (isolated WebKit, daemon st
 _viewer_loop = None  # GLib.MainLoop for viewer subprocess
 _BATTERY_STATE_CACHE_TTL = 30.0
 _battery_state_cache = None  # (monotonic timestamp, bool | None)
-_activity_reset_last = 0.0  # monotonic timestamp of the last viewer activity reset
+_ACTIVITY_RESET_INTERVAL = 0.25  # seconds; keep short lock delays responsive
+_activity_reset_last = None  # monotonic timestamp of the last viewer activity reset
 
 _valid_int = config_store._valid_int
 normalize_config = config_store.normalize_config
@@ -1414,7 +1415,7 @@ def _notify_lock_activity():
     """Reset the daemon lock timer at most once per second during input activity."""
     global _activity_reset_last
     now = time.monotonic()
-    if now - _activity_reset_last < 1.0:
+    if (_activity_reset_last is not None\n            and now - _activity_reset_last < _ACTIVITY_RESET_INTERVAL):
         return False
     _activity_reset_last = now
     if _is_viewer_mode:
