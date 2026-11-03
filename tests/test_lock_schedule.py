@@ -166,5 +166,55 @@ class TestCountdownCancellation(unittest.TestCase):
         self.assertFalse(label.visible)
 
 
+
+class TestActivityLockReset(unittest.TestCase):
+    @classmethod
+    def setUpClass(cls):
+        cls.ctl = support.load_ctl()
+
+    def setUp(self):
+        self.original_mode = self.ctl._is_viewer_mode
+        self.original_last = self.ctl._activity_reset_last
+        self.ctl._activity_reset_last = 0.0
+
+    def tearDown(self):
+        self.ctl._is_viewer_mode = self.original_mode
+        self.ctl._activity_reset_last = self.original_last
+
+    def test_viewer_activity_resets_daemon_timer_at_most_once_per_second(self):
+        calls = []
+        self.ctl._is_viewer_mode = True
+        with unittest.mock.patch.object(
+            self.ctl.time, "monotonic", side_effect=[10.0, 10.5, 11.0]
+        ), unittest.mock.patch.object(
+            self.ctl, "_call_daemon", side_effect=lambda method: (calls.append(method) or True, None)
+        ):
+            self.assertTrue(self.ctl._notify_lock_activity())
+            self.assertFalse(self.ctl._notify_lock_activity())
+            self.assertTrue(self.ctl._notify_lock_activity())
+        self.assertEqual(calls, ["Activity", "Activity"])
+
+    def test_standalone_activity_resets_local_timer(self):
+        self.ctl._is_viewer_mode = False
+        with unittest.mock.patch.object(self.ctl.time, "monotonic", return_value=20.0), \
+             unittest.mock.patch.object(self.ctl, "_schedule_lock") as schedule:
+            self.assertTrue(self.ctl._notify_lock_activity())
+        schedule.assert_called_once_with()
+
+    def test_daemon_activity_handler_reschedules_lock_timer(self):
+        with unittest.mock.patch.object(self.ctl, "_schedule_lock") as schedule:
+            self.ctl._reset_lock_timer_from_activity()
+        schedule.assert_called_once_with()
+
+    def test_dbus_interface_exposes_activity_method_and_input_handlers_use_it(self):
+        from pathlib import Path
+        source = (Path(support.REPO_ROOT) / "bin" / "material-screensaver-ctl.py").read_text(
+            encoding="utf-8"
+        )
+        self.assertIn('<method name="Activity"/>', source)
+        self.assertIn('elif method == "Activity":\n                                _reset_lock_timer_from_activity()', source)
+        self.assertGreaterEqual(source.count("_notify_lock_activity()"), 4)
+
+
 if __name__ == "__main__":
     unittest.main(verbosity=2)

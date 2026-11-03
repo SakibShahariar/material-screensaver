@@ -63,6 +63,7 @@ _is_viewer_mode = False  # True in viewer subprocess (isolated WebKit, daemon st
 _viewer_loop = None  # GLib.MainLoop for viewer subprocess
 _BATTERY_STATE_CACHE_TTL = 30.0
 _battery_state_cache = None  # (monotonic timestamp, bool | None)
+_activity_reset_last = 0.0  # monotonic timestamp of the last viewer activity reset
 
 _valid_int = config_store._valid_int
 normalize_config = config_store.normalize_config
@@ -833,6 +834,7 @@ p{color:#c4c0ca;line-height:1.5}
         win.set_child(viewer_content)
 
         def on_key(ctrl, keyval, keycode, state, _win=win):
+            _notify_lock_activity()
             try:
                 cancel_countdown()
             except NameError:
@@ -864,14 +866,16 @@ p{color:#c4c0ca;line-height:1.5}
                     _dbg(f"Suppressed non-fatal exception in on_key: {exc}")
                 return False
         def on_click(ctrl, n_press, x, y, _win=win, _web=web):
-            # Clicks cancel the lock warning but never dismiss the viewer.
+            # Clicks reset the lock delay and cancel the current warning.
+            _notify_lock_activity()
             try:
                 cancel_countdown()
             except NameError:
                 pass
             return False
         def on_motion(ctrl, x, y, _win=win, _web=web):
-            # Pointer activity cancels the lock warning without dismissing.
+            # Pointer activity resets the lock delay without dismissing.
+            _notify_lock_activity()
             try:
                 cancel_countdown()
             except NameError:
@@ -1399,6 +1403,27 @@ def _schedule_lock():
         _lock_timeout_id = GLib.timeout_add_seconds(secs, _do_lock)
     except Exception as exc:
         _dbg(f"Suppressed non-fatal exception in _schedule_lock: {exc}")
+
+
+def _reset_lock_timer_from_activity():
+    """Restart the configured lock delay after user activity."""
+    _schedule_lock()
+
+
+def _notify_lock_activity():
+    """Reset the daemon lock timer at most once per second during input activity."""
+    global _activity_reset_last
+    now = time.monotonic()
+    if now - _activity_reset_last < 1.0:
+        return False
+    _activity_reset_last = now
+    if _is_viewer_mode:
+        ok, error = _call_daemon("Activity")
+        if not ok:
+            _dbg(f"Could not reset daemon lock timer after activity: {error}")
+    else:
+        _reset_lock_timer_from_activity()
+    return True
 
 def _cancel_countdown_sources(label, sources, source_remove):
     """Cancel pending countdown callbacks and hide the warning label."""
@@ -2659,6 +2684,7 @@ def run_daemon():
                         <method name="Show"/>
                         <method name="Hide"/>
                         <method name="Toggle"/>
+                        <method name="Activity"/>
                         <method name="IsActive">
                           <arg type="b" name="active" direction="out"/>
                         </method>
@@ -2681,6 +2707,9 @@ def run_daemon():
                                     hide_viewer()
                                 else:
                                     show_viewer()
+                                invocation.return_value(None)
+                            elif method == "Activity":
+                                _reset_lock_timer_from_activity()
                                 invocation.return_value(None)
                             elif method == "IsActive":
                                 active = is_viewer_active()
