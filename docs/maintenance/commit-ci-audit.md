@@ -24,10 +24,10 @@ Persistent repository-specific record of commit-level CI checks and red-cross in
 
 - Repository: `SakibShahariar/material-screensaver`
 - Default branch: `master`
-- Checkpoint SHA: `5be984faac60e80ed9ecebd29ca5cf11f9ea5942`
+- Checkpoint SHA: `69a3aba75bb9a8f138ff4826ac5d789e69975f9e`
 - Initialized: 2026-11-02
 - Baseline correction: a workflow run for the checkpoint commit was later found and inspected; it failed in the test-suite step. The failure is recorded below rather than treating the earlier empty combined-status response as authoritative.
-- Next session: review commits after `5be984faac60e80ed9ecebd29ca5cf11f9ea5942`; retain the historical failures below for audit context.
+- Next session: review commits after `69a3aba75bb9a8f138ff4826ac5d789e69975f9e`; retain the historical failures below for audit context.
 
 ## Initial baseline
 
@@ -95,6 +95,8 @@ The lock-test fixture failure was resolved by `423eebf`; the GUI title-regex fai
 | `d5b1c33ac47226570555a11c0be41ba5de0d1c55` | test(perf): verify timer-paced frame scheduling (#38) | green | [41656290095](https://github.com/SakibShahariar/material-screensaver/actions/runs/41656290095) | Corrected the extraction regex and added deterministic timer/native-RAF harnesses; tests, lint, and repeated scene benchmark passed. |
 
 | `5be984faac60e80ed9ecebd29ca5cf11f9ea5942` | perf(ci): benchmark a focused Canvas animation scene (#44) | green | [41656846195](https://github.com/SakibShahariar/material-screensaver/actions/runs/41656846195) | Switched the Canvas sample to the RAF-driven flow scene; tests, lint, repeated benchmark, and artifact upload passed. |
+
+| `69a3aba75bb9a8f138ff4826ac5d789e69975f9e` | docs(perf): record first Canvas and WebGL CI baseline (#44) | green | [41657508932](https://github.com/SakibShahariar/material-screensaver/actions/runs/41657508932) | Recorded the first three-sample Canvas/WebGL CI median reference; tests and lint passed. |
 
 ### Failure record template
 

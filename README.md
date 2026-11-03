@@ -18,8 +18,10 @@ A few scenes from the collection:
 
 | | |
 |---|---|
-| ![Soft, translucent abstract forms.](screenshots/shot01.png) | ![A repeating geometric diamond pattern.](screenshots/shot02.png) |
-| ![A night skyline with illuminated windows.](screenshots/shot03.png) | ![Floating translucent bubbles.](screenshots/shot06.png) |
+| ![Soft, rounded color blobs swell and overlap, forming slow, liquid-like shapes.](screenshots/shot01.png) | ![A grid of diamond-shaped tiles slowly flips between two colors.](screenshots/shot02.png) |
+| ![A layered city skyline with lit windows sits beneath a sky that shifts between dusk and night.](screenshots/shot03.png) | ![Translucent bubbles of different sizes float upward and pop against a dark background.](screenshots/shot06.png) |
+| **Liquid Blobs** — Soft, rounded color blobs swell and overlap, forming slow, liquid-like shapes. | **Origami** — A grid of diamond-shaped tiles slowly flips between two colors. |
+| **City** — A layered city skyline with lit windows sits beneath a sky that shifts between dusk and night. | **Bubbles** — Translucent bubbles of different sizes float upward and pop against a dark background. |
 
 ## Features
 

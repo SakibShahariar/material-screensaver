@@ -241,6 +241,31 @@ def list_screensavers(screensaver_dir):
     return sorted(glob.glob(os.path.join(screensaver_dir, "*.html")))
 
 
+
+def load_scene_descriptions(screensaver_dir):
+    """Load concise visual descriptions keyed by built-in HTML scene filename."""
+    path = os.path.join(screensaver_dir, "scene-descriptions.json")
+    try:
+        with open(path, encoding="utf-8") as handle:
+            payload = json.load(handle)
+    except (OSError, json.JSONDecodeError):
+        return {}
+    if not isinstance(payload, dict) or payload.get("version") != 1:
+        return {}
+    raw = payload.get("descriptions")
+    if not isinstance(raw, dict):
+        return {}
+    return {
+        filename: description.strip()
+        for filename, description in raw.items()
+        if isinstance(filename, str)
+        and filename.endswith(".html")
+        and os.path.basename(filename) == filename
+        and isinstance(description, str)
+        and description.strip()
+        and len(description.strip()) <= 180
+    }
+
 def get_scene_options(config, scene):
     """Return validated option values for a scene, using schema defaults safely."""
     schema = SCENE_OPTION_SCHEMA.get(scene, {})

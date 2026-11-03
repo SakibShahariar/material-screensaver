@@ -403,6 +403,7 @@ class ScreensaverWindow(Adw.ApplicationWindow):
         sv_group.add(favorite_row)
 
         self.screensaver_files = list_screensavers()
+        self.scene_descriptions = config_store.load_scene_descriptions(SCREENSAVER_DIR)
         self.filtered_screensaver_files = list(self.screensaver_files)
         self.selected_scene = None
         self._picker_updating = False
@@ -866,11 +867,20 @@ class ScreensaverWindow(Adw.ApplicationWindow):
                 self.combo_row.set_model(Gtk.StringList.new([display_name(f) for f in filtered]))
                 selected = filtered.index(preserve_scene) if preserve_scene in filtered else Gtk.INVALID_LIST_POSITION
                 self.combo_row.set_selected(selected)
-                subtitle = "" if preserve_scene in filtered else "Current selection is hidden by filters; it has not changed"
+                description = self.scene_descriptions.get(preserve_scene, "")
+                if preserve_scene in filtered:
+                    subtitle = description
+                else:
+                    subtitle = "Current selection is hidden by filters; it has not changed"
+                    if description:
+                        subtitle += " — " + description
             else:
                 self.combo_row.set_model(Gtk.StringList.new(["No matching scenes"]))
                 self.combo_row.set_selected(0)
                 subtitle = "No scenes match these filters; current selection is unchanged"
+                description = self.scene_descriptions.get(preserve_scene, "")
+                if description:
+                    subtitle += " — " + description
             self.combo_row.set_subtitle(subtitle)
             self.combo_row.set_sensitive(bool(filtered) and not self.random_switch.get_active())
         finally:
@@ -1201,6 +1211,9 @@ class ScreensaverWindow(Adw.ApplicationWindow):
         had_preview_override = self._preview_override is not None
         self._preview_override = None
         self.selected_scene = self.filtered_screensaver_files[idx]
+        self.combo_row.set_subtitle(
+            self.scene_descriptions.get(self.selected_scene, "")
+        )
         updates = {"active": self.selected_scene}
         if had_preview_override:
             updates["random"] = False
