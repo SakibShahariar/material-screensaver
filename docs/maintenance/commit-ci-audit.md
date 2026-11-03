@@ -83,6 +83,8 @@ The lock-test fixture failure was resolved by `423eebf`; the GUI title-regex fai
 | `2295a9dc94f828b804b89531fe57ad1665ad8572` | fix(ctl): throttle activity resets for short lock delays (#47) | red | [41652880519](https://github.com/SakibShahariar/material-screensaver/actions/runs/41652880519) | Tests and lint failed because a literal `\\n` was inserted into a Python condition; syntax error. |
 | `816826d5f0e96f470a19d8653aa638bf70855b9e` | fix(ctl): correct activity throttle condition syntax (#47) | green | [41653026291](https://github.com/SakibShahariar/material-screensaver/actions/runs/41653026291) | Replaced the escaped sequence with a real multiline condition; tests and lint passed. |
 
+| `419563f6116c2449263c9e272ab43889b1cc7f4c` | perf(ci): collect scene startup CPU and memory baselines (#44) | pending | [41654229895](https://github.com/SakibShahariar/material-screensaver/actions/runs/41654229895) | Added a headless WebKit performance sampler and CI artifact; first workflow run is still in progress. |
+
 ### Failure record template
 
 - Commit SHA:

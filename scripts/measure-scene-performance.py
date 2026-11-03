@@ -103,7 +103,7 @@ def _webviews_from_windows(windows):
     return views
 
 
-def _measure_one(ctl, Gtk, GLib, scene_path: Path, fps: int, warmup: int, duration: int):
+def _measure_one(ctl, Gtk, GLib, WebKit, scene_path: Path, fps: int, warmup: int, duration: int):
     config = dict(ctl.DEFAULT_CONFIG)
     config.update({
         "fps_limit": fps,
@@ -124,7 +124,14 @@ def _measure_one(ctl, Gtk, GLib, scene_path: Path, fps: int, warmup: int, durati
     state = {"loaded": False, "startup_ms": None, "before": None, "after": None,
              "elapsed": None, "timed_out": False}
 
+    timeout_id = None
+
     def finish_sample():
+        if timeout_id is not None:
+            try:
+                GLib.source_remove(timeout_id)
+            except Exception:
+                pass
         state["after"] = _sample_process_tree(ctl)
         state["elapsed"] = time.monotonic() - state["sample_started"]
         loop.quit()
@@ -137,7 +144,7 @@ def _measure_one(ctl, Gtk, GLib, scene_path: Path, fps: int, warmup: int, durati
         return GLib.SOURCE_REMOVE
 
     def on_load_changed(_view, event):
-        if event == ctl._webkit_load_finished and not state["loaded"]:
+        if event == WebKit.LoadEvent.FINISHED and not state["loaded"]:
             state["loaded"] = True
             state["startup_ms"] = round((time.perf_counter() - started) * 1000, 2)
             GLib.timeout_add_seconds(warmup, begin_sample)
@@ -151,27 +158,21 @@ def _measure_one(ctl, Gtk, GLib, scene_path: Path, fps: int, warmup: int, durati
             loop.quit()
         return GLib.SOURCE_REMOVE
 
-    GLib.timeout_add_seconds(max(30, warmup + duration + 20), on_timeout)
+    timeout_id = GLib.timeout_add_seconds(max(30, warmup + duration + 20), on_timeout)
     try:
         loop.run()
     finally:
-        for window in windows:
-            try:
-                overlay = window.get_child()
-                view = overlay.get_child() if overlay is not None else None
-                if view is not None:
-                    try:
-                        view.terminate_web_process()
-                    except Exception:
-                        pass
-                    try:
-                        view.run_dispose()
-                    except Exception:
-                        pass
-                window.close()
-                window.run_dispose()
-            except Exception:
-                pass
+        try:
+            # Use the application's own teardown path so fullscreen retries,
+            # WebKit helpers, and pending GLib sources are cleaned consistently.
+            ctl.hide_viewer()
+        except Exception:
+            for window in windows:
+                try:
+                    window.close()
+                    window.run_dispose()
+                except Exception:
+                    pass
         ctl._viewer_windows = []
         ctl._is_showing = False
         ctl._ephemeral_ctx = None
@@ -232,7 +233,7 @@ def main(argv=None) -> int:
             return 2
         for fps in fps_values:
             print(f"Measuring {scene_name} at {fps} FPS...", file=sys.stderr, flush=True)
-            samples.append(_measure_one(ctl, Gtk, GLib, scene_path, fps, args.warmup, args.duration))
+            samples.append(_measure_one(ctl, Gtk, GLib, WebKit, scene_path, fps, args.warmup, args.duration))
 
     report = {
         "schema_version": 1,
