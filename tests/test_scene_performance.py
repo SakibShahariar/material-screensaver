@@ -39,5 +39,22 @@ class TestScenePerformanceMetrics(unittest.TestCase):
         self.assertEqual(metrics["rss_end_mib_sum"], 6.0)
 
 
+    def test_repeated_samples_are_summarized_with_medians(self):
+        samples = [
+            {"scene": "scene.html", "fps_limit": 30, "startup_ms_to_load_finished": 100,
+             "cpu_percent_process_tree": 120, "rss_end_mib_sum": 200},
+            {"scene": "scene.html", "fps_limit": 30, "startup_ms_to_load_finished": 300,
+             "cpu_percent_process_tree": 160, "rss_end_mib_sum": 240},
+            {"scene": "scene.html", "fps_limit": 30, "startup_ms_to_load_finished": 200,
+             "cpu_percent_process_tree": 140, "rss_end_mib_sum": 220},
+        ]
+        summary = measure._summarize_repeated_samples(samples)
+        self.assertEqual(len(summary), 1)
+        self.assertEqual(summary[0]["sample_count"], 3)
+        self.assertEqual(summary[0]["startup_ms_median"], 200)
+        self.assertEqual(summary[0]["cpu_percent_process_tree_median"], 140)
+        self.assertEqual(summary[0]["rss_end_mib_sum_median"], 220)
+
+
 if __name__ == "__main__":
     unittest.main(verbosity=2)

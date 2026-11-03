@@ -12,6 +12,7 @@ import importlib.util
 import json
 import os
 from pathlib import Path
+import statistics
 import sys
 import time
 
@@ -76,6 +77,31 @@ def _summarize_samples(before, after, elapsed_seconds: float, ticks_per_second: 
         "process_count_end": len(after),
         "cpu_processes_compared": len(shared),
     }
+
+
+def _summarize_repeated_samples(samples):
+    """Summarize repeated runs with medians rather than a single noisy sample."""
+    groups = {}
+    for sample in samples:
+        key = (sample["scene"], sample["fps_limit"])
+        groups.setdefault(key, []).append(sample)
+    summary = []
+    for (scene, fps), values in sorted(groups.items()):
+        summary.append({
+            "scene": scene,
+            "fps_limit": fps,
+            "sample_count": len(values),
+            "startup_ms_median": round(statistics.median(
+                value["startup_ms_to_load_finished"] for value in values
+            ), 2),
+            "cpu_percent_process_tree_median": round(statistics.median(
+                value["cpu_percent_process_tree"] for value in values
+            ), 2),
+            "rss_end_mib_sum_median": round(statistics.median(
+                value["rss_end_mib_sum"] for value in values
+            ), 2),
+        })
+    return summary
 
 
 def _load_ctl():
@@ -203,6 +229,7 @@ def main(argv=None) -> int:
     parser.add_argument("--fps", default="30,15", help="comma-separated FPS caps to sample")
     parser.add_argument("--duration", type=int, default=4, help="steady-state sample duration")
     parser.add_argument("--warmup", type=int, default=1, help="seconds to warm up after page load")
+    parser.add_argument("--repeat", type=int, default=3, help="independent samples per scene/FPS pair")
     parser.add_argument("--output", type=Path, help="optional JSON output path")
     args = parser.parse_args(argv)
     try:
@@ -211,8 +238,8 @@ def main(argv=None) -> int:
         parser.error("--fps must be a comma-separated list of integers")
     if not fps_values or any(value < 10 or value > 60 for value in fps_values):
         parser.error("FPS values must be between 10 and 60")
-    if args.duration < 1 or args.warmup < 0:
-        parser.error("--duration must be positive and --warmup cannot be negative")
+    if args.duration < 1 or args.warmup < 0 or args.repeat < 1:
+        parser.error("--duration must be positive, --warmup cannot be negative, and --repeat must be at least 1")
 
     try:
         import gi
@@ -232,8 +259,19 @@ def main(argv=None) -> int:
             print(f"error: required benchmark scene missing: {scene_path}", file=sys.stderr)
             return 2
         for fps in fps_values:
-            print(f"Measuring {scene_name} at {fps} FPS...", file=sys.stderr, flush=True)
-            samples.append(_measure_one(ctl, Gtk, GLib, WebKit, scene_path, fps, args.warmup, args.duration))
+            for repeat in range(1, args.repeat + 1):
+                print(
+                    f"Measuring {scene_name} at {fps} FPS "
+                    f"(sample {repeat}/{args.repeat})...",
+                    file=sys.stderr,
+                    flush=True,
+                )
+                sample = _measure_one(
+                    ctl, Gtk, GLib, WebKit, scene_path, fps,
+                    args.warmup, args.duration,
+                )
+                sample["repeat"] = repeat
+                samples.append(sample)
 
     report = {
         "schema_version": 1,
@@ -245,6 +283,7 @@ def main(argv=None) -> int:
             "budget_enforcement": "not enabled; collect repeatable baselines before choosing thresholds",
         },
         "samples": samples,
+        "summary_medians": _summarize_repeated_samples(samples),
     }
     rendered = json.dumps(report, indent=2) + "\n"
     if args.output:

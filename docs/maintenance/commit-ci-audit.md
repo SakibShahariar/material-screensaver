@@ -85,6 +85,10 @@ The lock-test fixture failure was resolved by `423eebf`; the GUI title-regex fai
 
 | `419563f6116c2449263c9e272ab43889b1cc7f4c` | perf(ci): collect scene startup CPU and memory baselines (#44) | pending | [41654229895](https://github.com/SakibShahariar/material-screensaver/actions/runs/41654229895) | Added a headless WebKit performance sampler and CI artifact; first workflow run is still in progress. |
 
+
+| `419563f6116c2449263c9e272ab43889b1cc7f4c` | perf(ci): collect scene startup CPU and memory baselines (#44) | red | [41654229895](https://github.com/SakibShahariar/material-screensaver/actions/runs/41654229895) | The first benchmark implementation used a nonexistent load-event constant and did not complete; corrected in the next commit. |
+| `675a0fcf80498f792b57f273f50d43d7271c194c` | fix(perf): use WebKit load events and viewer teardown (#44) | green | [41654457749](https://github.com/SakibShahariar/material-screensaver/actions/runs/41654457749) | Used the WebKit load-finished enum and the application's teardown path; tests, lint, benchmark, and artifact upload passed. |
+
 ### Failure record template
 
 - Commit SHA:

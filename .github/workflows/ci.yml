@@ -129,7 +129,7 @@ jobs:
           LIBGL_ALWAYS_SOFTWARE: "1"
         run: |
           xvfb-run -a /usr/bin/python3 scripts/measure-scene-performance.py \
-            --fps 30,15 --warmup 1 --duration 4 --output scene-performance.json
+            --fps 30,15 --warmup 1 --duration 4 --repeat 3 --output scene-performance.json
 
       - name: Upload scene performance measurements
         if: always()

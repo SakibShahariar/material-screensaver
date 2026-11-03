@@ -5,7 +5,7 @@ The CI workflow collects repeatable **headless** startup, CPU, and memory sample
 - `solar-system.html` — Canvas 2D
 - `organic-harmonic-field.html` — WebGL
 
-Each scene is measured at 30 FPS and 15 FPS using the same viewer setup and its injected frame-rate wrapper. CI uploads the JSON report as the `scene-performance-metrics` artifact.
+Each scene is measured three times at 30 FPS and 15 FPS using the same viewer setup and its injected frame-rate wrapper. The report includes every sample plus per-scene/FPS medians to reduce the influence of one-off runner noise. CI uploads the JSON report as the `scene-performance-metrics` artifact.
 
 ## Run locally
 
@@ -13,7 +13,7 @@ On a Linux desktop with GTK4, WebKitGTK 6.0, PyGObject, and Xvfb installed:
 
 ```sh
 LIBGL_ALWAYS_SOFTWARE=1 xvfb-run -a python3 scripts/measure-scene-performance.py \
-  --fps 30,15 --warmup 1 --duration 4 --output scene-performance.json
+  --fps 30,15 --warmup 1 --duration 4 --repeat 3 --output scene-performance.json
 ```
 
 The report includes time to WebKit load completion, aggregate process-tree CPU percentage, and summed resident memory at the start and end of the sample. CPU usage may exceed 100% when multiple processes use multiple cores. Summed RSS can count shared pages more than once.
