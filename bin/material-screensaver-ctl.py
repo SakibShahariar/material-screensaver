@@ -213,62 +213,99 @@ def _get_shared_context():
         _shared_web_context = None
     return _shared_web_context
 
-def _kill_orphan_webkit():
-    """Terminate lingering WebKit descendants without blocking the GLib loop.
+def _read_proc_process(proc_root, pid):
+    """Read the parent PID, command line, and kernel start time for one process."""
+    try:
+        with open(os.path.join(proc_root, str(pid), "stat"), encoding="utf-8") as stream:
+            stat = stream.read()
+        # comm is parenthesized and may itself contain spaces or ')'.
+        tail = stat[stat.rfind(")") + 2:].split()
+        # tail starts at stat field 3 (state); ppid is field 4 and
+        # starttime is field 22. starttime distinguishes a reused PID.
+        if len(tail) < 20:
+            return None
+        ppid = int(tail[1])
+        start_time = tail[19]
+        with open(os.path.join(proc_root, str(pid), "cmdline"), "rb") as stream:
+            raw_cmd = stream.read()
+        cmd = raw_cmd.replace(b"\\0", b" ").decode(errors="replace").strip()
+        return ppid, cmd, start_time
+    except (OSError, ValueError, IndexError):
+        return None
 
-    Linux /proc avoids spawning synchronous `ps` subprocesses. Matching
-    processes receive SIGTERM first; a GLib timeout sends SIGKILL only if the
-    same PID still has a matching command line, avoiding a blind delayed kill
-    if the PID has already been reused.
+
+def _proc_child_pids(proc_root, pid):
+    """Return child PIDs reported by each thread of one process."""
+    task_dir = os.path.join(proc_root, str(pid), "task")
+    try:
+        thread_ids = os.listdir(task_dir)
+    except OSError:
+        return set()
+
+    children = set()
+    for thread_id in thread_ids:
+        if not thread_id.isdigit():
+            continue
+        path = os.path.join(task_dir, thread_id, "children")
+        try:
+            with open(path, encoding="ascii") as stream:
+                children.update(int(value) for value in stream.read().split())
+        except (OSError, ValueError):
+            continue
+    return children
+
+
+def _discover_proc_descendants(proc_root, root_pid):
+    """Walk only this process tree using procfs child lists, not all of /proc."""
+    root_info = _read_proc_process(proc_root, root_pid)
+    if root_info is None:
+        return []
+
+    pending = [(root_pid, root_info[2])]
+    seen = {root_pid}
+    descendants = []
+    while pending:
+        parent_pid, parent_start = pending.pop()
+        parent_info = _read_proc_process(proc_root, parent_pid)
+        if parent_info is None or parent_info[2] != parent_start:
+            continue
+
+        child_pids = _proc_child_pids(proc_root, parent_pid)
+        # Do not trust a child list if the parent exited and its PID was reused
+        # while the list was being read.
+        parent_after = _read_proc_process(proc_root, parent_pid)
+        if parent_after is None or parent_after[2] != parent_start:
+            continue
+
+        for child_pid in child_pids:
+            if child_pid in seen:
+                continue
+            child_info = _read_proc_process(proc_root, child_pid)
+            if child_info is None or child_info[0] != parent_pid:
+                continue
+            seen.add(child_pid)
+            descendants.append((
+                child_pid, parent_pid, parent_start, child_info[2], child_info[1]
+            ))
+            pending.append((child_pid, child_info[2]))
+    return descendants
+
+
+def _kill_orphan_webkit(proc_root="/proc", root_pid=None, kill_process=None,
+                        schedule_force_kill=None):
+    """Terminate lingering WebKit descendants without scanning the system process table.
+
+    Walks the current process's procfs child lists, including children created
+    by non-leader threads. PID start times and parent identities are rechecked
+    before both SIGTERM and delayed SIGKILL so stale child-list entries and
+    reused PIDs cannot target unrelated processes.
     """
-    import os
     import signal
 
-    def _read_process(pid):
-        try:
-            with open(f"/proc/{pid}/stat", encoding="utf-8") as stream:
-                stat = stream.read()
-            # comm is parenthesized and may itself contain spaces or ')'.
-            tail = stat[stat.rfind(")") + 2:].split()
-            if len(tail) < 2:
-                return None
-            ppid = int(tail[1])
-            with open(f"/proc/{pid}/cmdline", "rb") as stream:
-                raw_cmd = stream.read()
-            cmd = raw_cmd.replace(b"\0", b" ").decode(errors="replace").strip()
-            return ppid, cmd
-        except (OSError, ValueError, IndexError):
-            return None
-
-    try:
-        process_entries = os.listdir("/proc")
-    except OSError:
-        return 0
-
-    process_info = {}
-    for entry in process_entries:
-        if not entry.isdigit():
-            continue
-        pid = int(entry)
-        info = _read_process(pid)
-        if info is not None:
-            process_info[pid] = info
-
-    # Walk all descendants, not just children and grandchildren: WebKit's
-    # sandbox helpers can add another process layer on some distributions.
-    children = {}
-    for pid, (ppid, _cmd) in process_info.items():
-        children.setdefault(ppid, []).append(pid)
-    descendants = []
-    pending = list(children.get(os.getpid(), ()))
-    seen = set()
-    while pending:
-        pid = pending.pop()
-        if pid in seen:
-            continue
-        seen.add(pid)
-        descendants.append(pid)
-        pending.extend(children.get(pid, ()))
+    if root_pid is None:
+        root_pid = os.getpid()
+    if kill_process is None:
+        kill_process = os.kill
 
     def _is_webkit_helper(cmd):
         return ("WebKitNetworkProcess" in cmd
@@ -277,44 +314,55 @@ def _kill_orphan_webkit():
                 or "WebKitGTK" in cmd)
 
     to_reap = []
-    for pid in descendants:
-        cmd = process_info[pid][1]
-        if not _is_webkit_helper(cmd):
+    for pid, parent_pid, parent_start, process_start, original_cmd in (
+        _discover_proc_descendants(proc_root, root_pid)
+    ):
+        parent_now = _read_proc_process(proc_root, parent_pid)
+        current = _read_proc_process(proc_root, pid)
+        if (parent_now is None or parent_now[2] != parent_start
+                or current is None or current[0] != parent_pid
+                or current[2] != process_start or current[1] != original_cmd
+                or not _is_webkit_helper(current[1])):
             continue
         try:
-            os.kill(pid, signal.SIGTERM)
-            to_reap.append((pid, cmd))
+            kill_process(pid, signal.SIGTERM)
+            to_reap.append((pid, parent_pid, parent_start, process_start, original_cmd))
         except (ProcessLookupError, PermissionError, OSError):
             continue
 
     if to_reap:
-        try:
-            import gi
-            gi.require_version("GLib", "2.0")
-            from gi.repository import GLib
+        def _force_kill():
+            for pid, parent_pid, parent_start, process_start, original_cmd in to_reap:
+                parent_now = _read_proc_process(proc_root, parent_pid)
+                current = _read_proc_process(proc_root, pid)
+                if (parent_now is None or parent_now[2] != parent_start
+                        or current is None or current[0] != parent_pid
+                        or current[2] != process_start or current[1] != original_cmd
+                        or not _is_webkit_helper(current[1])):
+                    continue
+                try:
+                    kill_process(pid, signal.SIGKILL)
+                except (ProcessLookupError, PermissionError, OSError):
+                    pass
+            return False
 
-            def _force_kill():
-                for pid, original_cmd in to_reap:
-                    current = _read_process(pid)
-                    if current is None or not _is_webkit_helper(current[1]):
-                        continue
-                    # Require a matching process identity, not just a reused PID.
-                    if current[1] != original_cmd:
-                        continue
-                    try:
-                        os.kill(pid, signal.SIGKILL)
-                    except (ProcessLookupError, PermissionError, OSError):
-                        pass
-                return GLib.SOURCE_REMOVE
-
-            GLib.timeout_add(150, _force_kill)
-        except Exception:
-            # If GLib is unavailable, leave SIGTERM to complete naturally rather
-            # than block this caller with sleep() or immediately escalate.
-            pass
+        if schedule_force_kill is None:
+            try:
+                import gi
+                gi.require_version("GLib", "2.0")
+                from gi.repository import GLib
+                schedule_force_kill = lambda callback: GLib.timeout_add(150, callback)
+            except Exception:
+                # If GLib is unavailable, leave SIGTERM to complete naturally.
+                schedule_force_kill = None
+        if schedule_force_kill is not None:
+            try:
+                schedule_force_kill(_force_kill)
+            except Exception:
+                # Do not block the GTK loop or escalate synchronously.
+                pass
 
     return len(to_reap)
-
 def _battery_policy_label(cfg, battery_saving):
     """Return a concise overlay label only when battery FPS reduction is active."""
     if not battery_saving:

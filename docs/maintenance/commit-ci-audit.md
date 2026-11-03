@@ -24,10 +24,10 @@ Persistent repository-specific record of commit-level CI checks and red-cross in
 
 - Repository: `SakibShahariar/material-screensaver`
 - Default branch: `master`
-- Checkpoint SHA: `3540595a6b72aad4a12f3cea79dab1d2c3c89519`
+- Checkpoint SHA: `14bcaaba2f45acb3d97865e4b624f36e132262e4`
 - Initialized: 2026-11-02
 - Baseline correction: a workflow run for the checkpoint commit was later found and inspected; it failed in the test-suite step. The failure is recorded below rather than treating the earlier empty combined-status response as authoritative.
-- Next session: review commits after `3540595a6b72aad4a12f3cea79dab1d2c3c89519`; retain the historical failures below for audit context.
+- Next session: review commits after `14bcaaba2f45acb3d97865e4b624f36e132262e4`; retain the historical failures below for audit context.
 
 ## Initial baseline
 
@@ -60,6 +60,14 @@ The following commits all have an observed failed test job and successful lint j
 | `31593d7c6070a55a47eac129f53c9a40b03e3726` | test(gui): exercise debounced filter callback (#62) | green | [41646183571](https://github.com/SakibShahariar/material-screensaver/actions/runs/41646183571) | Corrected test fixture; tests and lint passed. |
 
 The lock-test fixture failure was resolved by `423eebf`; the GUI title-regex failure by `779623c`; the config-snapshot test assertion failure by `0e63ed3`; and the debounce test fixture failure by `31593d7`. The checkpoint advances through the last fully verified commit. The next substantive commit remains outside this checkpoint until its own CI result is observed.
+
+| `ca24a0968bd42f6ec721badcaa8f129ba80974da` | perf(ctl): cache UPower state for viewer setup (#63) | red | [41646623211](https://github.com/SakibShahariar/material-screensaver/actions/runs/41646623211) | Tests failed because a mock command result used a literal escaped newline, so the parser did not see a state line. |
+| `3540595a6b72aad4a12f3cea79dab1d2c3c89519` | test(ctl): provide realistic UPower output (#63) | green | [41646860228](https://github.com/SakibShahariar/material-screensaver/actions/runs/41646860228) | Corrected mock stdout; tests and lint passed. |
+
+### README streamlining follow-up
+
+| `eb19a5567b1b03918d45cbdb508a4896f32c758b` | docs: streamline README and move troubleshooting details | red | [41649597941](https://github.com/SakibShahariar/material-screensaver/actions/runs/41649597941) | Lint passed; tests failed because the shortened README omitted the reduced-motion cap description expected by an existing test. |
+| `14bcaaba2f45acb3d97865e4b624f36e132262e4` | docs: restore reduced-motion detail and audit CI failure | green | [41650136466](https://github.com/SakibShahariar/material-screensaver/actions/runs/41650136466) | Restored the 10 FPS detail; tests and lint passed. |
 
 | `ca24a0968bd42f6ec721badcaa8f129ba80974da` | perf(ctl): cache UPower state for viewer setup (#63) | red | [41646623211](https://github.com/SakibShahariar/material-screensaver/actions/runs/41646623211) | Tests failed because a mock command result used a literal escaped newline, so the parser did not see a state line. |
 | `3540595a6b72aad4a12f3cea79dab1d2c3c89519` | test(ctl): provide realistic UPower output (#63) | green | [41646860228](https://github.com/SakibShahariar/material-screensaver/actions/runs/41646860228) | Corrected mock stdout; tests and lint passed. |
