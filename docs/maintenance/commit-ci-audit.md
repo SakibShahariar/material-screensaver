@@ -90,6 +90,8 @@ The lock-test fixture failure was resolved by `423eebf`; the GUI title-regex fai
 | `675a0fcf80498f792b57f273f50d43d7271c194c` | fix(perf): use WebKit load events and viewer teardown (#44) | green | [41654457749](https://github.com/SakibShahariar/material-screensaver/actions/runs/41654457749) | Used the WebKit load-finished enum and the application's teardown path; tests, lint, benchmark, and artifact upload passed. |
 | `e2b5cd0facd475e945f847d84f61e638ccb7f07c` | perf(ci): repeat scene samples and report medians (#44) | green | [41655018836](https://github.com/SakibShahariar/material-screensaver/actions/runs/41655018836) | Three samples per scene/FPS pair; median startup, CPU, and RSS metrics reported and uploaded as an artifact. Tests, lint, and benchmark passed. |
 
+| `d422454238068f55f3f457c6a90f6cabb34e6dab` | perf(ctl): avoid display-rate polling in FPS throttle (#38) | pending | [workflow pending](https://github.com/SakibShahariar/material-screensaver/actions) | Replaced repeated native RAF polling with interval-based timer pacing; automated test verification pending. |
+
 ### Failure record template
 
 - Commit SHA:

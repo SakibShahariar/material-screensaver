@@ -363,7 +363,7 @@ class TestJsSyntax(unittest.TestCase):
     def _fps_throttle_harness(self, fps, assertions):
         source = _read(os.path.join(support.REPO_ROOT, "bin", "material-screensaver-ctl.py"))
         match = re.search(
-            r'fps_script = """(.*?)""".replace\\("__FPS_LIMIT__", str\\(fps_limit\\)\\)',
+            r'fps_script = """(.*?)""".replace\("__FPS_LIMIT__", str\(fps_limit\)\)',
             source,
             re.S,
         )
@@ -390,6 +390,7 @@ global.window = {
   },
   clearTimeout(id) { timers.delete(id); },
 };
+global.performance = window.performance;
 function runFrame(timestamp = now) {
   const next = nativeFrames.entries().next().value;
   if (!next) throw new Error("no native animation frame was scheduled");
@@ -429,12 +430,17 @@ window.requestAnimationFrame(timestamp => delivered.push(timestamp));
 if (nativeFrames.size !== 1) throw new Error("first frame was not scheduled immediately");
 runFrame(0);
 if (delivered.length !== 1 || delivered[0] !== 0) throw new Error("first frame was not delivered");
-window.requestAnimationFrame(timestamp => delivered.push(timestamp));
+const waitingId = window.requestAnimationFrame(() => delivered.push("cancelled while waiting"));
 if (nativeFrames.size !== 0 || timers.size !== 1) {
   throw new Error("capped scheduler kept requesting native 60 Hz frames instead of waiting");
 }
 const delay = timers.values().next().value.delay;
 if (delay < 33) throw new Error("30 FPS pacing delay was too short: " + delay);
+window.cancelAnimationFrame(waitingId);
+if (timers.size !== 0 || nativeFrames.size !== 0) {
+  throw new Error("cancelling a waiting callback did not clear its pacing timer");
+}
+window.requestAnimationFrame(timestamp => delivered.push(timestamp));
 runTimer();
 runFrame(now);
 if (delivered.length !== 2 || delivered[1] < 33) {
