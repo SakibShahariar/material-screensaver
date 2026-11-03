@@ -46,6 +46,86 @@ class TestGuiLogic(unittest.TestCase):
         with open(self.gui.CONFIG_PATH, "w", encoding="utf-8") as f:
             json.dump(data, f)
 
+    def test_settings_search_debounce_coalesces_rapid_changes(self):
+        original_glib = self.gui.GLib
+        original_match = self.gui.settings_group_matches
+
+        class FakeGLib:
+            SOURCE_REMOVE = False
+            callbacks = {}
+            removed = []
+            next_id = 1
+
+            @classmethod
+            def timeout_add(cls, delay, callback):
+                callback_id = cls.next_id
+                cls.next_id += 1
+                cls.callbacks[callback_id] = (delay, callback)
+                return callback_id
+
+            @classmethod
+            def source_remove(cls, callback_id):
+                cls.removed.append(callback_id)
+                cls.callbacks.pop(callback_id, None)
+                return True
+
+        class FakeSearchEntry:
+            value = ""
+
+            def get_text(self):
+                return self.value
+
+        class FakeGroup:
+            def __init__(self):
+                self.visible = None
+
+            def set_visible(self, visible):
+                self.visible = visible
+
+        group = FakeGroup()
+        search = FakeSearchEntry()
+        rebuilds = []
+        matches = []
+
+        class FakeWindow:
+            selected_scene = "scene.html"
+            _settings_search_timeout_id = None
+            _settings_search_groups = [group]
+            search_entry = search
+
+            @staticmethod
+            def _rebuild_screensaver_picker(scene):
+                rebuilds.append(scene)
+
+        def match(_group, query):
+            matches.append(query)
+            return query == "fps"
+
+        self.gui.GLib = FakeGLib
+        self.gui.settings_group_matches = match
+        try:
+            search.value = "f"
+            self.gui.ScreensaverWindow.on_picker_filter_changed(FakeWindow)
+            first_id = FakeWindow._settings_search_timeout_id
+            search.value = "fps"
+            self.gui.ScreensaverWindow.on_picker_filter_changed(FakeWindow)
+            second_id = FakeWindow._settings_search_timeout_id
+
+            self.assertNotEqual(first_id, second_id)
+            self.assertEqual(FakeGLib.removed, [first_id])
+            self.assertEqual(rebuilds, [])
+            self.assertEqual(matches, [])
+
+            _delay, callback = FakeGLib.callbacks[second_id]
+            self.assertFalse(callback())
+            self.assertEqual(rebuilds, ["scene.html"])
+            self.assertEqual(matches, ["fps"])
+            self.assertTrue(group.visible)
+            self.assertIsNone(FakeWindow._settings_search_timeout_id)
+        finally:
+            self.gui.GLib = original_glib
+            self.gui.settings_group_matches = original_match
+
     def test_settings_search_matches_descendant_labels(self):
         class FakeWidget:
             def __init__(self, title="", children=()):

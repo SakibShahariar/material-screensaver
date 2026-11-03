@@ -24,10 +24,10 @@ Persistent repository-specific record of commit-level CI checks and red-cross in
 
 - Repository: `SakibShahariar/material-screensaver`
 - Default branch: `master`
-- Checkpoint SHA: `44ec3498851aff1735124f2d80ef232f35af6c84`
+- Checkpoint SHA: `0e63ed30c42ccbab98860f82db4f6bd4ec5543a1`
 - Initialized: 2026-11-02
 - Baseline correction: a workflow run for the checkpoint commit was later found and inspected; it failed in the test-suite step. The failure is recorded below rather than treating the earlier empty combined-status response as authoritative.
-- Next session: review commits after this checkpoint, including the ledger and `AGENTS.md` setup commits; investigate any older red/pending commit specifically identified by the owner.
+- Next session: review commits after `0e63ed30c42ccbab98860f82db4f6bd4ec5543a1`; retain the historical failures below for audit context.
 
 ## Initial baseline
 
@@ -46,7 +46,17 @@ The following commits all have an observed failed test job and successful lint j
 | `ffb4e1bd8cb11bba701086956712ab0f104a9b47` | docs: define issue triage categories | red | [41573380962](https://github.com/SakibShahariar/material-screensaver/actions/runs/41573380962) | tests / Run test suite |
 | `aaff2f7ec7fd9110075b4dcc6a301e25246b1083` | docs(agents): define administrative commit hygiene | red | [41597938193](https://github.com/SakibShahariar/material-screensaver/actions/runs/41597938193) | tests / Run test suite |
 
-Fix commit and rerun outcome will be appended after verification.
+### 2026-11-03 follow-up audit
+
+| Commit SHA | Subject | CI result | Workflow run | Outcome |
+|---|---|---|---|---|
+| `423eebfea83295f4f4949806623f5b094074619a` | test(lock): isolate viewer state between lock cases (#8) | green | [41644027097](https://github.com/SakibShahariar/material-screensaver/actions/runs/41644027097) | Tests and lint passed; repaired shared test-fixture state leakage. |
+| `34ae3fe8f490a7bdb6146e861ae2cffc63f8a386` | perf(gui): cache scene titles between searches (#59) | red | [41644489962](https://github.com/SakibShahariar/material-screensaver/actions/runs/41644489962) | Tests failed because the title regex was over-escaped; fallback titles appeared instead of HTML titles. |
+| `779623c6f085247b8c0f9e0b83cbd96242ffed4d` | fix(gui): preserve scene title matching in cache (#59) | green | [41644554326](https://github.com/SakibShahariar/material-screensaver/actions/runs/41644554326) | Corrected regex; tests and lint passed. |
+| `a78e130f1b626369e4fc14a1357fc0a11860dc71` | perf(ctl): reuse one config snapshot per viewer setup (#61) | red | [41645272969](https://github.com/SakibShahariar/material-screensaver/actions/runs/41645272969) | Tests exposed stale source assertions after config reads moved to the shared snapshot; implementation lint passed. |
+| `0e63ed30c42ccbab98860f82db4f6bd4ec5543a1` | test(ctl): align config snapshot assertions (#61) | green | [41645513300](https://github.com/SakibShahariar/material-screensaver/actions/runs/41645513300) | Updated static assertions; tests and lint passed. |
+
+The lock-test fixture failure recorded above was resolved by `423eebf`. The GUI title-regex failure was resolved by `779623c`. The config-snapshot test assertion failure was resolved by `0e63ed3`. The checkpoint now advances through the last fully verified commit; the next substantive commit remains outside this checkpoint until its own CI result is observed.
 
 ### Failure record template
 

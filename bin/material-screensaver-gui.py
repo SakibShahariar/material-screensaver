@@ -300,6 +300,7 @@ class ScreensaverWindow(Adw.ApplicationWindow):
 
         page = Adw.PreferencesPage()
         self._settings_search_groups = []
+        self._settings_search_timeout_id = None
 
         # First-run guide stays out of the way once dismissed or setup is complete.
         self.onboarding_group = None
@@ -686,6 +687,12 @@ class ScreensaverWindow(Adw.ApplicationWindow):
         self.battery_status_row.set_subtitle(status)
 
     def _save_window_size_on_close(self, *_args):
+        if self._settings_search_timeout_id is not None:
+            try:
+                GLib.source_remove(self._settings_search_timeout_id)
+            except Exception:
+                pass
+            self._settings_search_timeout_id = None
         width, height = self.get_width(), self.get_height()
         if width > 0 and height > 0:
             try:
@@ -872,10 +879,22 @@ class ScreensaverWindow(Adw.ApplicationWindow):
             self._update_preview()
 
     def on_picker_filter_changed(self, *_args):
+        if self._settings_search_timeout_id is not None:
+            try:
+                GLib.source_remove(self._settings_search_timeout_id)
+            except Exception:
+                pass
+        self._settings_search_timeout_id = GLib.timeout_add(
+            150, self._apply_picker_filter_change
+        )
+
+    def _apply_picker_filter_change(self):
+        self._settings_search_timeout_id = None
         self._rebuild_screensaver_picker(self.selected_scene)
         query = self.search_entry.get_text()
         for group in self._settings_search_groups:
             group.set_visible(settings_group_matches(group, query))
+        return GLib.SOURCE_REMOVE
 
     def _refresh_favorite_button(self):
         favorites = load_config().get("favorites", [])
