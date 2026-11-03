@@ -14,6 +14,7 @@ from gi.repository import Gtk, Adw, GLib, Gio, Gdk
 import argparse
 import os
 import sys
+import time
 import json
 import material_screensaver_config as config_store
 import random
@@ -31,6 +32,8 @@ WINDOW_STATE_PATH = os.path.expanduser("~/.config/material-screensaver/window-st
 DEFAULT_WINDOW_SIZE = (480, 600)
 WINDOW_SIZE_BOUNDS = ((480, 1600), (600, 1200))
 REQUESTED_PREVIEW = None
+_BATTERY_STATE_CACHE_TTL = 30.0
+_battery_state_cache = None  # (monotonic timestamp, bool | None)
 
 KEYBINDING_PATH = "/org/gnome/settings-daemon/plugins/media-keys/custom-keybindings/material-screensaver/"
 KEYBINDING_PARENT_SCHEMA = "org.gnome.settings-daemon.plugins.media-keys"
@@ -117,8 +120,20 @@ def display_name(filename):
     _DISPLAY_NAME_CACHE[scene_path] = (signature, title)
     return title
 
+def _battery_cache_now():
+    return time.monotonic()
+
+
 def query_battery_discharging():
-    """Return True/False from UPower, or None when power state is unavailable."""
+    """Return cached UPower state for 30 seconds; None means unavailable/unknown."""
+    global _battery_state_cache
+    now = _battery_cache_now()
+    if _battery_state_cache is not None:
+        checked_at, cached_state = _battery_state_cache
+        if now - checked_at < _BATTERY_STATE_CACHE_TTL:
+            return cached_state
+
+    state = None
     try:
         result = subprocess.run(
             ["upower", "-i", "/org/freedesktop/UPower/devices/DisplayDevice"],
@@ -128,14 +143,16 @@ def query_battery_discharging():
             for line in result.stdout.splitlines():
                 key, sep, value = line.strip().partition(":")
                 if sep and key.strip() == "state":
-                    state = value.strip().lower()
-                    if state == "discharging":
-                        return True
-                    if state in ("charging", "fully-charged", "pending-charge", "pending-discharge"):
-                        return False
+                    power_state = value.strip().lower()
+                    if power_state == "discharging":
+                        state = True
+                    elif power_state in ("charging", "fully-charged", "pending-charge", "pending-discharge"):
+                        state = False
+                    break
     except (OSError, subprocess.SubprocessError):
         pass
-    return None
+    _battery_state_cache = (now, state)
+    return state
 
 
 def normalize_window_size(data):

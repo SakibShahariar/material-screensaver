@@ -34,12 +34,14 @@ class TestGuiLogic(unittest.TestCase):
     def setUp(self):
         self._tmp = tempfile.TemporaryDirectory(prefix="ms-gui-")
         self.gui.CONFIG_PATH = os.path.join(self._tmp.name, "config.json")
+        self.gui._battery_state_cache = None
         self.gui.SCREENSAVER_DIR = os.path.join(self._tmp.name, "savers")
         os.makedirs(self.gui.SCREENSAVER_DIR, exist_ok=True)
 
     def tearDown(self):
         self._tmp.cleanup()
         self.gui.CONFIG_PATH = os.path.expanduser("~/.config/material-screensaver/config.json")
+        self.gui._battery_state_cache = None
         self.gui.SCREENSAVER_DIR = os.path.expanduser("~/.local/share/material-screensaver/screensavers")
 
     def _write(self, data):
@@ -185,14 +187,47 @@ class TestGuiLogic(unittest.TestCase):
                 stdout = "state: discharging\n"
             self.gui.subprocess.run = lambda *_args, **_kwargs: Result()
             self.assertIs(self.gui.query_battery_discharging(), True)
+            self.gui._battery_state_cache = None
             Result.stdout = "state: fully-charged\n"
             self.assertIs(self.gui.query_battery_discharging(), False)
+            self.gui._battery_state_cache = None
             Result.returncode = 1
             self.assertIsNone(self.gui.query_battery_discharging())
+            self.gui._battery_state_cache = None
             self.gui.subprocess.run = lambda *_args, **_kwargs: (_ for _ in ()).throw(TimeoutError())
             self.assertIsNone(self.gui.query_battery_discharging())
         finally:
             self.gui.subprocess.run = original
+
+    def test_query_battery_state_is_cached_until_expiry(self):
+        original_run = self.gui.subprocess.run
+        original_clock = self.gui._battery_cache_now
+        self.gui._battery_state_cache = None
+        now = [50.0]
+        calls = []
+
+        class Result:
+            returncode = 0
+            stdout = "state: discharging\\n"
+
+        def fake_run(*_args, **_kwargs):
+            calls.append(True)
+            return Result()
+
+        self.gui._battery_cache_now = lambda: now[0]
+        self.gui.subprocess.run = fake_run
+        try:
+            self.assertIs(self.gui.query_battery_discharging(), True)
+            self.assertIs(self.gui.query_battery_discharging(), True)
+            self.assertEqual(len(calls), 1)
+            now[0] += self.gui._BATTERY_STATE_CACHE_TTL + 1
+            Result.stdout = "state: fully-charged\\n"
+            self.assertIs(self.gui.query_battery_discharging(), False)
+            self.assertEqual(len(calls), 2)
+        finally:
+            self.gui.subprocess.run = original_run
+            self.gui._battery_cache_now = original_clock
+            self.gui._battery_state_cache = None
 
     def test_query_battery_unknown_and_missing_command_are_unavailable(self):
         original = self.gui.subprocess.run
@@ -203,8 +238,10 @@ class TestGuiLogic(unittest.TestCase):
 
             self.gui.subprocess.run = lambda *_args, **_kwargs: Result()
             self.assertIsNone(self.gui.query_battery_discharging())
+            self.gui._battery_state_cache = None
             Result.stdout = ""
             self.assertIsNone(self.gui.query_battery_discharging())
+            self.gui._battery_state_cache = None
             self.gui.subprocess.run = lambda *_args, **_kwargs: (_ for _ in ()).throw(FileNotFoundError())
             self.assertIsNone(self.gui.query_battery_discharging())
         finally:

@@ -28,6 +28,7 @@ import subprocess
 import atexit
 import signal
 import tempfile
+import time
 from urllib.parse import urlencode
 
 SCREENSAVER_DIR = os.path.expanduser("~/.local/share/material-screensaver/screensavers")
@@ -60,6 +61,8 @@ _viewer_child_watch_id = None  # GLib child-watch source; removed before synchro
 _ephemeral_ctx = None  # single ephemeral WebContext reused across Shows (fixes per-Show leak)
 _is_viewer_mode = False  # True in viewer subprocess (isolated WebKit, daemon stays lean)
 _viewer_loop = None  # GLib.MainLoop for viewer subprocess
+_BATTERY_STATE_CACHE_TTL = 30.0
+_battery_state_cache = None  # (monotonic timestamp, bool | None)
 
 _valid_int = config_store._valid_int
 normalize_config = config_store.normalize_config
@@ -322,8 +325,20 @@ def _battery_policy_label(cfg, battery_saving):
     return f"Battery saver active · FPS cap {min(fps_limit, 15)}"
 
 
+def _battery_cache_now():
+    return time.monotonic()
+
+
 def _battery_is_discharging():
-    """Return True/False from UPower, or None when battery state is unknown."""
+    """Return cached UPower state for 30 seconds; None means unavailable/unknown."""
+    global _battery_state_cache
+    now = _battery_cache_now()
+    if _battery_state_cache is not None:
+        checked_at, cached_state = _battery_state_cache
+        if now - checked_at < _BATTERY_STATE_CACHE_TTL:
+            return cached_state
+
+    state = None
     try:
         result = subprocess.run(
             ["upower", "-i", "/org/freedesktop/UPower/devices/DisplayDevice"],
@@ -333,14 +348,16 @@ def _battery_is_discharging():
             for line in result.stdout.splitlines():
                 key, sep, value = line.strip().partition(":")
                 if sep and key.strip() == "state":
-                    state = value.strip().lower()
-                    if state == "discharging":
-                        return True
-                    if state in ("charging", "fully-charged", "pending-charge", "pending-discharge"):
-                        return False
+                    power_state = value.strip().lower()
+                    if power_state == "discharging":
+                        state = True
+                    elif power_state in ("charging", "fully-charged", "pending-charge", "pending-discharge"):
+                        state = False
+                    break
     except (OSError, subprocess.SubprocessError) as exc:
         _dbg(f"Could not query UPower battery state: {exc}")
-    return None
+    _battery_state_cache = (now, state)
+    return state
 
 
 def _create_viewer_windows(html_path, clock_format="24h", scene_options=None, viewer_cfg=None):

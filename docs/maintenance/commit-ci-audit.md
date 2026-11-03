@@ -24,10 +24,10 @@ Persistent repository-specific record of commit-level CI checks and red-cross in
 
 - Repository: `SakibShahariar/material-screensaver`
 - Default branch: `master`
-- Checkpoint SHA: `0e63ed30c42ccbab98860f82db4f6bd4ec5543a1`
+- Checkpoint SHA: `31593d7c6070a55a47eac129f53c9a40b03e3726`
 - Initialized: 2026-11-02
 - Baseline correction: a workflow run for the checkpoint commit was later found and inspected; it failed in the test-suite step. The failure is recorded below rather than treating the earlier empty combined-status response as authoritative.
-- Next session: review commits after `0e63ed30c42ccbab98860f82db4f6bd4ec5543a1`; retain the historical failures below for audit context.
+- Next session: review commits after `31593d7c6070a55a47eac129f53c9a40b03e3726`; retain the historical failures below for audit context.
 
 ## Initial baseline
 
@@ -56,7 +56,10 @@ The following commits all have an observed failed test job and successful lint j
 | `a78e130f1b626369e4fc14a1357fc0a11860dc71` | perf(ctl): reuse one config snapshot per viewer setup (#61) | red | [41645272969](https://github.com/SakibShahariar/material-screensaver/actions/runs/41645272969) | Tests exposed stale source assertions after config reads moved to the shared snapshot; implementation lint passed. |
 | `0e63ed30c42ccbab98860f82db4f6bd4ec5543a1` | test(ctl): align config snapshot assertions (#61) | green | [41645513300](https://github.com/SakibShahariar/material-screensaver/actions/runs/41645513300) | Updated static assertions; tests and lint passed. |
 
-The lock-test fixture failure recorded above was resolved by `423eebf`. The GUI title-regex failure was resolved by `779623c`. The config-snapshot test assertion failure was resolved by `0e63ed3`. The checkpoint now advances through the last fully verified commit; the next substantive commit remains outside this checkpoint until its own CI result is observed.
+| `594faa8b64a59ed673d073c6db4bc46abd4c8e2d` | perf(gui): debounce settings group filtering (#62) | red | [41645968803](https://github.com/SakibShahariar/material-screensaver/actions/runs/41645968803) | Test fixture lacked the debounced callback method; product code lint passed. |
+| `31593d7c6070a55a47eac129f53c9a40b03e3726` | test(gui): exercise debounced filter callback (#62) | green | [41646183571](https://github.com/SakibShahariar/material-screensaver/actions/runs/41646183571) | Corrected test fixture; tests and lint passed. |
+
+The lock-test fixture failure was resolved by `423eebf`; the GUI title-regex failure by `779623c`; the config-snapshot test assertion failure by `0e63ed3`; and the debounce test fixture failure by `31593d7`. The checkpoint advances through the last fully verified commit. The next substantive commit remains outside this checkpoint until its own CI result is observed.
 
 ### Failure record template
 

@@ -78,6 +78,65 @@ class TestLockCountdownConfig(CtlTestCase):
         self.assertTrue(self.ctl.config_store.normalize_config({"lock_countdown": True})["lock_countdown"])
         self.assertFalse(self.ctl.config_store.normalize_config({"lock_countdown": "true"})["lock_countdown"])
 
+class TestBatteryStateCache(CtlTestCase):
+    def setUp(self):
+        super().setUp()
+        self.original_run = self.ctl.subprocess.run
+        self.original_clock = self.ctl._battery_cache_now
+        self.ctl._battery_state_cache = None
+        self.now = [100.0]
+        self.ctl._battery_cache_now = lambda: self.now[0]
+        self.calls = 0
+
+    def tearDown(self):
+        self.ctl.subprocess.run = self.original_run
+        self.ctl._battery_cache_now = self.original_clock
+        self.ctl._battery_state_cache = None
+        super().tearDown()
+
+    def test_caches_state_until_expiry_then_refreshes(self):
+        states = ["discharging", "charging"]
+
+        class Result:
+            returncode = 0
+            stdout = ""
+
+        def fake_run(*_args, **_kwargs):
+            state = states[min(self.calls, len(states) - 1)]
+            self.calls += 1
+            result = Result()
+            result.stdout = f"state: {state}\\n"
+            return result
+
+        self.ctl.subprocess.run = fake_run
+        self.assertIs(self.ctl._battery_is_discharging(), True)
+        self.assertIs(self.ctl._battery_is_discharging(), True)
+        self.assertEqual(self.calls, 1)
+        self.now[0] += self.ctl._BATTERY_STATE_CACHE_TTL + 1
+        self.assertIs(self.ctl._battery_is_discharging(), False)
+        self.assertEqual(self.calls, 2)
+
+    def test_unavailable_state_is_cached_and_expires(self):
+        def fake_run(*_args, **_kwargs):
+            self.calls += 1
+            if self.calls == 1:
+                raise FileNotFoundError("upower unavailable")
+
+            class Result:
+                returncode = 0
+                stdout = "state: fully-charged\\n"
+
+            return Result()
+
+        self.ctl.subprocess.run = fake_run
+        self.assertIsNone(self.ctl._battery_is_discharging())
+        self.assertIsNone(self.ctl._battery_is_discharging())
+        self.assertEqual(self.calls, 1)
+        self.now[0] += self.ctl._BATTERY_STATE_CACHE_TTL + 1
+        self.assertIs(self.ctl._battery_is_discharging(), False)
+        self.assertEqual(self.calls, 2)
+
+
 class TestBatteryPolicyLabel(CtlTestCase):
     def test_label_only_appears_when_battery_saving_is_active(self):
         self.assertIsNone(self.ctl._battery_policy_label({"fps_limit": 30}, False))
