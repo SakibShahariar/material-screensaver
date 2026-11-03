@@ -104,7 +104,7 @@ def display_name(filename):
         return fallback
 
     title = fallback
-    match = re.search(r"<title\\b[^>]*>(.*?)</title\\s*>", source, re.IGNORECASE | re.DOTALL)
+    match = re.search(r"<title\b[^>]*>(.*?)</title\s*>", source, re.IGNORECASE | re.DOTALL)
     if match:
         candidate = html_lib.unescape(re.sub(r"<[^>]*>", "", match.group(1))).strip()
         prefix = "Material Screensaver — "
