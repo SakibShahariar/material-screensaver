@@ -131,5 +131,25 @@ class TestWebKitProcessCleanup(unittest.TestCase):
         self.assertEqual(self.kills, [(104, signal.SIGTERM)])
 
 
+    def test_does_not_read_unrelated_system_processes(self):
+        self._make_nested_tree()
+        unrelated_pids = set(range(2000, 2300))
+        for pid in unrelated_pids:
+            self._write_process(pid, 1, "unrelated-worker", pid)
+            self._write_children(pid, [])
+
+        read_process = self.ctl._read_proc_process
+        read_pids = []
+
+        def track_reads(proc_root, pid):
+            read_pids.append(pid)
+            return read_process(proc_root, pid)
+
+        with mock.patch.object(self.ctl, "_read_proc_process", side_effect=track_reads):
+            self._run_cleanup()
+        self.assertTrue(read_pids)
+        self.assertTrue(unrelated_pids.isdisjoint(read_pids))
+
+
 if __name__ == "__main__":
     unittest.main(verbosity=2)

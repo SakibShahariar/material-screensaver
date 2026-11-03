@@ -299,6 +299,8 @@ def _kill_orphan_webkit(proc_root="/proc", root_pid=None, kill_process=None,
     by non-leader threads. PID start times and parent identities are rechecked
     before both SIGTERM and delayed SIGKILL so stale child-list entries and
     reused PIDs cannot target unrelated processes.
+
+    Return the number of matching descendants successfully sent SIGTERM.
     """
     import signal
 

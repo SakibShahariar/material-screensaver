@@ -24,10 +24,10 @@ Persistent repository-specific record of commit-level CI checks and red-cross in
 
 - Repository: `SakibShahariar/material-screensaver`
 - Default branch: `master`
-- Checkpoint SHA: `14bcaaba2f45acb3d97865e4b624f36e132262e4`
+- Checkpoint SHA: `8750e9a04ac22ba378a579cf7cb499b18621b438`
 - Initialized: 2026-11-02
 - Baseline correction: a workflow run for the checkpoint commit was later found and inspected; it failed in the test-suite step. The failure is recorded below rather than treating the earlier empty combined-status response as authoritative.
-- Next session: review commits after `14bcaaba2f45acb3d97865e4b624f36e132262e4`; retain the historical failures below for audit context.
+- Next session: review commits after `8750e9a04ac22ba378a579cf7cb499b18621b438`; retain the historical failures below for audit context.
 
 ## Initial baseline
 
@@ -74,6 +74,7 @@ The lock-test fixture failure was resolved by `423eebf`; the GUI title-regex fai
 | `abf6091025dcd9d69700c22e817787e9f8c333d6` | perf(ctl): walk WebKit descendants without global proc scan (#60) | red | [41650565668](https://github.com/SakibShahariar/material-screensaver/actions/runs/41650565668) | Tests failed: the PID-reuse fixture changed identity during descendant discovery; other cleanup tests passed. |
 | `2fc1ef9191dc630527d3a90d456fa57598db0bc9` | fix(ctl): preserve null-separated proc cmdlines (#60) | red | [41650972275](https://github.com/SakibShahariar/material-screensaver/actions/runs/41650972275) | Tests still failed in the PID-reuse fixture; lint passed. |
 | `417da93872c26a14018d4598e93e04cfd5bf7f1d` | test(ctl): check PID reuse immediately before signalling (#60) | red | [41651166171](https://github.com/SakibShahariar/material-screensaver/actions/runs/41651166171) | PID-reuse fixture still did not persist the replacement parent identity, so the original process's child was still selected; lint passed. |
+| `8750e9a04ac22ba378a579cf7cb499b18621b438` | test(ctl): persist reused PID identity in cleanup test (#60) | green | [41651416134](https://github.com/SakibShahariar/material-screensaver/actions/runs/41651416134) | Persisted the synthetic PID replacement; tests and lint passed. |
 
 ### Failure record template
 
