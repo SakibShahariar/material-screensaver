@@ -208,7 +208,7 @@ class TestGuiLogic(unittest.TestCase):
 
         class Result:
             returncode = 0
-            stdout = "state: discharging\\n"
+            stdout = "state: discharging\n"
 
         def fake_run(*_args, **_kwargs):
             calls.append(True)
@@ -221,7 +221,7 @@ class TestGuiLogic(unittest.TestCase):
             self.assertIs(self.gui.query_battery_discharging(), True)
             self.assertEqual(len(calls), 1)
             now[0] += self.gui._BATTERY_STATE_CACHE_TTL + 1
-            Result.stdout = "state: fully-charged\\n"
+            Result.stdout = "state: fully-charged\n"
             self.assertIs(self.gui.query_battery_discharging(), False)
             self.assertEqual(len(calls), 2)
         finally:
@@ -234,7 +234,7 @@ class TestGuiLogic(unittest.TestCase):
         try:
             class Result:
                 returncode = 0
-                stdout = "state: unknown\\n"
+                stdout = "state: unknown\n"
 
             self.gui.subprocess.run = lambda *_args, **_kwargs: Result()
             self.assertIsNone(self.gui.query_battery_discharging())

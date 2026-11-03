@@ -105,7 +105,7 @@ class TestBatteryStateCache(CtlTestCase):
             state = states[min(self.calls, len(states) - 1)]
             self.calls += 1
             result = Result()
-            result.stdout = f"state: {state}\\n"
+            result.stdout = f"state: {state}\n"
             return result
 
         self.ctl.subprocess.run = fake_run
@@ -124,7 +124,7 @@ class TestBatteryStateCache(CtlTestCase):
 
             class Result:
                 returncode = 0
-                stdout = "state: fully-charged\\n"
+                stdout = "state: fully-charged\n"
 
             return Result()
 
