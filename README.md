@@ -4,36 +4,34 @@
 
 # Material Screensaver
 
-**Ambient animated scenes for GNOME on Wayland.**
+**Animated ambient scenes for GNOME on Wayland.**
 
-A lightweight collection of 31 offline HTML/JavaScript screensavers, with a GTK4 and libadwaita settings app.
+31 offline HTML/JavaScript screensavers with a GTK4 and libadwaita settings app.
 
-[Features](#features) · [Install](#install) · [Quick start](#quick-start) · [Documentation](#documentation)
+[Features](#features) · [Install](#install) · [Controls](#controls) · [Documentation](#documentation)
 
 </div>
 
 ## Preview
 
-A few scenes from the collection:
-
 | | |
 |---|---|
-| ![Soft, rounded color blobs swell and overlap, forming slow, liquid-like shapes.](screenshots/shot01.png) | ![A grid of diamond-shaped tiles slowly flips between two colors.](screenshots/shot02.png) |
-| ![A layered city skyline with lit windows sits beneath a sky that shifts between dusk and night.](screenshots/shot03.png) | ![Translucent bubbles of different sizes float upward and pop against a dark background.](screenshots/shot06.png) |
-| **Liquid Blobs** — Soft, rounded color blobs swell and overlap, forming slow, liquid-like shapes. | **Origami** — A grid of diamond-shaped tiles slowly flips between two colors. |
-| **City** — A layered city skyline with lit windows sits beneath a sky that shifts between dusk and night. | **Bubbles** — Translucent bubbles of different sizes float upward and pop against a dark background. |
+| ![Liquid Blobs](screenshots/shot01.png) | ![Origami](screenshots/shot02.png) |
+| **Liquid Blobs** | **Origami** |
+| ![City](screenshots/shot03.png) | ![Bubbles](screenshots/shot06.png) |
+| **City** | **Bubbles** |
 
 ## Features
 
-- **31 animated scenes** spanning abstract, geometric, space, and nature-inspired visuals.
+- **31 scenes** across abstract, geometric, space, and nature-inspired styles.
 - **GNOME integration** with idle activation and multi-monitor support.
-- **Settings app** with search, categories, favorites, random selection, per-scene options, and a clock overlay.
-- **Quick controls** including a configurable shortcut and `Super+Q` to dismiss the viewer.
-- **Power options** including a configurable frame-rate cap, battery saver, and display blanking.
-- **Reduced motion** support for the system preference, capping requestAnimationFrame-driven scenes at **10 FPS**.
-- **Offline by default:** bundled scenes do not need a network connection.
+- **Scene controls** for search, categories, favorites, random selection, and per-scene options.
+- **Clock overlay** and configurable keyboard shortcuts.
+- **Power controls** with frame-rate limits, battery saver, and display blanking.
+- **Reduced motion** support, limiting animated scenes to 10 FPS when enabled.
+- **Offline by default:** bundled scenes require no network connection.
 
-> Material Screensaver is not a secure lock screen. Use GNOME's normal session-lock mechanism to lock your computer.
+> **Not a lock screen.** Use GNOME's session lock to secure your computer.
 
 ## Requirements
 
@@ -41,7 +39,7 @@ A few scenes from the collection:
 - Python 3 with PyGObject
 - GTK 4, libadwaita, and WebKitGTK 6.0 GI bindings
 
-Package names vary by distribution. Install the GTK4, libadwaita, WebKitGTK 6.0, and Python GI packages provided by your distribution.
+Install the corresponding packages from your distribution.
 
 ## Install
 
@@ -51,13 +49,13 @@ From the repository checkout:
 ./install.sh
 ```
 
-Log out and back in once so GNOME Shell discovers the companion extension. Then open **Material Screensaver Settings** from Activities.
+Log out and back in once for GNOME Shell to discover the extension. Then launch **Material Screensaver Settings** from Activities.
 
-## Quick start
+## Controls
 
-Open Settings to choose a scene and adjust the idle timeout, frame-rate cap, battery saver, favorites, and clock options.
+Choose a scene and configure idle timeout, frame rate, battery saver, favorites, and clock options in Settings.
 
-You can also control the viewer from a terminal:
+The command-line controller is also available:
 
 ```sh
 ~/.local/bin/material-screensaver-ctl.py start
@@ -65,28 +63,22 @@ You can also control the viewer from a terminal:
 ~/.local/bin/material-screensaver-ctl.py toggle
 ```
 
-To add a scene, place an `.html` file in `~/.local/share/material-screensaver/screensavers/`. Read the [scene authoring guide](docs/scene-authoring.md) and use the [starter template](docs/scene-template.html).
+Add custom scenes as `.html` files in `~/.local/share/material-screensaver/screensavers/`. See the [scene authoring guide](docs/scene-authoring.md) and [starter template](docs/scene-template.html).
 
 ## Documentation
 
-- [Troubleshooting and advanced configuration](docs/troubleshooting.md)
-- [Scene authoring guide](docs/scene-authoring.md)
+- [Troubleshooting and configuration](docs/troubleshooting.md)
+- [Scene authoring](docs/scene-authoring.md)
 - [GNOME Wayland integration test plan](docs/gnome-integration-test-plan.md)
 - [Changelog](CHANGELOG.md)
 
 ## Uninstall
 
-From the repository checkout:
-
 ```sh
 ./uninstall.sh
 ```
 
-To preserve your application settings for a future reinstall:
-
-```sh
-./uninstall.sh --keep-settings
-```
+Keep settings for a future reinstall with `./uninstall.sh --keep-settings`.
 
 ## Development
 
@@ -98,8 +90,8 @@ python3 scripts/validate-scenes.py
 python3 scripts/check-scene-payload-budget.py
 ```
 
-These checks do not replace visual and lifecycle testing in a live GNOME Wayland session; see the [integration test plan](docs/gnome-integration-test-plan.md).
+Live GNOME Wayland testing is still required for visual and lifecycle behavior. See the [integration test plan](docs/gnome-integration-test-plan.md).
 
 ## License
 
-GPL-3.0-only. See [LICENSE](LICENSE). Third-party assets and dependencies may have separate notices or licenses.
+GPL-3.0-only. See [LICENSE](LICENSE). Third-party assets and dependencies may have separate licenses.
