@@ -812,6 +812,23 @@ p{color:#c4c0ca;line-height:1.5}
             countdown = Gtk.Label(label="")
             countdown.add_css_class("osd")
             countdown.add_css_class("caption")
+            countdown.add_css_class("material-lock-countdown")
+            try:
+                countdown_css = Gtk.CssProvider()
+                countdown_css.load_from_data(b"""
+.material-lock-countdown {
+  color: @accent_fg_color;
+  background-color: @accent_bg_color;
+  border-radius: 999px;
+  padding: 8px 16px;
+  font-weight: 600;
+}
+""")
+                Gtk.StyleContext.add_provider_for_display(
+                    display, countdown_css, Gtk.STYLE_PROVIDER_PRIORITY_APPLICATION
+                )
+            except Exception as exc:
+                _dbg(f"Could not apply Material countdown styling: {exc}")
             countdown.set_halign(Gtk.Align.CENTER)
             countdown.set_valign(Gtk.Align.END)
             countdown.set_margin_bottom(28)
