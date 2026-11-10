@@ -1351,12 +1351,38 @@ def _monitor_login1_session_lock():
                 "GetSession", GLib.Variant("(s)", (session_id,)),
                 Gio.DBusCallFlags.NONE, 2000, None,
             )
+            (session_path,) = result.unpack()
         else:
-            result = manager.call_sync(
-                "GetSessionByPID", GLib.Variant("(u)", (os.getpid(),)),
-                Gio.DBusCallFlags.NONE, 2000, None,
-            )
-        (session_path,) = result.unpack()
+            try:
+                # A user service is normally a child of the per-user manager,
+                # not of the graphical session.  Consequently GetSessionByPID
+                # cannot resolve the service PID on systems with separate
+                # session and manager scopes.
+                result = manager.call_sync(
+                    "GetSessionByPID", GLib.Variant("(u)", (os.getpid(),)),
+                    Gio.DBusCallFlags.NONE, 2000, None,
+                )
+                (session_path,) = result.unpack()
+            except Exception:
+                result = manager.call_sync(
+                    "ListSessions", None, Gio.DBusCallFlags.NONE, 2000, None,
+                )
+                sessions = result.unpack()[0]
+                session_path = None
+                for candidate_id, uid, _user, seat, candidate_path in sessions:
+                    if uid != os.getuid() or not seat:
+                        continue
+                    candidate = Gio.DBusProxy.new_sync(
+                        bus, Gio.DBusProxyFlags.NONE, None,
+                        "org.freedesktop.login1", candidate_path,
+                        "org.freedesktop.login1.Session", None,
+                    )
+                    active = candidate.get_cached_property("Active")
+                    if active is None or active.get_boolean():
+                        session_path = candidate_path
+                        break
+                if session_path is None:
+                    raise RuntimeError("no active graphical session found")
         proxy = Gio.DBusProxy.new_sync(
             bus, Gio.DBusProxyFlags.NONE, None,
             "org.freedesktop.login1", session_path,
