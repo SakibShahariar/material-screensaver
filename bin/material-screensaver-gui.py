@@ -310,7 +310,10 @@ class ScreensaverWindow(Adw.PreferencesWindow):
         super().__init__(application=app, title="Screensaver")
         self._preview_override = REQUESTED_PREVIEW
         self.set_default_size(*load_window_size())
+        self._window_state_save_id = None
         self.connect("close-request", self._save_window_size_on_close)
+        self.connect("notify::width", self._schedule_window_state_save)
+        self.connect("notify::height", self._schedule_window_state_save)
 
         scene_page = Adw.PreferencesPage()
         behavior_page = Adw.PreferencesPage()
@@ -713,19 +716,39 @@ class ScreensaverWindow(Adw.PreferencesWindow):
                 status = f"Power state unavailable; battery cap cannot be confirmed. Configured cap: {normal_fps} FPS. {blank_policy}"
         self.battery_status_row.set_subtitle(status)
 
-    def _save_window_size_on_close(self, *_args):
-        if self._settings_search_timeout_id is not None:
-            try:
-                GLib.source_remove(self._settings_search_timeout_id)
-            except Exception:
-                pass
-            self._settings_search_timeout_id = None
+    def _save_window_size(self):
         width, height = self.get_width(), self.get_height()
         if width > 0 and height > 0:
             try:
                 save_window_size(width, height)
             except OSError as exc:
                 print(f"Could not save settings window size: {exc}", file=sys.stderr)
+
+    def _schedule_window_state_save(self, *_args):
+        if self._window_state_save_id is not None:
+            return
+
+        def save_later():
+            self._window_state_save_id = None
+            self._save_window_size()
+            return GLib.SOURCE_REMOVE
+
+        self._window_state_save_id = GLib.timeout_add(250, save_later)
+
+    def _save_window_size_on_close(self, *_args):
+        if self._window_state_save_id is not None:
+            try:
+                GLib.source_remove(self._window_state_save_id)
+            except Exception:
+                pass
+            self._window_state_save_id = None
+        if self._settings_search_timeout_id is not None:
+            try:
+                GLib.source_remove(self._settings_search_timeout_id)
+            except Exception:
+                pass
+            self._settings_search_timeout_id = None
+        self._save_window_size()
         # GTK4 on Wayland does not permit applications to restore window position.
         return False
 

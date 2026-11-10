@@ -179,6 +179,14 @@ class TestGuiLogic(unittest.TestCase):
             json.dump({"width": True, "height": "large"}, handle)
         self.assertEqual(self.gui.load_window_size(path), (480, 600))
 
+    def test_window_size_is_saved_after_resize_and_on_close(self):
+        with open(os.path.join(support.REPO_ROOT, "bin", "material-screensaver-gui.py"), encoding="utf-8") as handle:
+            source = handle.read()
+        self.assertIn('self.connect("notify::width", self._schedule_window_state_save)', source)
+        self.assertIn('self.connect("notify::height", self._schedule_window_state_save)', source)
+        self.assertIn("GLib.timeout_add(250, save_later)", source)
+        self.assertIn("self._save_window_size()", source)
+
     def test_query_battery_discharging_states_and_failures(self):
         original = self.gui.subprocess.run
         try:
