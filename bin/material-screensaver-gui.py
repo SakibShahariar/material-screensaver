@@ -1273,7 +1273,14 @@ class ScreensaverWindow(Adw.ApplicationWindow):
 
         def completed(process, result):
             try:
-                stdout, stderr = process.communicate_utf8_finish(result)
+                communicated = process.communicate_utf8_finish(result)
+                # PyGObject versions differ here: newer bindings include the
+                # gboolean returned by g_subprocess_communicate_utf8_finish,
+                # while older bindings expose only the two output strings.
+                if len(communicated) == 3:
+                    _communicated, stdout, stderr = communicated
+                else:
+                    stdout, stderr = communicated
                 on_finished(process.get_successful(), stdout or "", stderr or "")
             except Exception as exc:
                 on_finished(False, "", str(exc))
