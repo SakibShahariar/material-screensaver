@@ -1224,48 +1224,31 @@ def _lock_screen_async(on_complete):
     candidates fall through in order, just like _lock_screen().
     """
     try:
+        import threading
         import gi
-        gi.require_version("Gio", "2.0")
-        from gi.repository import Gio
+        gi.require_version("GLib", "2.0")
+        from gi.repository import GLib
     except Exception as exc:
         print(f"Cannot use asynchronous session locking: {exc}", file=sys.stderr)
         on_complete(False)
         return
 
-    candidates = iter(LOCK_COMMANDS)
-
-    def try_next():
+    def lock_in_background():
         try:
-            cmd = next(candidates)
-        except StopIteration:
-            _log_event("session_lock_failed")
-            print("Unable to lock the session: all lock commands failed; keeping screensaver visible.",
-                  file=sys.stderr)
-            on_complete(False)
-            return
-        try:
-            proc = Gio.Subprocess.new(
-                cmd, Gio.SubprocessFlags.STDOUT_SILENCE | Gio.SubprocessFlags.STDERR_SILENCE)
+            locked = _lock_screen()
         except Exception as exc:
-            print(f"Session lock command failed ({cmd[0]}): {exc}", file=sys.stderr)
-            try_next()
-            return
+            print(f"Session lock worker failed: {exc}", file=sys.stderr)
+            locked = False
+        try:
+            GLib.idle_add(on_complete, locked, priority=GLib.PRIORITY_DEFAULT)
+        except Exception as exc:
+            print(f"Could not return session lock result to GTK: {exc}", file=sys.stderr)
 
-        def on_wait(proc, result, _user_data=None):
-            try:
-                succeeded = proc.wait_check_finish(result)
-            except Exception as exc:
-                print(f"Session lock command failed ({cmd[0]}): {exc}", file=sys.stderr)
-                try_next()
-                return
-            if succeeded:
-                _log_event("session_lock_succeeded", backend=cmd[0])
-                on_complete(True)
-            else:
-                _log_event("session_lock_backend_failed", backend=cmd[0])
-                try_next()
-
-        proc.wait_check_async(None, on_wait, None)
+    try:
+        threading.Thread(target=lock_in_background, name="material-screensaver-lock", daemon=True).start()
+    except Exception as exc:
+        print(f"Could not start session lock worker: {exc}", file=sys.stderr)
+        on_complete(False)
 
 
 def _idle_watch_needs_refresh(
