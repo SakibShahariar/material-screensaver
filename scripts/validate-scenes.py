@@ -11,6 +11,9 @@ from html.parser import HTMLParser
 from pathlib import Path
 import sys
 
+sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "bin"))
+from material_scene_manifest import validate_manifest
+
 
 class SceneParser(HTMLParser):
     def __init__(self) -> None:
@@ -185,11 +188,15 @@ def main(argv: list[str] | None = None) -> int:
     if not args.directory.is_dir():
         print(f"error: not a directory: {args.directory}", file=sys.stderr)
         return 2
+    manifest, manifest_errors = validate_manifest(args.directory)
+    if manifest_errors:
+        for error in manifest_errors:
+            print(f"{args.directory}: {error}", file=sys.stderr)
     scenes = sorted(args.directory.glob("*.html"))
     if not scenes:
         print(f"error: no .html scenes found in {args.directory}", file=sys.stderr)
         return 2
-    failed = 0
+    failed = len(manifest_errors)
     for scene in scenes:
         errors = validate_scene(scene)
         if errors:

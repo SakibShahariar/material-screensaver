@@ -1,0 +1,129 @@
+{
+  "version": 1,
+  "scenes": {
+    "autumnleaves.html": {
+      "description": "Red, orange, and yellow leaves tumble across the screen and gather into a loose pile along the bottom.",
+      "capabilities": []
+    },
+    "blob.html": {
+      "description": "Soft, rounded color blobs swell and overlap, forming slow, liquid-like shapes.",
+      "capabilities": []
+    },
+    "bounce.html": {
+      "description": "A glowing rounded-square mark bounces across the screen, squashing and stretching at each impact.",
+      "capabilities": []
+    },
+    "bubbles.html": {
+      "description": "Translucent bubbles of different sizes float upward and pop against a dark background.",
+      "capabilities": []
+    },
+    "circuitboard.html": {
+      "description": "Glowing right-angled traces form a branching circuit pattern as bright pulses travel along the paths.",
+      "capabilities": []
+    },
+    "city.html": {
+      "description": "A layered city skyline with lit windows sits beneath a sky that shifts between dusk and night.",
+      "capabilities": []
+    },
+    "constellation.html": {
+      "description": "Small glowing stars drift and connect with thin lines, forming shifting constellations.",
+      "capabilities": []
+    },
+    "cymatics.html": {
+      "description": "Thousands of tiny points gather into symmetrical wave patterns that slowly morph from one shape to another.",
+      "capabilities": []
+    },
+    "fireworks.html": {
+      "description": "Bright bursts of colored sparks bloom, scatter, and fade across a dark sky.",
+      "capabilities": []
+    },
+    "flow.html": {
+      "description": "Fine glowing particles trace curved, flowing paths that fade into the background.",
+      "capabilities": []
+    },
+    "gameoflife.html": {
+      "description": "A grid of glowing cells grows and changes in clusters, leaving shifting gaps of dark space.",
+      "capabilities": []
+    },
+    "glitch.html": {
+      "description": "Colorful geometric shapes slide and rotate beneath brief bands of visual distortion.",
+      "capabilities": []
+    },
+    "kaleidoscope.html": {
+      "description": "Glowing circular motifs repeat in mirrored wedges, slowly rotating into kaleidoscopic patterns.",
+      "capabilities": []
+    },
+    "lanterns.html": {
+      "description": "Glowing paper lanterns drift upward beneath a field of twinkling stars.",
+      "capabilities": []
+    },
+    "magnetic-field-lines.html": {
+      "description": "Curving luminous paths loop around shifting points while tiny particles follow the lines.",
+      "capabilities": []
+    },
+    "metaphysical-horizon.html": {
+      "description": "Seven soft pools of colored light overlap and slowly pulse across a dark field.",
+      "capabilities": []
+    },
+    "n-body-galaxies.html": {
+      "description": "Two dense star systems swirl toward one another, their glowing stars leaving faint trails.",
+      "capabilities": []
+    },
+    "organic-harmonic-field.html": {
+      "description": "Layered bands of color bend and ripple into a flowing, organic wave pattern.",
+      "capabilities": []
+    },
+    "origami.html": {
+      "description": "A grid of diamond-shaped tiles slowly flips between two colors.",
+      "capabilities": []
+    },
+    "papercranes.html": {
+      "description": "A flock of folded paper cranes glides across a softly shaded sky, their wings gently flapping.",
+      "capabilities": []
+    },
+    "quantum-interference.html": {
+      "description": "Overlapping circular waves create shifting bands of light around several moving points.",
+      "capabilities": []
+    },
+    "rain-on-a-window.html": {
+      "description": "Water droplets bead and slide down a glass-like surface in front of softly blurred lights.",
+      "capabilities": []
+    },
+    "rain.html": {
+      "description": "Slanting rain streaks cross a dark sky, punctuated by brief flashes of lightning.",
+      "capabilities": []
+    },
+    "sakura.html": {
+      "description": "Cherry-blossom petals drift and turn slowly across the screen.",
+      "capabilities": []
+    },
+    "soft-body-creatures.html": {
+      "description": "Soft, translucent blobs wobble, stretch, and drift as their rounded outlines change shape.",
+      "capabilities": []
+    },
+    "solar-system.html": {
+      "description": "A bright central sun anchors orbiting planets, with faint star clouds and compact spaceflight readouts.",
+      "capabilities": []
+    },
+    "starfield.html": {
+      "description": "A sparse field of stars drifts across layered, softly glowing nebula clouds.",
+      "capabilities": []
+    },
+    "strange-attractor-flow.html": {
+      "description": "Glowing particles curl through a continuously twisting, looped pattern, leaving fading trails.",
+      "capabilities": []
+    },
+    "typewriter.html": {
+      "description": "Lines of text appear one character at a time on a dark screen, followed by a blinking cursor.",
+      "capabilities": []
+    },
+    "voronoi.html": {
+      "description": "A shifting mosaic of irregular polygon cells fills the screen with softly glowing edges.",
+      "capabilities": []
+    },
+    "wave-function-collapse.html": {
+      "description": "A grid of glowing line segments, corners, and junctions gradually resolves into a connected pattern, then fades.",
+      "capabilities": []
+    }
+  }
+}

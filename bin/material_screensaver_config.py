@@ -5,6 +5,7 @@ import math
 import os
 import sys
 import tempfile
+from material_scene_manifest import validate_manifest
 
 DEFAULT_MATUGEN_COLORS_PATH = os.path.expanduser("~/.config/matugen/matugen-colors.css")
 SCENE_OPTION_SCHEMA = {
@@ -238,7 +239,13 @@ def save_config(config_path, **updates):
 
 def list_screensavers(screensaver_dir):
     """Return sorted full paths for HTML screensavers in the given directory."""
-    return sorted(glob.glob(os.path.join(screensaver_dir, "*.html")))
+    paths = sorted(glob.glob(os.path.join(screensaver_dir, "*.html")))
+    _manifest, errors = validate_manifest(screensaver_dir)
+    if errors and _manifest is None:
+        return []
+    if _manifest is not None:
+        return [path for path in paths if os.path.basename(path) in _manifest]
+    return paths
 
 
 
@@ -312,5 +319,3 @@ def sync_matugen_colors_link(screensaver_dir, cfg):
                 os.unlink(tmp)
             except OSError:
                 pass
-
-

@@ -34,3 +34,30 @@ npx --yes eslint@9 screensavers/clock-shared.js extensions/material-screensaver-
 ```
 
 Also inspect browser-console errors and confirm the scene behaves acceptably in a real GNOME Wayland session. Automated checks do not prove visual quality, power use, multi-monitor behavior, or correct cleanup under session lock.
+
+## Optional scene manifest
+
+Scene packages may include a version-1 `scene-manifest.json` beside their HTML
+files. When present, every HTML scene must have an entry. The manifest is
+validated before scenes are shown in Settings or enabled by the viewer:
+
+```json
+{
+  "version": 1,
+  "scenes": {
+    "example.html": {
+      "description": "A calm field of slowly shifting colors.",
+      "thumbnail": "example.png",
+      "options": {
+        "speed": {"type": "number", "min": 0.1, "max": 2.0, "step": 0.1, "default": 1.0}
+      },
+      "capabilities": ["canvas"]
+    }
+  }
+}
+```
+
+`description`, `thumbnail`, `options`, and `capabilities` are optional. A
+thumbnail must be an existing local file, option definitions use the types
+`boolean`, `integer`, `number`, or `string`, and capabilities are lowercase
+identifiers. Directories without a manifest retain legacy HTML discovery.
