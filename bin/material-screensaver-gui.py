@@ -312,10 +312,10 @@ class ScreensaverWindow(Adw.ApplicationWindow):
         self.set_default_size(*load_window_size())
         self.connect("close-request", self._save_window_size_on_close)
 
-        toolbar_view = Adw.ToolbarView()
-        toolbar_view.add_top_bar(Adw.HeaderBar())
-
-        page = Adw.PreferencesPage()
+        scene_page = Adw.PreferencesPage()
+        behavior_page = Adw.PreferencesPage()
+        appearance_page = Adw.PreferencesPage()
+        system_page = Adw.PreferencesPage()
         self._settings_search_groups = []
         self._settings_search_timeout_id = None
 
@@ -323,7 +323,7 @@ class ScreensaverWindow(Adw.ApplicationWindow):
         self.onboarding_group = None
         if not load_config().get("onboarding_dismissed", False):
             self.onboarding_group = Adw.PreferencesGroup(title="Getting started")
-            page.add(self.onboarding_group)
+            scene_page.add(self.onboarding_group)
             self._settings_search_groups.append(self.onboarding_group)
             self.onboarding_group.add(Adw.ActionRow(
                 title="1. Choose a scene",
@@ -364,7 +364,7 @@ class ScreensaverWindow(Adw.ApplicationWindow):
 
         # --- Screensaver picker ---
         sv_group = Adw.PreferencesGroup(title="Screensaver")
-        page.add(sv_group)
+        scene_page.add(sv_group)
 
         self.random_switch = Gtk.Switch(valign=Gtk.Align.CENTER)
         random_row = Adw.ActionRow(
@@ -417,7 +417,7 @@ class ScreensaverWindow(Adw.ApplicationWindow):
         sv_group.add(self.combo_row)
 
         self.monitor_assignment_group = Adw.PreferencesGroup(title="Per-monitor screensavers")
-        page.add(self.monitor_assignment_group)
+        scene_page.add(self.monitor_assignment_group)
         self._settings_search_groups.append(self.monitor_assignment_group)
         self.monitor_assignment_rows = {}
 
@@ -430,7 +430,7 @@ class ScreensaverWindow(Adw.ApplicationWindow):
 
         # --- Per-scene customization ---
         self.customization_group = Adw.PreferencesGroup(title="Customize selected scene")
-        page.add(self.customization_group)
+        scene_page.add(self.customization_group)
         self._settings_search_groups.append(self.customization_group)
         self.scene_option_rows = {}
         self.scene_option_specs = {}
@@ -447,7 +447,7 @@ class ScreensaverWindow(Adw.ApplicationWindow):
         # --- Live Preview (WebKit thumbnail) ---
         if HAS_WEBKIT and self.screensaver_files:
             preview_group_live = Adw.PreferencesGroup(title="Live Preview")
-            page.add(preview_group_live)
+            scene_page.add(preview_group_live)
             self._settings_search_groups.append(preview_group_live)
             frame = Gtk.Frame()
             frame.add_css_class("card")
@@ -495,7 +495,7 @@ class ScreensaverWindow(Adw.ApplicationWindow):
 
         # --- Timing ---
         timing_group = Adw.PreferencesGroup(title="Timing")
-        page.add(timing_group)
+        behavior_page.add(timing_group)
         self._settings_search_groups.append(timing_group)
         # Config stores seconds (idle: 1 second–24 hours; lock: 0–24 hours).
         # Use seconds in the UI so valid hand-edited values are not rounded or
@@ -544,7 +544,7 @@ class ScreensaverWindow(Adw.ApplicationWindow):
 
         # --- Clock format ---
         clock_group = Adw.PreferencesGroup(title="Clock")
-        page.add(clock_group)
+        behavior_page.add(clock_group)
         self._settings_search_groups.append(clock_group)
         self.ampm_switch = Gtk.Switch(valign=Gtk.Align.CENTER)
         ampm_row = Adw.ActionRow(title="Use 12-hour clock (AM/PM)")
@@ -571,7 +571,7 @@ class ScreensaverWindow(Adw.ApplicationWindow):
 
         # --- Matugen palette ---
         matugen_group = Adw.PreferencesGroup(title="Matugen")
-        page.add(matugen_group)
+        appearance_page.add(matugen_group)
         self._settings_search_groups.append(matugen_group)
         matugen_row = Adw.ActionRow(
             title="Colors stylesheet",
@@ -588,7 +588,7 @@ class ScreensaverWindow(Adw.ApplicationWindow):
 
         # --- Optional lock message ---
         message_group = Adw.PreferencesGroup(title="Lock message")
-        page.add(message_group)
+        appearance_page.add(message_group)
         self._settings_search_groups.append(message_group)
         message_row = Adw.ActionRow(
             title="Message shown over the screensaver",
@@ -608,7 +608,7 @@ class ScreensaverWindow(Adw.ApplicationWindow):
 
         # --- Automatic ---
         auto_group = Adw.PreferencesGroup(title="Automatic")
-        page.add(auto_group)
+        system_page.add(auto_group)
         self._settings_search_groups.append(auto_group)
         self.autostart_switch = Gtk.Switch(valign=Gtk.Align.CENTER)
         self.autostart_row = Adw.ActionRow(
@@ -622,7 +622,7 @@ class ScreensaverWindow(Adw.ApplicationWindow):
 
         # --- Shortcut ---
         shortcut_group = Adw.PreferencesGroup(title="Keyboard Shortcut")
-        page.add(shortcut_group)
+        system_page.add(shortcut_group)
         self._settings_search_groups.append(shortcut_group)
         self.shortcut_row = Adw.ActionRow(title="Toggle screensaver")
         change_btn = Gtk.Button(label="Change…", valign=Gtk.Align.CENTER)
@@ -635,7 +635,7 @@ class ScreensaverWindow(Adw.ApplicationWindow):
 
         # --- Configuration backup and restore ---
         backup_group = Adw.PreferencesGroup(title="Configuration backup")
-        page.add(backup_group)
+        system_page.add(backup_group)
         self._settings_search_groups.append(backup_group)
         backup_row = Adw.ActionRow(
             title="Export settings",
@@ -654,9 +654,55 @@ class ScreensaverWindow(Adw.ApplicationWindow):
         restore_row.add_suffix(import_button)
         backup_group.add(restore_row)
 
-        toolbar_view.set_content(page)
+        # Keep the long settings form navigable without forcing every option
+        # into one scrolling page. The list remains compact and collapses with
+        # the split view on narrow windows.
+        stack = Adw.ViewStack()
+        stack.add_titled(scene_page, "scenes", "Scenes")
+        stack.add_titled(behavior_page, "behavior", "Behavior")
+        stack.add_titled(appearance_page, "appearance", "Appearance")
+        stack.add_titled(system_page, "system", "System")
+
+        sections = (
+            ("scenes", "Scenes"),
+            ("behavior", "Behavior"),
+            ("appearance", "Appearance"),
+            ("system", "System"),
+        )
+        sidebar_list = Gtk.ListBox()
+        sidebar_list.set_selection_mode(Gtk.SelectionMode.SINGLE)
+        sidebar_list.add_css_class("navigation-sidebar")
+        sidebar_rows = {}
+        for name, title in sections:
+            row = Gtk.ListBoxRow()
+            row.set_child(Gtk.Label(label=title, xalign=0))
+            sidebar_list.append(row)
+            sidebar_rows[row] = name
+
+        def on_section_selected(_list, row):
+            if row is not None:
+                stack.set_visible_child_name(sidebar_rows[row])
+
+        sidebar_list.connect("row-selected", on_section_selected)
+        sidebar_list.select_row(sidebar_list.get_row_at_index(0))
+
+        sidebar_box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL)
+        sidebar_box.append(Adw.HeaderBar())
+        sidebar_scroll = Gtk.ScrolledWindow()
+        sidebar_scroll.set_policy(Gtk.PolicyType.NEVER, Gtk.PolicyType.AUTOMATIC)
+        sidebar_scroll.set_child(sidebar_list)
+        sidebar_box.append(sidebar_scroll)
+
+        content_toolbar = Adw.ToolbarView()
+        content_toolbar.add_top_bar(Adw.HeaderBar())
+        content_toolbar.set_content(stack)
+        split_view = Adw.NavigationSplitView()
+        split_view.set_sidebar(Adw.NavigationPage.new(sidebar_box, "Sections"))
+        split_view.set_content(Adw.NavigationPage.new(content_toolbar, "Settings"))
+        split_view.set_min_sidebar_width(160)
+        split_view.set_max_sidebar_width(220)
         self.toast_overlay = Adw.ToastOverlay()
-        self.toast_overlay.set_child(toolbar_view)
+        self.toast_overlay.set_child(split_view)
         self.set_content(self.toast_overlay)
 
         self.load_state()
