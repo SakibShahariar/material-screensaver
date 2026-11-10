@@ -305,7 +305,7 @@ def settings_group_matches(group, query):
     return not query or query in widget_search_text(group)
 
 
-class ScreensaverWindow(Adw.ApplicationWindow):
+class ScreensaverWindow(Adw.PreferencesWindow):
     def __init__(self, app):
         super().__init__(application=app, title="Screensaver")
         self._preview_override = REQUESTED_PREVIEW
@@ -654,56 +654,19 @@ class ScreensaverWindow(Adw.ApplicationWindow):
         restore_row.add_suffix(import_button)
         backup_group.add(restore_row)
 
-        # Keep the long settings form navigable without forcing every option
-        # into one scrolling page. The list remains compact and collapses with
-        # the split view on narrow windows.
-        stack = Adw.ViewStack()
-        stack.add_titled(scene_page, "scenes", "Scenes")
-        stack.add_titled(behavior_page, "behavior", "Behavior")
-        stack.add_titled(appearance_page, "appearance", "Appearance")
-        stack.add_titled(system_page, "system", "System")
-
-        sections = (
-            ("scenes", "Scenes"),
-            ("behavior", "Behavior"),
-            ("appearance", "Appearance"),
-            ("system", "System"),
+        # PreferencesWindow supplies the native libadwaita settings sidebar,
+        # responsive page navigation, and toast overlay.
+        pages = (
+            (scene_page, "Scenes", "image-x-generic-symbolic"),
+            (behavior_page, "Behavior", "preferences-system-time-symbolic"),
+            (appearance_page, "Appearance", "applications-graphics-symbolic"),
+            (system_page, "System", "preferences-system-symbolic"),
         )
-        sidebar_list = Gtk.ListBox()
-        sidebar_list.set_selection_mode(Gtk.SelectionMode.SINGLE)
-        sidebar_list.add_css_class("navigation-sidebar")
-        sidebar_rows = {}
-        for name, title in sections:
-            row = Gtk.ListBoxRow()
-            row.set_child(Gtk.Label(label=title, xalign=0))
-            sidebar_list.append(row)
-            sidebar_rows[row] = name
-
-        def on_section_selected(_list, row):
-            if row is not None:
-                stack.set_visible_child_name(sidebar_rows[row])
-
-        sidebar_list.connect("row-selected", on_section_selected)
-        sidebar_list.select_row(sidebar_list.get_row_at_index(0))
-
-        sidebar_box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL)
-        sidebar_box.append(Adw.HeaderBar())
-        sidebar_scroll = Gtk.ScrolledWindow()
-        sidebar_scroll.set_policy(Gtk.PolicyType.NEVER, Gtk.PolicyType.AUTOMATIC)
-        sidebar_scroll.set_child(sidebar_list)
-        sidebar_box.append(sidebar_scroll)
-
-        content_toolbar = Adw.ToolbarView()
-        content_toolbar.add_top_bar(Adw.HeaderBar())
-        content_toolbar.set_content(stack)
-        split_view = Adw.NavigationSplitView()
-        split_view.set_sidebar(Adw.NavigationPage.new(sidebar_box, "Sections"))
-        split_view.set_content(Adw.NavigationPage.new(content_toolbar, "Settings"))
-        split_view.set_min_sidebar_width(160)
-        split_view.set_max_sidebar_width(220)
-        self.toast_overlay = Adw.ToastOverlay()
-        self.toast_overlay.set_child(split_view)
-        self.set_content(self.toast_overlay)
+        for preferences_page, title, icon_name in pages:
+            preferences_page.set_title(title)
+            preferences_page.set_icon_name(icon_name)
+            self.add(preferences_page)
+        self.toast_overlay = self
 
         self.load_state()
         self.connect("notify::is-active", self.on_preview_activity_changed)
