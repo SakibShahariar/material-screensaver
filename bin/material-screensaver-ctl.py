@@ -1460,7 +1460,11 @@ def _schedule_lock():
             global _lock_timeout_id
             _lock_timeout_id=None
             _log_event("lock_timer_fired")
-            if is_viewer_active():
+            # The viewer can briefly report inactive while its Wayland window
+            # is transitioning even though this daemon still owns the active
+            # screensaver session. Do not silently skip the configured lock.
+            if _is_showing or is_viewer_active():
+                _log_event("session_lock_attempted")
                 # Never dismiss the screensaver unless a lock command reports success.
                 # Async execution keeps the GTK/GLib main loop responsive.
                 def on_locked(locked):
