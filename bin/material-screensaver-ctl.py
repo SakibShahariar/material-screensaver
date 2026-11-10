@@ -1017,9 +1017,15 @@ p{color:#c4c0ca;line-height:1.5}
         # Wayland: present must happen after app is active and surface realized.
         # Using `present()` then `fullscreen()` immediately can create ghost (dash visible, WebProcess 0.1% throttled).
         # Fix: present now, fullscreen on idle after surface mapped. Also connect to map for fallback.
-        def _do_fullscreen(w=win, d=display, wb=web):
-            try:
+        def _request_fullscreen(w, monitor):
+            if monitor is not None and hasattr(w, "fullscreen_on_monitor"):
+                w.fullscreen_on_monitor(monitor)
+            else:
                 w.fullscreen()
+
+        def _do_fullscreen(w=win, d=display, wb=web, monitor=mon):
+            try:
+                _request_fullscreen(w, monitor)
             except Exception as exc:
                 _dbg(f"Suppressed non-fatal exception in _do_fullscreen: {exc}")
             try:
@@ -1034,6 +1040,10 @@ p{color:#c4c0ca;line-height:1.5}
                 w.set_focus_visible(True)
             except Exception as exc:
                 _dbg(f"Suppressed non-fatal exception in _do_fullscreen: {exc}")
+            try:
+                _log_event("viewer_window_state", visible=w.get_visible(), fullscreen=w.is_fullscreen())
+            except Exception as exc:
+                _dbg(f"Suppressed non-fatal exception in _do_fullscreen state log: {exc}")
             try:
                 _hide_cursor(w, wb)
             except Exception as exc:
@@ -1075,18 +1085,24 @@ p{color:#c4c0ca;line-height:1.5}
                 _pending_sources.append(sid)
             except Exception as exc:
                 _dbg(f"Suppressed non-fatal exception in _do_fullscreen: {exc}")
-            def _retry_fs(w=win):
+            def _retry_fs(w=win, monitor=mon):
                 try:
-                    if w.get_visible():
-                        w.fullscreen()
+                    if w.get_visible() and not w.is_fullscreen():
+                        _request_fullscreen(w, monitor)
                         w.present()
+                    _log_event("viewer_window_state", visible=w.get_visible(), fullscreen=w.is_fullscreen())
                 except Exception as exc:
                     _dbg(f"Suppressed non-fatal exception in _retry_fs: {exc}")
                 return False
             sid2 = GLib.timeout_add(200, _retry_fs)
             sid3 = GLib.timeout_add(600, _retry_fs)
+            # Mutter may defer the first fullscreen request while a new
+            # Wayland surface is being negotiated. Keep retrying briefly so a
+            # live-but-normal window cannot become a ghost viewer.
+            sid4 = GLib.timeout_add(1500, _retry_fs)
+            sid5 = GLib.timeout_add(3000, _retry_fs)
             try:
-                _pending_sources.extend([sid2, sid3])
+                _pending_sources.extend([sid2, sid3, sid4, sid5])
             except Exception as exc:
                 _dbg(f"Suppressed non-fatal exception in _do_fullscreen: {exc}")
         except Exception:
@@ -1098,7 +1114,7 @@ p{color:#c4c0ca;line-height:1.5}
         try:
             def _on_map(w, _pspec=None):
                 try:
-                    w.fullscreen()
+                    _request_fullscreen(w, mon)
                     w.present()
                 except Exception as exc:
                     _dbg(f"Suppressed non-fatal exception in _on_map: {exc}")
