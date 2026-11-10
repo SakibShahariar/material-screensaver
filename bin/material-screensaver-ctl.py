@@ -857,6 +857,8 @@ p{color:#c4c0ca;line-height:1.5}
                 )
         win.set_child(viewer_content)
 
+        super_pressed = {"value": False}
+
         def on_key(ctrl, keyval, keycode, state, _win=win):
             _notify_lock_activity()
             try:
@@ -867,9 +869,12 @@ p{color:#c4c0ca;line-height:1.5}
             try:
                 from gi.repository import Gdk
                 is_q = keyval in (Gdk.KEY_q, Gdk.KEY_Q)
-                has_super = bool(state & Gdk.ModifierType.SUPER_MASK)
                 is_super = keyval in (Gdk.KEY_Super_L, Gdk.KEY_Super_R, Gdk.KEY_Meta_L, Gdk.KEY_Meta_R, 65515, 65516)
-                if is_q and has_super:
+                if is_super:
+                    super_pressed["value"] = True
+                has_super = bool(state & (Gdk.ModifierType.SUPER_MASK | Gdk.ModifierType.META_MASK))
+                if is_q and (has_super or super_pressed["value"]):
+                    _log_event("viewer_dismissed", shortcut="Super+Q")
                     hide_viewer()
                     return True
                 if is_super:
@@ -994,6 +999,7 @@ p{color:#c4c0ca;line-height:1.5}
                     from gi.repository import Gdk
                     is_super = keyval in (Gdk.KEY_Super_L, Gdk.KEY_Super_R, Gdk.KEY_Meta_L, Gdk.KEY_Meta_R, 65515, 65516)
                     if is_super:
+                        super_pressed["value"] = False
                         return True
                 except Exception as exc:
                     _dbg(f"Suppressed non-fatal exception in on_key_release: {exc}")
