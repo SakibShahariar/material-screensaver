@@ -1827,6 +1827,23 @@ def run_viewer(html_path, clock_format="24h", scene_options=None, viewer_cfg=Non
         _viewer_windows = _create_viewer_windows(html_path, clock_format, scene_options, viewer_cfg)
         loop = GLib.MainLoop()
         _viewer_loop = loop
+        def _viewer_close_request(_window):
+            # A compositor/window-manager close can destroy the surface
+            # without going through the keyboard handler. Always terminate
+            # the isolated viewer process when its last window is closed.
+            try:
+                _log_event("viewer_window_closed")
+                loop.quit()
+            except Exception as exc:
+                _dbg(f"Suppressed non-fatal exception in _viewer_close_request: {exc}")
+            return False
+
+        for window in _viewer_windows:
+            try:
+                window.connect("close-request", _viewer_close_request)
+            except Exception as exc:
+                _dbg(f"Suppressed non-fatal exception connecting close-request: {exc}")
+
         def _viewer_sig(*_a):
             try:
                 for w in list(_viewer_windows):
