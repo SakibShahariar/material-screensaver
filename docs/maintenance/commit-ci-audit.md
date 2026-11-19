@@ -24,10 +24,10 @@ Persistent repository-specific record of commit-level CI checks and red-cross in
 
 - Repository: `SakibShahariar/material-screensaver`
 - Default branch: `master`
-- Checkpoint SHA: `41dc4df3219166884aa73c14fb3ed4e1b6200919`
+- Checkpoint SHA: `814afc697af08133c3c378ef3989d235e9fdacbf`
 - Initialized: 2026-11-02
 - Baseline correction: a workflow run for the checkpoint commit was later found and inspected; it failed in the test-suite step. The failure is recorded below rather than treating the earlier empty combined-status response as authoritative.
-- Next session: review commits after `41dc4df3219166884aa73c14fb3ed4e1b6200919` (including the local README fix and its pending CI run); retain the historical failures below for audit context.
+- Next session: review commits after `814afc697af08133c3c378ef3989d235e9fdacbf`; retain the historical red, pending, and unavailable entries below for audit context.
 
 ## Initial baseline
 
@@ -108,7 +108,7 @@ Reviewed the range after the previous checkpoint `48a9c4214a92f62b6815e4d8ec464c
 |---|---|---|---|---|
 | `f6f8352c1272ecde78b92bea89ffc943300439d7` | docs(scenes): keep captions aligned with theme colors (#64) | green | [41659146125](https://github.com/SakibShahariar/material-screensaver/actions/runs/41659146125) | Tests and lint passed. |
 | `30dc4aada0cb53b1ea70c5342ae15438a559c319` | docs(agents): clarify acceptance criteria evidence | green | [41864231334](https://github.com/SakibShahariar/material-screensaver/actions/runs/41864231334) | Tests and lint passed. |
-| `43ac3f4333af82aec8af8be08dded52c408cfa05` | docs: streamline Material Screensaver README | red | [42514687798](https://github.com/SakibShahariar/material-screensaver/actions/runs/42514687798) | Removed the canonical preview captions, `**31 animated scenes**` count wording, and `requestAnimationFrame-driven scenes at **10 FPS**` line; six tests failed, lint passed. |
+| `43ac3f4333af82aec8af8be08dded52c408cfa05` | docs: streamline Material Screensaver README | red | [42514687798](https://github.com/SakibShahariar/material-screensaver/actions/runs/42514687798) | Removed the canonical preview captions, `**31 animated scenes**` count wording, and `requestAnimationFrame-driven scenes at **10 FPS**` line; six tests failed, lint passed. Resolved by `814afc6`. |
 | `23ac781063cbbddf67ad94bd41404a500bce0a7b` | fix(ctl): resolve graphical session for logind lock monitoring | unavailable | none | No check runs recorded. |
 | `3b79a19f07f7ca7de96b246c2aabc9a73f81f23d` | fix(gui): handle subprocess result tuple from PyGObject | unavailable | none | No check runs recorded. |
 | `f523ec6bc366ca40248f9cd2655d7b30c11f2333` | feat(gui): organize settings into sidebar sections | unavailable | none | No check runs recorded. |
@@ -118,13 +118,14 @@ Reviewed the range after the previous checkpoint `48a9c4214a92f62b6815e4d8ec464c
 | `7e447e90ae1f573d695a797b3e705dddecd8596d` | fix(viewer): exit process when window closes | unavailable | none | No check runs recorded. |
 | `4cb20e42a9ae6781842ce34f966e7794f07414ed` | fix(lock): attempt lock during viewer transition | unavailable | none | No check runs recorded. |
 | `429c384bcf09893d7aa0d0fab366cd3aef223771` | fix(lock): complete lock commands off the GTK callback | unavailable | none | No check runs recorded. |
-| `cb59bee332e88566129bd76262070d22ff2e24bf` | feat(viewer): style lock countdown with accent colors | red | [42800117819](https://github.com/SakibShahariar/material-screensaver/actions/runs/42800117819) | Same six README test failures; lint passed. |
-| `6bd6319e90a35e479d1001390426b166048ff872` | feat(scenes): validate versioned scene manifests (#55) | red | [42801759473](https://github.com/SakibShahariar/material-screensaver/actions/runs/42801759473) | Same six README test failures; lint passed. |
-| `41dc4df3219166884aa73c14fb3ed4e1b6200919` | fix(gui): persist resized settings window | red | [42808498997](https://github.com/SakibShahariar/material-screensaver/actions/runs/42808498997) | Same six README test failures; lint passed. |
+| `cb59bee332e88566129bd76262070d22ff2e24bf` | feat(viewer): style lock countdown with accent colors | red | [42800117819](https://github.com/SakibShahariar/material-screensaver/actions/runs/42800117819) | Same six README test failures; lint passed. Resolved by `814afc6`. |
+| `6bd6319e90a35e479d1001390426b166048ff872` | feat(scenes): validate versioned scene manifests (#55) | red | [42801759473](https://github.com/SakibShahariar/material-screensaver/actions/runs/42801759473) | Same six README test failures; lint passed. Resolved by `814afc6`. |
+| `41dc4df3219166884aa73c14fb3ed4e1b6200919` | fix(gui): persist resized settings window | red | [42808498997](https://github.com/SakibShahariar/material-screensaver/actions/runs/42808498997) | Same six README test failures; lint passed. Resolved by `814afc6`. |
+| `814afc697af08133c3c378ef3989d235e9fdacbf` | fix(docs): restore README content required by CI tests | green | [44498147410](https://github.com/SakibShahariar/material-screensaver/actions/runs/44498147410) | 2026-11-19. Restored the three test-guarded README strings; lint and tests passed, along with scene validation, payload budget, WebKit CSP, and performance steps. |
 
 Diagnosis: one root cause. `43ac3f4` dropped three README strings asserted by `tests/test_scene_descriptions.py` and `tests/test_static.py`. Every later push re-ran the same failing tree, so three otherwise-unrelated feature/fix commits inherited red status. This repeats the earlier `eb19a55` streamline failure resolved by `14bcaab`.
 
-Fix (2026-11-19, local commit): restored the canonical preview captions, the `**31 animated scenes**` feature wording, and the `requestAnimationFrame-driven scenes at **10 FPS**` reduced-motion line in `README.md`; kept the remainder of the streamline. Local verification: 216/216 unit tests pass, `validate-scenes.py` 31/31 pass, `check-scene-payload-budget.py` passes. Ruff is not installed locally; the change is README-only and lint was green in the observed CI runs. The fix commit's CI result is **pending** until it is pushed; the red entries above stay open until that green run is observed.
+Fix: `814afc697af08133c3c378ef3989d235e9fdacbf` restored the canonical preview captions, the `**31 animated scenes**` feature wording, and the `requestAnimationFrame-driven scenes at **10 FPS**` reduced-motion line in `README.md`; kept the remainder of the streamline. Local verification: 216/216 unit tests pass, `validate-scenes.py` 31/31 pass, `check-scene-payload-budget.py` passes. Ruff is not installed locally; the change is README-only. Pushed to `master` on 2026-11-19 and verified green in [run 44498147410](https://github.com/SakibShahariar/material-screensaver/actions/runs/44498147410) (lint success, tests success). The four red entries above are therefore resolved; the nine unavailable entries remain without evidence and are carried forward.
 
 ### Failure record template
 
@@ -145,4 +146,4 @@ Fix (2026-11-19, local commit): restored the canonical preview captions, the `**
 | Date | Reviewed range / checkpoint | Result summary |
 |---|---|---|
 | 2026-11-02 | Initial checkpoint: `44ec3498851aff1735124f2d80ef232f35af6c84` | Latest commit queried; empty status response recorded as unavailable. Earlier history not retroactively audited. |
-| 2026-11-19 | `48a9c421` → `41dc4df3` (15 commits) | Two green, nine unavailable (no check runs), four red. All four red runs share the README-streamline regression at `43ac3f4`; local README fix applied with 216/216 tests passing, CI verification pending. |
+| 2026-11-19 | `48a9c421` → `814afc69` (16 commits) | Two green, nine unavailable (no check runs), four red from the README-streamline regression at `43ac3f4`. Fix `814afc69` pushed and verified green in run 44498147410; red entries resolved, unavailable entries carried forward. |
