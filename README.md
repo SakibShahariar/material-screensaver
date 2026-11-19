@@ -17,18 +17,18 @@
 | | |
 |---|---|
 | ![Liquid Blobs](screenshots/shot01.png) | ![Origami](screenshots/shot02.png) |
-| **Liquid Blobs** | **Origami** |
+| **Liquid Blobs** — Soft, rounded color blobs swell and overlap, forming slow, liquid-like shapes. | **Origami** — A grid of diamond-shaped tiles slowly flips between two colors. |
 | ![City](screenshots/shot03.png) | ![Bubbles](screenshots/shot06.png) |
-| **City** | **Bubbles** |
+| **City** — A layered city skyline with lit windows sits beneath a sky that shifts between dusk and night. | **Bubbles** — Translucent bubbles of different sizes float upward and pop against a dark background. |
 
 ## Features
 
-- **31 scenes** across abstract, geometric, space, and nature-inspired styles.
+- **31 animated scenes** across abstract, geometric, space, and nature-inspired styles.
 - **GNOME integration** with idle activation and multi-monitor support.
 - **Scene controls** for search, categories, favorites, random selection, and per-scene options.
 - **Clock overlay** and configurable keyboard shortcuts.
 - **Power controls** with frame-rate limits, battery saver, and display blanking.
-- **Reduced motion** support, limiting animated scenes to 10 FPS when enabled.
+- **Reduced motion** support for the system preference, capping requestAnimationFrame-driven scenes at **10 FPS** when enabled.
 - **Offline by default:** bundled scenes require no network connection.
 
 > **Not a lock screen.** Use GNOME's session lock to secure your computer.

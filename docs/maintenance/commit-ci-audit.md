@@ -24,10 +24,10 @@ Persistent repository-specific record of commit-level CI checks and red-cross in
 
 - Repository: `SakibShahariar/material-screensaver`
 - Default branch: `master`
-- Checkpoint SHA: `48a9c4214a92f62b6815e4d8ec464c4b9a39bcf8`
+- Checkpoint SHA: `41dc4df3219166884aa73c14fb3ed4e1b6200919`
 - Initialized: 2026-11-02
 - Baseline correction: a workflow run for the checkpoint commit was later found and inspected; it failed in the test-suite step. The failure is recorded below rather than treating the earlier empty combined-status response as authoritative.
-- Next session: review commits after `48a9c4214a92f62b6815e4d8ec464c4b9a39bcf8`; retain the historical failures below for audit context.
+- Next session: review commits after `41dc4df3219166884aa73c14fb3ed4e1b6200919` (including the local README fix and its pending CI run); retain the historical failures below for audit context.
 
 ## Initial baseline
 
@@ -100,6 +100,32 @@ The lock-test fixture failure was resolved by `423eebf`; the GUI title-regex fai
 
 | `48a9c4214a92f62b6815e4d8ec464c4b9a39bcf8` | feat(settings): add visual descriptions for all scenes (#64) | green | [41658677951](https://github.com/SakibShahariar/material-screensaver/actions/runs/41658677951) | Added descriptions for all 31 scenes, displayed the selected description in Settings, updated README preview captions, and added coverage tests; tests, lint, and performance workflow passed. |
 
+### 2026-11-19 follow-up audit (README streamline regression)
+
+Reviewed the range after the previous checkpoint `48a9c4214a92f62b6815e4d8ec464c4b9a39bcf8` through HEAD `41dc4df3219166884aa73c14fb3ed4e1b6200919`. Nine intermediate commits have zero recorded check runs in the GitHub API and are marked **unavailable** (absence of evidence is not a pass). The other three pushes are **red** because the README streamline at `43ac3f4` removed content asserted by the test suite; lint is green in all four observed runs.
+
+| Commit SHA | Subject | CI result | Workflow run | Outcome |
+|---|---|---|---|---|
+| `f6f8352c1272ecde78b92bea89ffc943300439d7` | docs(scenes): keep captions aligned with theme colors (#64) | green | [41659146125](https://github.com/SakibShahariar/material-screensaver/actions/runs/41659146125) | Tests and lint passed. |
+| `30dc4aada0cb53b1ea70c5342ae15438a559c319` | docs(agents): clarify acceptance criteria evidence | green | [41864231334](https://github.com/SakibShahariar/material-screensaver/actions/runs/41864231334) | Tests and lint passed. |
+| `43ac3f4333af82aec8af8be08dded52c408cfa05` | docs: streamline Material Screensaver README | red | [42514687798](https://github.com/SakibShahariar/material-screensaver/actions/runs/42514687798) | Removed the canonical preview captions, `**31 animated scenes**` count wording, and `requestAnimationFrame-driven scenes at **10 FPS**` line; six tests failed, lint passed. |
+| `23ac781063cbbddf67ad94bd41404a500bce0a7b` | fix(ctl): resolve graphical session for logind lock monitoring | unavailable | none | No check runs recorded. |
+| `3b79a19f07f7ca7de96b246c2aabc9a73f81f23d` | fix(gui): handle subprocess result tuple from PyGObject | unavailable | none | No check runs recorded. |
+| `f523ec6bc366ca40248f9cd2655d7b30c11f2333` | feat(gui): organize settings into sidebar sections | unavailable | none | No check runs recorded. |
+| `0ae760fa464cfac656319209e69cf915de7f0d16` | refactor(gui): use native libadwaita preferences navigation | unavailable | none | No check runs recorded. |
+| `f3d6e41737989bc5f319382b9f486479db837c9b` | fix(viewer): retry Wayland fullscreen requests | unavailable | none | No check runs recorded. |
+| `89d51eeb23cfce725865c20368e75550ebfa6697` | fix(viewer): reliably dismiss with Super+Q | unavailable | none | No check runs recorded. |
+| `7e447e90ae1f573d695a797b3e705dddecd8596d` | fix(viewer): exit process when window closes | unavailable | none | No check runs recorded. |
+| `4cb20e42a9ae6781842ce34f966e7794f07414ed` | fix(lock): attempt lock during viewer transition | unavailable | none | No check runs recorded. |
+| `429c384bcf09893d7aa0d0fab366cd3aef223771` | fix(lock): complete lock commands off the GTK callback | unavailable | none | No check runs recorded. |
+| `cb59bee332e88566129bd76262070d22ff2e24bf` | feat(viewer): style lock countdown with accent colors | red | [42800117819](https://github.com/SakibShahariar/material-screensaver/actions/runs/42800117819) | Same six README test failures; lint passed. |
+| `6bd6319e90a35e479d1001390426b166048ff872` | feat(scenes): validate versioned scene manifests (#55) | red | [42801759473](https://github.com/SakibShahariar/material-screensaver/actions/runs/42801759473) | Same six README test failures; lint passed. |
+| `41dc4df3219166884aa73c14fb3ed4e1b6200919` | fix(gui): persist resized settings window | red | [42808498997](https://github.com/SakibShahariar/material-screensaver/actions/runs/42808498997) | Same six README test failures; lint passed. |
+
+Diagnosis: one root cause. `43ac3f4` dropped three README strings asserted by `tests/test_scene_descriptions.py` and `tests/test_static.py`. Every later push re-ran the same failing tree, so three otherwise-unrelated feature/fix commits inherited red status. This repeats the earlier `eb19a55` streamline failure resolved by `14bcaab`.
+
+Fix (2026-11-19, local commit): restored the canonical preview captions, the `**31 animated scenes**` feature wording, and the `requestAnimationFrame-driven scenes at **10 FPS**` reduced-motion line in `README.md`; kept the remainder of the streamline. Local verification: 216/216 unit tests pass, `validate-scenes.py` 31/31 pass, `check-scene-payload-budget.py` passes. Ruff is not installed locally; the change is README-only and lint was green in the observed CI runs. The fix commit's CI result is **pending** until it is pushed; the red entries above stay open until that green run is observed.
+
 ### Failure record template
 
 - Commit SHA:
@@ -119,3 +145,4 @@ The lock-test fixture failure was resolved by `423eebf`; the GUI title-regex fai
 | Date | Reviewed range / checkpoint | Result summary |
 |---|---|---|
 | 2026-11-02 | Initial checkpoint: `44ec3498851aff1735124f2d80ef232f35af6c84` | Latest commit queried; empty status response recorded as unavailable. Earlier history not retroactively audited. |
+| 2026-11-19 | `48a9c421` → `41dc4df3` (15 commits) | Two green, nine unavailable (no check runs), four red. All four red runs share the README-streamline regression at `43ac3f4`; local README fix applied with 216/216 tests passing, CI verification pending. |
