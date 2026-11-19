@@ -25,6 +25,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   updated (the test-suite count check parses that line dynamically). Collection total
   is now 31.
 ### Fixed
+- Viewer teardown now resolves the WebView inside the window's `Gtk.Overlay` instead of
+  treating the overlay itself as the WebView. WebKit is properly stopped, loading is
+  halted, and widgets are unparented before disposal — removing the silent
+  `'Overlay' object has no attribute 'terminate_web_process'` failure and the GTK
+  critical emitted on window dispose.
 - Idle activation now closes an open GNOME Overview before showing the viewer, via the
   Shell's `OverviewActive` D-Bus property. Previously the fullscreen viewer could appear
   as a thumbnail inside the Overview instead of covering the screen. The step fails open

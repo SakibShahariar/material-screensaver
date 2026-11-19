@@ -414,6 +414,32 @@ def _battery_is_discharging():
     return state
 
 
+def _viewer_webview(window):
+    """Return the WebView hosted by a viewer window.
+
+    The window's direct child is a Gtk.Overlay that wraps the WebView (and the
+    clock/countdown overlays), so get_child() alone is not the WebView.
+    """
+    web = getattr(window, "_viewer_webview", None)
+    if web is not None:
+        return web
+    try:
+        child = window.get_child()
+    except Exception:
+        return None
+    if child is None:
+        return None
+    if hasattr(child, "terminate_web_process"):
+        return child
+    try:
+        inner = child.get_child()
+    except Exception:
+        return None
+    if inner is not None and hasattr(inner, "terminate_web_process"):
+        return inner
+    return None
+
+
 def _scene_uri(scene_path, clock_format="24h", viewer_cfg=None):
     """Build the file URI a viewer WebView loads for one scene."""
     import gi
@@ -867,6 +893,7 @@ p{color:#c4c0ca;line-height:1.5}
         web.connect("load-failed", on_scene_load_failed)
         web.load_uri(uri)
         try:
+            win._viewer_webview = web
             win._rotation_web = web
             win._rotation_scene = os.path.basename(monitor_html_path)
             win._rotation_locked = rotation_locked
@@ -1984,16 +2011,30 @@ def run_viewer(html_path, clock_format="24h", scene_options=None, viewer_cfg=Non
     try:
         for w in list(_viewer_windows):
             try:
-                web = w.get_child()
+                web = _viewer_webview(w)
                 if web is not None:
                     try:
+                        web.stop_loading()
+                    except Exception as exc:
+                        _dbg(f"Suppressed non-fatal exception in _viewer_sig: {exc}")
+                    try:
                         web.terminate_web_process()
+                    except Exception as exc:
+                        _dbg(f"Suppressed non-fatal exception in _viewer_sig: {exc}")
+                    try:
+                        web.unparent()
                     except Exception as exc:
                         _dbg(f"Suppressed non-fatal exception in _viewer_sig: {exc}")
                     try:
                         web.run_dispose()
                     except Exception as exc:
                         _dbg(f"Suppressed non-fatal exception in _viewer_sig: {exc}")
+                # Unparent the overlay before disposing the window; disposing a
+                # still-parented widget emits a GTK critical and leaks refs.
+                try:
+                    w.set_child(None)
+                except Exception as exc:
+                    _dbg(f"Suppressed non-fatal exception in _viewer_sig: {exc}")
                 w.run_dispose()
             except Exception as exc:
                 _dbg(f"Suppressed non-fatal exception in _viewer_sig: {exc}")
@@ -2167,7 +2208,7 @@ def hide_viewer():
         try:
             for w in list(_viewer_windows):
                 try:
-                    web = w.get_child()
+                    web = _viewer_webview(w)
                     if web is not None:
                         try:
                             web.terminate_web_process()
@@ -2311,7 +2352,7 @@ def hide_viewer():
             # Detach WebView first — crucial to let WebKit release bwrap/WebProcess
             web = None
             try:
-                web = w.get_child()
+                web = _viewer_webview(w)
             except Exception:
                 web = None
             if web is not None:
