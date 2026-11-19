@@ -56,6 +56,12 @@ Check the lock-after value in Settings and review recent service logs for lock-r
 
 Check GNOME display settings and the configured scale factors, then restart the viewer after the display layout is stable. Record the monitor count, resolutions, scale factors, and whether a display was hot-plugged. See [issue #43](https://github.com/SakibShahariar/material-screensaver/issues/43) and the [GNOME Wayland integration test plan](gnome-integration-test-plan.md).
 
+### Settings window size and position
+
+The Settings window restores its **size** from `~/.config/material-screensaver/window-state.json`, clamped to the current monitor geometry so a size saved on a larger display does not reopen clipped after a resolution change or monitor removal.
+
+Its **position is not saved or restored**. GTK4 has no window-position API (`Gtk.Window.move()`/`set_position()` were removed, and GDK exposes no primary-monitor API), and Wayland leaves placement to the compositor. The window therefore reopens at a compositor-chosen position; overriding that placement is out of scope. Window state lives in a separate file from `config.json`, so resetting preferences does not affect it.
+
 ## Fullscreen media and idle inhibition
 
 When GNOME applications request session idle inhibition (commonly while fullscreen media is playing), Material Screensaver checks GNOME SessionManager before opening its viewer. If an idle inhibitor is active, activation is deferred and the idle watch is re-armed shortly afterward. If SessionManager is unavailable, the check fails open so ordinary idle activation continues rather than being disabled accidentally.
