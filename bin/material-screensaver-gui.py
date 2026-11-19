@@ -397,6 +397,21 @@ class ScreensaverWindow(Adw.PreferencesWindow):
         random_row.set_activatable_widget(self.random_switch)
         sv_group.add(random_row)
 
+        self.rotation_switch = Gtk.Switch(valign=Gtk.Align.CENTER)
+        rotation_row = Adw.ActionRow(
+            title="Rotate scenes while active",
+            subtitle="Cycle through favorites, or all scenes, on a timer",
+        )
+        rotation_row.add_suffix(self.rotation_switch)
+        rotation_row.set_activatable_widget(self.rotation_switch)
+        sv_group.add(rotation_row)
+
+        self.rotation_intervals = (30, 60, 300, 900)
+        self.rotation_interval_row = Adw.ComboRow(title="Rotation interval")
+        self.rotation_interval_row.set_model(Gtk.StringList.new(
+            ["30 seconds", "1 minute", "5 minutes", "15 minutes"]))
+        sv_group.add(self.rotation_interval_row)
+
         self.search_entry = Gtk.SearchEntry(hexpand=True)
         self.search_entry.set_placeholder_text("Search scenes, categories, and settings")
         search_row = Adw.ActionRow(title="Search")
@@ -695,6 +710,8 @@ class ScreensaverWindow(Adw.PreferencesWindow):
 
         # connect after loading so initial population doesn't trigger writes
         self.random_switch.connect("notify::active", self.on_random_toggled)
+        self.rotation_switch.connect("notify::active", self.on_rotation_toggled)
+        self.rotation_interval_row.connect("notify::selected", self.on_rotation_interval_changed)
         self.combo_row.connect("notify::selected", self.on_screensaver_changed)
         self.idle_row.connect("notify::value", self.on_idle_changed)
         self.lock_row.connect("notify::value", self.on_lock_changed)
@@ -789,6 +806,12 @@ class ScreensaverWindow(Adw.PreferencesWindow):
 
         is_random = cfg.get("random", False) and self._preview_override is None
         self.random_switch.set_active(is_random)
+        self.rotation_switch.set_active(cfg.get("rotation_enabled", False))
+        rotation_interval = cfg.get("rotation_interval_seconds", 300)
+        self.rotation_interval_row.set_selected(
+            self.rotation_intervals.index(rotation_interval)
+            if rotation_interval in self.rotation_intervals else 2
+        )
         active = self._preview_override or cfg.get("active")
         self.selected_scene = active if active in self.screensaver_files else (
             self.screensaver_files[0] if self.screensaver_files else None
@@ -1265,6 +1288,14 @@ class ScreensaverWindow(Adw.PreferencesWindow):
         self._save_config(random=is_random)
         self.combo_row.set_sensitive(bool(self.filtered_screensaver_files) and not is_random)
         self._update_preview()
+
+    def on_rotation_toggled(self, switch, _pspec):
+        self._save_config(rotation_enabled=switch.get_active())
+
+    def on_rotation_interval_changed(self, row, _pspec):
+        index = row.get_selected()
+        if 0 <= index < len(self.rotation_intervals):
+            self._save_config(rotation_interval_seconds=self.rotation_intervals[index])
 
     def on_screensaver_changed(self, row, _pspec):
         if self._picker_updating:

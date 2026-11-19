@@ -16,6 +16,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - "Test it now" preview group (Start/Stop buttons) from the settings GUI — the inline
   Live Preview thumbnail already shows the selected style.
 ### Added
+- Optional scene rotation while the screensaver is active (off by default). Configure
+  **Rotate scenes while active** and an interval in Settings; rotation cycles through
+  favorites when set, otherwise all valid scenes, by reloading the existing viewer
+  WebViews — no new processes, and the lock timer and Super+Q dismissal are unaffected.
 - New screensaver styles **Rain on a Window** (Canvas 2D, blob.html-shaped, full clock
   + hint + `prefers-reduced-motion` handling). README "Styles included" list + count
   updated (the test-suite count check parses that line dynamically). Collection total

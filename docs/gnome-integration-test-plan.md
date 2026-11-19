@@ -31,6 +31,7 @@ Do not describe a case as passed unless it was actually run. Mark it **Blocked**
 | VIEW-01 | Dismiss with shortcut | Show viewer and press Super+Q. | Viewer closes and does not immediately reopen. |
 | VIEW-02 | Configured shortcut | Configure a non-conflicting shortcut and invoke it while hidden and visible. | It shows/hides the viewer; Super+Q remains reserved for dismissal. |
 | VIEW-03 | Lock from viewer | Set a short lock-after timeout and let it expire. | GNOME locks; the viewer is dismissed/hidden as intended. |
+| VIEW-04 | Scene rotation while active | Enable rotation with a short interval, show the viewer, and wait through several switches; then press Super+Q. | Scenes change in order without new viewer processes; the lock timer continues, Super+Q still dismisses, and no WebKit helpers leak. |
 | LOCK-01 | External lock while visible | Show viewer, press Super+L, then unlock. | Viewer does not appear over the unlocked desktop. |
 | LOCK-02 | External lock while hidden | Hide viewer, lock/unlock the session, then wait. | No stale viewer appears; idle activation still works afterward. |
 | LOCK-03 | Lock timer set to zero | Set Lock after to 0, show viewer and wait longer than the normal lock delay. | Session is not automatically locked by this app. |

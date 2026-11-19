@@ -414,6 +414,75 @@ def _battery_is_discharging():
     return state
 
 
+def _scene_uri(scene_path, clock_format="24h", viewer_cfg=None):
+    """Build the file URI a viewer WebView loads for one scene."""
+    import gi
+    gi.require_version("Gio", "2.0")
+    from gi.repository import Gio
+    viewer_cfg = viewer_cfg if isinstance(viewer_cfg, dict) else {}
+    params = {"format": clock_format}
+    params.update(config_store.get_scene_options(viewer_cfg, os.path.basename(scene_path)))
+    return f"{Gio.File.new_for_path(scene_path).get_uri()}?{urlencode(params)}"
+
+
+def _rotation_scene_names(cfg, available_scenes):
+    """Ordered rotation list: configured favorites when valid, else all scenes."""
+    favorites = cfg.get("favorites", []) if isinstance(cfg, dict) else []
+    chosen = [name for name in favorites if name in available_scenes]
+    return chosen if chosen else sorted(available_scenes)
+
+
+def _configure_viewer_rotation(viewer_cfg, windows, clock_format):
+    """Arm in-viewer scene rotation. Returns True when a timer was installed."""
+    if not isinstance(viewer_cfg, dict) or not viewer_cfg.get("rotation_enabled", False):
+        return False
+    interval = viewer_cfg.get("rotation_interval_seconds", 300)
+    if isinstance(interval, bool) or not isinstance(interval, int) or interval < 30:
+        return False
+    available = list_screensavers()
+    names = _rotation_scene_names(viewer_cfg, available)
+    if len(names) < 2 or not windows:
+        return False
+    state = {
+        "names": names,
+        "available": available,
+        "windows": windows,
+        "clock_format": clock_format,
+        "viewer_cfg": viewer_cfg,
+    }
+    try:
+        from gi.repository import GLib
+        GLib.timeout_add_seconds(interval, _rotate_viewer_scenes, state)
+        _log_event("viewer_rotation_armed", interval=interval, scenes=len(names))
+        return True
+    except Exception as exc:
+        _dbg(f"Could not arm viewer rotation: {exc}")
+        return False
+
+
+def _rotate_viewer_scenes(state):
+    """Advance each viewer window to the next scene, reusing its WebView."""
+    names = state["names"]
+    for window in state["windows"]:
+        web = getattr(window, "_rotation_web", None)
+        current = getattr(window, "_rotation_scene", None)
+        if web is None or getattr(window, "_rotation_locked", False):
+            continue
+        try:
+            index = names.index(current) if current in names else -1
+            next_name = names[(index + 1) % len(names)]
+            scene_path = state["available"].get(next_name)
+            if scene_path is None:
+                continue
+            web.load_uri(_scene_uri(
+                scene_path, state["clock_format"], state["viewer_cfg"]))
+            window._rotation_scene = next_name
+        except Exception as exc:
+            _dbg(f"Viewer rotation skipped a scene: {type(exc).__name__}")
+    _log_event("viewer_rotated")
+    return True
+
+
 def _create_viewer_windows(html_path, clock_format="24h", scene_options=None, viewer_cfg=None):
     """Create one fullscreen Gtk.Window per monitor with WebKit WebView."""
     if not isinstance(viewer_cfg, dict):
@@ -480,17 +549,19 @@ def _create_viewer_windows(html_path, clock_format="24h", scene_options=None, vi
             _ephemeral_ctx = _get_shared_context()
     ctx = _ephemeral_ctx
     for monitor_index, mon in enumerate(monitors):
+        rotation_locked = False
         try:
             monitor_key = config_store.monitor_identifier(mon, monitor_index)
             assigned_scene = config_store.resolve_monitor_scene(
                 monitor_key, monitor_assignments, available_scenes, os.path.basename(html_path)
             )
             monitor_html_path = available_scenes.get(assigned_scene, html_path)
-            monitor_scene_options = config_store.get_scene_options(viewer_cfg, os.path.basename(monitor_html_path))
-            uri = Gio.File.new_for_path(monitor_html_path).get_uri()
-            params = {"format": clock_format}
-            params.update(monitor_scene_options)
-            uri = f"{uri}?{urlencode(params)}"
+            rotation_locked = (
+                isinstance(monitor_assignments, dict)
+                and isinstance(monitor_assignments.get(monitor_key), str)
+                and monitor_assignments.get(monitor_key) in available_scenes
+            )
+            uri = _scene_uri(monitor_html_path, clock_format, viewer_cfg)
             if _daemon_app is not None:
                 win = Gtk.ApplicationWindow(application=_daemon_app, title="Material Screensaver")
             else:
@@ -795,6 +866,12 @@ p{color:#c4c0ca;line-height:1.5}
 
         web.connect("load-failed", on_scene_load_failed)
         web.load_uri(uri)
+        try:
+            win._rotation_web = web
+            win._rotation_scene = os.path.basename(monitor_html_path)
+            win._rotation_locked = rotation_locked
+        except Exception as exc:
+            _dbg(f"Could not record rotation state: {exc}")
         viewer_content = Gtk.Overlay()
         viewer_content.set_child(web)
         if battery_indicator_text:
@@ -1857,6 +1934,7 @@ def run_viewer(html_path, clock_format="24h", scene_options=None, viewer_cfg=Non
             {"screensaver_options": {scene_name: scene_options or {}}}, scene_name
         )
         _viewer_windows = _create_viewer_windows(html_path, clock_format, scene_options, viewer_cfg)
+        _configure_viewer_rotation(viewer_cfg, _viewer_windows, clock_format)
         loop = GLib.MainLoop()
         _viewer_loop = loop
         def _viewer_close_request(_window):

@@ -30,6 +30,8 @@ DEFAULT_CONFIG = {
     "clock_overlay_position": "bottom-right",
     "clock_overlay_opacity": 80,
     "random": False,
+    "rotation_enabled": False,
+    "rotation_interval_seconds": 300,
     "lock_after_seconds": 300,
     "lock_countdown": False,
     "matugen_colors_path": DEFAULT_MATUGEN_COLORS_PATH,
@@ -126,6 +128,11 @@ def normalize_config(data):
         cfg["random"] = data["random"]
     if isinstance(data.get("onboarding_dismissed"), bool):
         cfg["onboarding_dismissed"] = data["onboarding_dismissed"]
+    if isinstance(data.get("rotation_enabled"), bool):
+        cfg["rotation_enabled"] = data["rotation_enabled"]
+    rotation = _valid_int(data.get("rotation_interval_seconds"), 30, 3600)
+    if rotation is not None:
+        cfg["rotation_interval_seconds"] = rotation
     idle = _valid_int(data.get("idle_seconds"), 1, 86400)
     if idle is not None:
         cfg["idle_seconds"] = idle
