@@ -21,6 +21,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   updated (the test-suite count check parses that line dynamically). Collection total
   is now 31.
 ### Fixed
+- Idle activation now closes an open GNOME Overview before showing the viewer, via the
+  Shell's `OverviewActive` D-Bus property. Previously the fullscreen viewer could appear
+  as a thumbnail inside the Overview instead of covering the screen. The step fails open
+  when the Shell D-Bus service is unavailable.
 - The gesture guard now blocks touchpad swipes with three **or more** fingers. GNOME
   Shell treats 4-finger swipes as workspace/overview gestures too, so a 4-finger swipe
   could previously reveal the desktop over the fullscreen screensaver viewer.

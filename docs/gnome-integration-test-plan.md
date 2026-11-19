@@ -27,6 +27,7 @@ Do not describe a case as passed unless it was actually run. Mark it **Blocked**
 | IDLE-02 | Activity before timeout | Move mouse/type before the idle threshold, then wait again. | No early activation; the full idle period is observed again. |
 | IDLE-03 | Change timeout while active | Change idle timeout in Settings while the session is active. | The next activation uses the new timeout without restarting the service. |
 | IDLE-04 | Invalid/missing idle watch recovery | Restart the service and inspect its journal; repeat after transient D-Bus/service errors if safely reproducible. | A failed watch registration is logged and retried; automatic activation recovers. |
+| IDLE-05 | Idle activation from the Overview | Open the GNOME Overview, leave the input idle past the configured timeout, and observe activation. | The Overview closes first, then the viewer covers the screen fullscreen (no thumbnail inside the Overview). With the Shell D-Bus service unavailable, activation still proceeds and the failure is logged. |
 | VIEW-01 | Dismiss with shortcut | Show viewer and press Super+Q. | Viewer closes and does not immediately reopen. |
 | VIEW-02 | Configured shortcut | Configure a non-conflicting shortcut and invoke it while hidden and visible. | It shows/hides the viewer; Super+Q remains reserved for dismissal. |
 | VIEW-03 | Lock from viewer | Set a short lock-after timeout and let it expire. | GNOME locks; the viewer is dismissed/hidden as intended. |

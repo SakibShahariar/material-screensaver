@@ -1533,6 +1533,34 @@ def _cancel_lock():
     except Exception as exc:
         _dbg(f"Suppressed non-fatal exception in _cancel_lock: {exc}")
 
+def _close_overview_before_show():
+    """Leave an open GNOME Overview before the viewer goes fullscreen.
+
+    While the Overview is open, the Shell holds a modal grab in OVERVIEW mode,
+    so a newly mapped fullscreen window can be shown as a thumbnail instead of
+    covering the desktop. Setting OverviewActive=false calls Main.overview.hide()
+    in the Shell. The D-Bus property reads stale until the hide animation ends,
+    so do not poll it. Failure is non-fatal: activation must still proceed when
+    the Shell D-Bus service is unavailable.
+    """
+    try:
+        import gi
+        gi.require_version("Gio", "2.0")
+        from gi.repository import Gio, GLib
+        bus = Gio.bus_get_sync(Gio.BusType.SESSION, None)
+        bus.call_sync(
+            "org.gnome.Shell", "/org/gnome/Shell",
+            "org.freedesktop.DBus.Properties", "Set",
+            GLib.Variant("(ssv)", (
+                "org.gnome.Shell", "OverviewActive",
+                GLib.Variant("b", False),
+            )),
+            None, Gio.DBusCallFlags.NONE, 1500, None,
+        )
+        _dbg("requested GNOME Overview close before viewer")
+    except Exception as exc:
+        _log_event("overview_close_failed", error=type(exc).__name__)
+
 def _inhibit_overview():
     global _saved_overlay_key, _saved_shell_toggle
     try:
@@ -1956,6 +1984,9 @@ def show_viewer():
         except Exception:
             _viewer_process = None
     try:
+        # Leave the Overview first so the fullscreen viewer is not reduced to
+        # a thumbnail inside it. This runs before the subprocess is spawned.
+        _close_overview_before_show()
         _inhibit()
         _inhibit_overview()
         # Defensive: clear stale in-daemon windows (should be none with subprocess model)
