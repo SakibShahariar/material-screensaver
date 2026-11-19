@@ -179,6 +179,30 @@ class TestGuiLogic(unittest.TestCase):
             json.dump({"width": True, "height": "large"}, handle)
         self.assertEqual(self.gui.load_window_size(path), (480, 600))
 
+    def test_window_size_is_clamped_to_current_work_area(self):
+        # Saved size larger than a smaller display after resolution change.
+        self.assertEqual(
+            self.gui.clamp_window_size_to_work_area(1600, 1200, 1024, 768),
+            (984, 728),
+        )
+        # A work area that is still roomy leaves the saved size untouched.
+        self.assertEqual(
+            self.gui.clamp_window_size_to_work_area(900, 720, 1920, 1080),
+            (900, 720),
+        )
+        # Tiny work areas cannot force the window below its minimum size.
+        self.assertEqual(
+            self.gui.clamp_window_size_to_work_area(1600, 1200, 320, 240),
+            (480, 600),
+        )
+        # Invalid geometry is ignored rather than collapsing the window.
+        for work in ((0, 0), (-1, 800), (1920, None)):
+            with self.subTest(work=work):
+                self.assertEqual(
+                    self.gui.clamp_window_size_to_work_area(900, 720, *work),
+                    (900, 720),
+                )
+
     def test_window_size_is_saved_after_resize_and_on_close(self):
         with open(os.path.join(support.REPO_ROOT, "bin", "material-screensaver-gui.py"), encoding="utf-8") as handle:
             source = handle.read()
@@ -186,6 +210,12 @@ class TestGuiLogic(unittest.TestCase):
         self.assertIn('self.connect("notify::height", self._schedule_window_state_save)', source)
         self.assertIn("GLib.timeout_add(250, save_later)", source)
         self.assertIn("self._save_window_size()", source)
+
+    def test_restored_size_uses_work_area_clamp(self):
+        with open(os.path.join(support.REPO_ROOT, "bin", "material-screensaver-gui.py"), encoding="utf-8") as handle:
+            source = handle.read()
+        self.assertIn("self.set_default_size(*self._initial_window_size())", source)
+        self.assertIn("clamp_window_size_to_work_area(width, height, rect.width, rect.height)", source)
 
     def test_query_battery_discharging_states_and_failures(self):
         original = self.gui.subprocess.run

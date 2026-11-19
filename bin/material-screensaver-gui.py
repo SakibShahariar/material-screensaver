@@ -168,6 +168,25 @@ def normalize_window_size(data):
     return tuple(dimensions)
 
 
+def clamp_window_size_to_work_area(width, height, work_width, work_height):
+    """Keep a restored size inside the current monitor's work area.
+
+    A saved size can be larger than the display after a resolution change or
+    monitor removal. GTK4 leaves placement to the compositor, but a clamped
+    default size avoids an oversized or clipped first map. Invalid or zero
+    work-area dimensions are ignored so an odd display cannot collapse it.
+    """
+    width, height = normalize_window_size({"width": width, "height": height})
+    if not isinstance(work_width, int) or not isinstance(work_height, int):
+        return width, height
+    if work_width <= 0 or work_height <= 0:
+        return width, height
+    margin = 40
+    max_width = max(WINDOW_SIZE_BOUNDS[0][0], min(WINDOW_SIZE_BOUNDS[0][1], work_width - margin))
+    max_height = max(WINDOW_SIZE_BOUNDS[1][0], min(WINDOW_SIZE_BOUNDS[1][1], work_height - margin))
+    return min(width, max_width), min(height, max_height)
+
+
 def load_window_size(path=None):
     path = path or WINDOW_STATE_PATH
     try:
@@ -309,7 +328,7 @@ class ScreensaverWindow(Adw.PreferencesWindow):
     def __init__(self, app):
         super().__init__(application=app, title="Screensaver")
         self._preview_override = REQUESTED_PREVIEW
-        self.set_default_size(*load_window_size())
+        self.set_default_size(*self._initial_window_size())
         self._window_state_save_id = None
         self.connect("close-request", self._save_window_size_on_close)
         self.connect("notify::width", self._schedule_window_state_save)
@@ -715,6 +734,19 @@ class ScreensaverWindow(Adw.PreferencesWindow):
             else:
                 status = f"Power state unavailable; battery cap cannot be confirmed. Configured cap: {normal_fps} FPS. {blank_policy}"
         self.battery_status_row.set_subtitle(status)
+
+    def _initial_window_size(self):
+        """Restore the saved size, clamped to the current monitor geometry."""
+        width, height = load_window_size()
+        try:
+            display = Gdk.Display.get_default()
+            monitors = display.get_monitors() if display is not None else None
+            if monitors is not None and monitors.get_n_items() > 0:
+                rect = monitors.get_item(0).get_geometry()
+                return clamp_window_size_to_work_area(width, height, rect.width, rect.height)
+        except Exception as exc:
+            print(f"Could not read monitor geometry for window size: {exc}", file=sys.stderr)
+        return width, height
 
     def _save_window_size(self):
         width, height = self.get_width(), self.get_height()
