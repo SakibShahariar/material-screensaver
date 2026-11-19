@@ -105,7 +105,7 @@ class TestScriptsAndUnits(unittest.TestCase):
 
 
 class TestShellExtension(unittest.TestCase):
-    """The 3-finger-swipe guard shell extension ships intact and install.sh wires it."""
+    """The swipe-guard shell extension ships intact and install.sh wires it."""
 
     def _ext_dir(self, *parts):
         return os.path.join(support.REPO_ROOT, "extensions", EXT_UUID, *parts)
@@ -143,9 +143,30 @@ class TestShellExtension(unittest.TestCase):
             js = f.read()
         self.assertIn("Clutter.EventType.TOUCHPAD_SWIPE", js)
         self.assertIn("get_touchpad_gesture_finger_count", js)
+        self.assertIn("if (fingers < 3)", js)
+        self.assertNotIn("fingers !== 3", js)
         self.assertIn('const VIEWER_TITLE = "Material Screensaver"', js)
         self.assertIn("win.get_title() === VIEWER_TITLE", js)
         self.assertIn("win.is_fullscreen()", js)
+
+    def test_extension_js_blocks_four_finger_swipes(self):
+        # GNOME Shell's swipe trackers handle 3+ fingers, so the guard must too.
+        with open(self._ext_dir("extension.js"), encoding="utf-8") as f:
+            js = f.read()
+        match = re.search(r"if \((fingers\s*[<>=!]+\s*\d+)\)", js)
+        self.assertIsNotNone(match, "could not find the finger-count guard")
+        script = (
+            "for (const fingers of [2, 3, 4, 5]) "
+            f"console.log(fingers, ({match.group(1)}) ? 'propagate' : 'block');"
+        )
+        result = subprocess.run(["node", "-e", script], capture_output=True, text=True)
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertEqual(result.stdout.strip().splitlines(), [
+            "2 propagate",
+            "3 block",
+            "4 block",
+            "5 block",
+        ])
 
     def test_install_stages_and_can_restore_previous_screensavers(self):
         sh = self._read_sh()

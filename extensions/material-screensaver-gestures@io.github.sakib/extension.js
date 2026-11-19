@@ -16,8 +16,9 @@ export default class MaterialScreensaverGestureGuard extends Extension {
                 return Clutter.EVENT_PROPAGATE;
             }
 
-            // Only block 3-finger swipes (workspace switch / overview / alt-tab).
-            if (fingers !== 3)
+            // GNOME Shell handles swipe gestures with 3 or more fingers
+            // (workspace switch / overview), so block the whole range.
+            if (fingers < 3)
                 return Clutter.EVENT_PROPAGATE;
 
             // Scope to the screensaver: block only while our fullscreen viewer

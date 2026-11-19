@@ -106,7 +106,7 @@ cp "$SCRIPT_DIR"/icons/material-screensaver-icon.png \
 cp "$SCRIPT_DIR"/systemd/material-screensaver.service ~/.config/systemd/user/
 cp "$SCRIPT_DIR"/applications/material-screensaver-settings.desktop ~/.local/share/applications/
 
-# Companion GNOME Shell extension: blocks 3-finger touchpad swipes while the
+# Companion GNOME Shell extension: blocks touchpad swipes with 3+ fingers while the
 # screensaver's fullscreen viewer is focused. Self-guarded by window title, so
 # normal desktop gestures are untouched. The shell must be restarted/re-logged
 # once for a newly installed extension to be discovered; afterwards it loads.

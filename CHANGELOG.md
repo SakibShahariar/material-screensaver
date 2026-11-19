@@ -21,6 +21,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   updated (the test-suite count check parses that line dynamically). Collection total
   is now 31.
 ### Fixed
+- The gesture guard now blocks touchpad swipes with three **or more** fingers. GNOME
+  Shell treats 4-finger swipes as workspace/overview gestures too, so a 4-finger swipe
+  could previously reveal the desktop over the fullscreen screensaver viewer.
 - The daemon now uses GLib's child-watch notification for the isolated viewer instead
   of polling its process every 500 ms; the watch is removed before synchronous shutdown
   so GLib and `subprocess.Popen` cannot compete to reap the same child.
