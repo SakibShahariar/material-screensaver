@@ -25,6 +25,7 @@ import glob
 import material_screensaver_config as config_store
 import material_screensaver_transitions as transitions
 import material_screensaver_scene as scene_selection
+import material_screensaver_dbus as dbus_client
 import random
 import subprocess
 import atexit
@@ -39,9 +40,9 @@ DEFAULT_MATUGEN_COLORS_PATH = config_store.DEFAULT_MATUGEN_COLORS_PATH
 DEFAULT_CONFIG = config_store.DEFAULT_CONFIG
 
 # D-Bus service for daemon delegation (PID file gone)
-SERVICE_NAME = "io.github.sakib.MaterialScreensaver"
-OBJECT_PATH = "/io/github/sakib/MaterialScreensaver"
-INTERFACE_NAME = "io.github.sakib.MaterialScreensaver"
+SERVICE_NAME = dbus_client.SERVICE_NAME
+OBJECT_PATH = dbus_client.OBJECT_PATH
+INTERFACE_NAME = dbus_client.INTERFACE_NAME
 
 # Viewer state (daemon or standalone)
 _viewer_windows = []  # list[Gtk.Window]
@@ -2587,37 +2588,14 @@ def hide_viewer():
 
 # ---------- D-Bus delegation helpers ----------
 def _daemon_is_available():
-    try:
-        import gi
-        gi.require_version("Gio", "2.0")
-        from gi.repository import Gio
-        bus = Gio.bus_get_sync(Gio.BusType.SESSION, None)
-        # Check if name is owned
-        res = bus.call_sync("org.freedesktop.DBus", "/org/freedesktop/DBus",
-            "org.freedesktop.DBus", "NameHasOwner",
-            __import__("gi.repository.GLib", fromlist=["Variant"]).Variant("(s)", (SERVICE_NAME,)),
-            None, 0, -1, None)
-        return res.unpack()[0]
-    except Exception:
-        return False
+    """Thin wrapper around the shared D-Bus availability helper."""
+    return dbus_client.daemon_is_available(SERVICE_NAME)
+
 
 def _call_daemon(method):
     """Call daemon method via D-Bus. Returns (success, result)."""
-    try:
-        import gi
-        gi.require_version("Gio", "2.0")
-        from gi.repository import Gio, GLib
-        bus = Gio.bus_get_sync(Gio.BusType.SESSION, None)
-        proxy = Gio.DBusProxy.new_sync(bus, Gio.DBusProxyFlags.NONE, None,
-            SERVICE_NAME, OBJECT_PATH, INTERFACE_NAME, None)
-        if method == "IsActive":
-            res = proxy.call_sync("IsActive", None, Gio.DBusCallFlags.NONE, -1, None)
-            return True, res.unpack()[0]
-        else:
-            proxy.call_sync(method, None, Gio.DBusCallFlags.NONE, -1, None)
-            return True, None
-    except Exception as e:
-        return False, str(e)
+    return dbus_client.call_daemon(
+        method, SERVICE_NAME, OBJECT_PATH, INTERFACE_NAME)
 
 def is_running():
     """Cross-process check: daemon IsActive if available, else local."""
