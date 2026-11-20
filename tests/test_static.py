@@ -189,6 +189,13 @@ class TestThemeConsistency(unittest.TestCase):
         self.assertIn("if (clockLike) return;", source)
         self.assertNotIn('scene_has_shared_clock = "clock-shared.js" in scene_source', source)
 
+    def test_autumn_leaves_use_the_live_palette(self):
+        text = _read(os.path.join(support.REPO_ROOT, "screensavers", "autumnleaves.html"))
+        self.assertNotIn("const AUTUMN", text)
+        self.assertIn("const roles = [theme.primary, theme.secondary, theme.tertiary]", text)
+        self.assertIn("base.map(", text)
+        self.assertNotIn("blend(base", text)
+
     def test_body_background_uses_themed_surface(self):
         # A hardcoded body background would ignore the live Matugen palette.
         for path in support.html_files():
