@@ -421,6 +421,15 @@ class ScreensaverWindow(Adw.PreferencesWindow):
         transitions_row.set_activatable_widget(self.transitions_switch)
         sv_group.add(transitions_row)
 
+        self.status_menu_switch = Gtk.Switch(valign=Gtk.Align.CENTER)
+        status_menu_row = Adw.ActionRow(
+            title="Status menu",
+            subtitle="Quick controls in the top bar (takes effect after re-login)",
+        )
+        status_menu_row.add_suffix(self.status_menu_switch)
+        status_menu_row.set_activatable_widget(self.status_menu_switch)
+        sv_group.add(status_menu_row)
+
         self.search_entry = Gtk.SearchEntry(hexpand=True)
         self.search_entry.set_placeholder_text("Search scenes, categories, and settings")
         search_row = Adw.ActionRow(title="Search")
@@ -722,6 +731,7 @@ class ScreensaverWindow(Adw.PreferencesWindow):
         self.rotation_switch.connect("notify::active", self.on_rotation_toggled)
         self.rotation_interval_row.connect("notify::selected", self.on_rotation_interval_changed)
         self.transitions_switch.connect("notify::active", self.on_transitions_toggled)
+        self.status_menu_switch.connect("notify::active", self.on_status_menu_toggled)
         self.combo_row.connect("notify::selected", self.on_screensaver_changed)
         self.idle_row.connect("notify::value", self.on_idle_changed)
         self.lock_row.connect("notify::value", self.on_lock_changed)
@@ -818,6 +828,7 @@ class ScreensaverWindow(Adw.PreferencesWindow):
         self.random_switch.set_active(is_random)
         self.rotation_switch.set_active(cfg.get("rotation_enabled", False))
         self.transitions_switch.set_active(cfg.get("transitions_enabled", False))
+        self.status_menu_switch.set_active(cfg.get("status_menu_enabled", False))
         rotation_interval = cfg.get("rotation_interval_seconds", 300)
         self.rotation_interval_row.set_selected(
             self.rotation_intervals.index(rotation_interval)
@@ -1305,6 +1316,9 @@ class ScreensaverWindow(Adw.PreferencesWindow):
 
     def on_transitions_toggled(self, switch, _pspec):
         self._save_config(transitions_enabled=switch.get_active())
+
+    def on_status_menu_toggled(self, switch, _pspec):
+        self._save_config(status_menu_enabled=switch.get_active())
 
     def on_rotation_interval_changed(self, row, _pspec):
         index = row.get_selected()

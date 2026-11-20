@@ -33,6 +33,7 @@ DEFAULT_CONFIG = {
     "rotation_enabled": False,
     "rotation_interval_seconds": 300,
     "transitions_enabled": False,
+    "status_menu_enabled": False,
     "lock_after_seconds": 300,
     "lock_countdown": False,
     "matugen_colors_path": DEFAULT_MATUGEN_COLORS_PATH,
@@ -133,6 +134,8 @@ def normalize_config(data):
         cfg["rotation_enabled"] = data["rotation_enabled"]
     if isinstance(data.get("transitions_enabled"), bool):
         cfg["transitions_enabled"] = data["transitions_enabled"]
+    if isinstance(data.get("status_menu_enabled"), bool):
+        cfg["status_menu_enabled"] = data["status_menu_enabled"]
     rotation = _valid_int(data.get("rotation_interval_seconds"), 30, 3600)
     if rotation is not None:
         cfg["rotation_interval_seconds"] = rotation
