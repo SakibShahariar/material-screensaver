@@ -162,7 +162,7 @@ addEventListener("load", () => {
 
 
 const speedMul = reduceMotion ? 0.3 : 1;
-let segments = [], tips = [], scale = 1, baseX = 0, baseY = 0;
+let segments = [], tips = [], sx = 1, sy = 1, baseX = 0, baseY = 0;
 let cycleStart = 0, seed = 1;
 
 function rng() {
@@ -172,8 +172,8 @@ function rng() {
 
 function buildPlant() {
   let s = "X";
-  const angle = 20 + rng() * 10;
-  for (let i = 0; i < 4; i++) {
+  const angle = 26 + rng() * 12;
+  for (let i = 0; i < 5; i++) {
     let next = "";
     for (const ch of s) {
       if (ch === "X") next += "F[+X][-X]FX";
@@ -204,9 +204,10 @@ function buildPlant() {
     }
   }
   const spanX = Math.max(1, maxX - minX), spanY = Math.max(1, maxY - minY);
-  scale = Math.min((W * 0.8) / spanX, (H * 0.78) / spanY);
-  baseX = W / 2 - ((minX + maxX) / 2) * scale;
-  baseY = H * 0.92 - maxY * scale;
+  sy = (H * 0.94) / spanY;
+  sx = Math.min((W * 0.96) / spanX, sy * 3);
+  baseX = W / 2 - ((minX + maxX) / 2) * sx;
+  baseY = H * 0.97 - maxY * sy;
 }
 
 function initScene() {
@@ -229,8 +230,8 @@ function frame(now) {
     ctx.strokeStyle = rgba(role, 0.32 + Math.min(0.5, s.depth * 0.06));
     ctx.lineWidth = Math.max(1, (7 - Math.min(6, s.depth)) * 0.55);
     ctx.beginPath();
-    ctx.moveTo(baseX + s.x1 * scale, baseY + s.y1 * scale);
-    ctx.lineTo(baseX + s.x2 * scale + sway * s.depth * 3, baseY + s.y2 * scale);
+    ctx.moveTo(baseX + s.x1 * sx, baseY + s.y1 * sy);
+    ctx.lineTo(baseX + s.x2 * sx + sway * s.depth * 3, baseY + s.y2 * sy);
     ctx.stroke();
   }
   if (grown === segments.length) {
@@ -240,7 +241,7 @@ function frame(now) {
       const pulse = 0.6 + 0.4 * Math.sin(t * 1.4 + i);
       ctx.fillStyle = rgba(role, 0.35 + pulse * 0.45);
       ctx.beginPath();
-      ctx.arc(baseX + tip.x * scale + sway * 8, baseY + tip.y * scale,
+      ctx.arc(baseX + tip.x * sx + sway * 8, baseY + tip.y * sy,
               2 + pulse * 2.5, 0, Math.PI * 2);
       ctx.fill();
     }

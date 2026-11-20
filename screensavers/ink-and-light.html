@@ -163,7 +163,7 @@ addEventListener("load", () => {
 
 const speedMul = reduceMotion ? 0.3 : 1;
 let drops = [];
-const grey = c => Math.round(0.299 * c[0] + 0.587 * c[1] + 0.114 * c[2]);
+
 
 function initScene() {
   drops = Array.from({ length: 7 }, (_, i) => ({
@@ -180,11 +180,9 @@ function frame(now) {
   const t = ((now - start) / 1000) * speedMul;
   const dt = Math.min(0.05, t - lastT || 0.016);
   lastT = t;
-  const lum = grey(theme.surface);
-  const paper = Math.min(244, lum + 205);
-  const ink = Math.max(18, Math.min(80, lum - 10));
+  const paper = theme.surface;
   ctx.setTransform(DPR, 0, 0, DPR, 0, 0);
-  ctx.fillStyle = `rgb(${paper},${paper},${paper})`;
+  ctx.fillStyle = rgba(paper, 1);
   ctx.fillRect(0, 0, W, H);
   for (const d of drops) {
     d.age += dt;
@@ -206,9 +204,10 @@ function frame(now) {
       if (i === 0) ctx.moveTo(x, y); else ctx.lineTo(x, y);
     }
     ctx.closePath();
-    ctx.fillStyle = `rgba(${ink},${ink},${ink},${0.55 + 0.35 * (1 - p)})`;
+    const role = roleList[Math.floor(d.x * 3) % roleList.length] || theme.primary;
+    ctx.fillStyle = rgba(role, 0.55 + 0.35 * (1 - p));
     ctx.fill();
-    ctx.strokeStyle = `rgba(${ink},${ink},${ink},0.85)`;
+    ctx.strokeStyle = rgba(role, 0.9);
     ctx.lineWidth = 1.2;
     ctx.stroke();
     if (p > 0.35) {

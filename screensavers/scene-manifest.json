@@ -158,7 +158,7 @@
       "capabilities": []
     },
     "ink-and-light.html": {
-      "description": "Dark ink pools spread and fade on pale paper with crisp, high-contrast edges.",
+      "description": "High-contrast ink pools spread and fade in the app's theme colors with crisp edges.",
       "capabilities": []
     }
   }

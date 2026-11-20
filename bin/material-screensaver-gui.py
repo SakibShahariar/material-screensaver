@@ -226,7 +226,11 @@ def save_window_size(width, height, path=None):
 
 
 def list_screensavers():
-    return [os.path.basename(path) for path in config_store.list_screensavers(SCREENSAVER_DIR)]
+    # Sort by displayed name: scene titles often differ from filenames
+    # (e.g. blob.html -> "Liquid Blobs"), so filename order looks unsorted.
+    files = [os.path.basename(path)
+             for path in config_store.list_screensavers(SCREENSAVER_DIR)]
+    return sorted(files, key=display_name)
 
 
 SCENE_CATEGORIES = {
