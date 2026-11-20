@@ -24,10 +24,10 @@ Persistent repository-specific record of commit-level CI checks and red-cross in
 
 - Repository: `SakibShahariar/material-screensaver`
 - Default branch: `master`
-- Checkpoint SHA: `0f790d348db4f44c6dfc162756a0e61370b90061`
+- Checkpoint SHA: `fc0b42533dc20eef8f7cd63696733f1ece77905d`
 - Initialized: 2026-11-02
 - Baseline correction: a workflow run for the checkpoint commit was later found and inspected; it failed in the test-suite step. The failure is recorded below rather than treating the earlier empty combined-status response as authoritative.
-- Next session: review commits after `0f790d348db4f44c6dfc162756a0e61370b90061`; retain the historical red, pending, and unavailable entries below for audit context.
+- Next session: review commits after `fc0b42533dc20eef8f7cd63696733f1ece77905d`; retain the historical red, pending, and unavailable entries below for audit context.
 
 ## Initial baseline
 
@@ -154,6 +154,17 @@ All commits below were observed green; lint and tests both succeeded in every ru
 
 Diagnosis: the only code-related red in this range was the GJS-globals ESLint failure on `928e798`, fixed by `0d735f2`. The two `apt-get` exit-124 failures were runner infrastructure timeouts; both passed on rerun without code changes. Checkpoint advanced through `0f790d3`.
 
+### 2026-11-20 third follow-up audit
+
+| Commit SHA | Subject | CI result | Workflow run | Outcome |
+|---|---|---|---|---|
+| `513bd0d2bdb11743add102d9fae521e5276cca54` | fix(ctl): make NextScene work in random mode | green | [44685931774](https://github.com/SakibShahariar/material-screensaver/actions/runs/44685931774) | First run green. |
+| `63c7cd8014bb6f1438758001def04d699efdc8fa` | refactor(ctl): extract transition helpers into a module | green | [44686930985](https://github.com/SakibShahariar/material-screensaver/actions/runs/44686930985) | First run green. |
+| `a49c4d43f5b16ab9cd5e937566853e8fd6f7b919` | refactor(ctl): extract scene-selection helpers into a module | green | [44688034917](https://github.com/SakibShahariar/material-screensaver/actions/runs/44688034917) | First run green. |
+| `fc0b42533dc20eef8f7cd63696733f1ece77905d` | refactor(ctl): extract D-Bus client helpers into a module | red → green | [44688692541](https://github.com/SakibShahariar/material-screensaver/actions/runs/44688692541) | First run: `apt-get install` timeout (exit 124), infrastructure. Rerun attempt 2 green; no code change. |
+
+No code-related red in this range. Checkpoint advanced through `fc0b425`.
+
 ### Failure record template
 
 - Commit SHA:
@@ -176,3 +187,4 @@ Diagnosis: the only code-related red in this range was the GJS-globals ESLint fa
 | 2026-11-19 | `48a9c421` → `814afc69` (16 commits) | Two green, nine unavailable (no check runs), four red from the README-streamline regression at `43ac3f4`. Fix `814afc69` pushed and verified green in run 44498147410; red entries resolved, unavailable entries carried forward. |
 | 2026-11-20 | `814afc69` → `5b40cf85` (7 commits) | All seven green; reviewed and recorded above. Checkpoint advanced to `5b40cf85`. |
 | 2026-11-20 | `5b40cf85` → `0f790d3` (6 commits) | Four green on first run; one red (GJS globals, fixed by `0d735f2`) and two `apt-get` timeout reruns. All final results green; checkpoint advanced to `0f790d3`. |
+| 2026-11-20 | `b434f79` → `fc0b425` (4 commits) | Three green on first run; one `apt-get` timeout rerun. Checkpoint advanced to `fc0b425`. |

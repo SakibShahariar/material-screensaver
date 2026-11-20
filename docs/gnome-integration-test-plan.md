@@ -76,6 +76,18 @@ journalctl --user -u material-screensaver.service --since "10 minutes ago" --no-
 
 For recovery-related failures, preserve the event name and safe metadata such as `backend`, `status`, or `error` type. Useful events include `idle_watch_registration_failed`, `viewer_spawn_failed`, `lock_monitor_failed`, `session_lock_backend_failed`, and `session_lock_failed`. Do not copy configured hook commands or private message text into public reports.
 
+## Observed results (2026-11-20)
+
+These were actually executed in a GNOME Shell 51.1 / Wayland session or an isolated Xvfb display; cases not listed here remain unverified.
+
+| Case | Result | Evidence |
+|---|---|---|
+| LIFE-03 (rapid start/stop) | **Passed** for cleanup: 8 consecutive Show/Hide cycles via the daemon D-Bus; 56 newly spawned viewer/WebKit/bwrap processes, 0 remained after any Hide. | Recorded on issue #60 along with a before/after procfs-read and latency comparison on a ~500-process desktop. |
+| IDLE-05 (Overview) | **Partial**: the Shell's `OverviewActive` D-Bus setter was verified live (Overview opened and closed). The full idle-from-Overview scenario was not run. | Code path adds the setter call before viewer spawn in `show_viewer()`. |
+| VIEW-04 (rotation) | **Partial**: an isolated Xvfb viewer armed rotation (`viewer_rotation_armed`, 3 scenes), ticked (`viewer_rotated`), and kept WebKit/bwrap process count flat at 7 across the tick. | Lock timer and Super+Q during rotation were not exercised in a live session. |
+| EXT-01 (gesture guard) | **Partial**: extension enabled and ACTIVE in GNOME 51.1, source and tests verified. Physical three-/four-finger swipes were not performed. | Gesture guard blocks 3+ finger swipes in source. |
+| Settings window state | **Passed** for size clamp: saved `1520x816` was clamped to `1496x816` against the live monitor geometry. | Issue #57; position restoration is documented as not applicable on GTK4/Wayland. |
+
 ## Current verification boundary
 
 Passing CI establishes that the repository's configured static checks and automated tests passed. It does **not** establish that Mutter idle watches, GNOME locking, real fullscreen coverage, touchpad gesture interception, WebKit file isolation, suspend/resume, or monitor hot-plug behavior passed. Those require this live-session checklist and must be recorded separately.
