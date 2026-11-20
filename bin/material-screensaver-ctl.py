@@ -2753,12 +2753,15 @@ def next_scene():
     if current not in names:
         current = names[0]
     chosen = names[(names.index(current) + 1) % len(names)]
+    # An explicit Next Scene must be visible; Random each time would otherwise
+    # override the saved active scene on the next viewer launch.
+    was_random = bool(cfg.get("random", False))
     try:
-        config_store.save_config(CONFIG_PATH, active=chosen)
+        config_store.save_config(CONFIG_PATH, active=chosen, random=False)
     except Exception as exc:
         print(f"Could not save next scene: {exc}", file=sys.stderr)
         return False
-    _log_event("scene_changed_next", scene=chosen)
+    _log_event("scene_changed_next", scene=chosen, random_disabled=was_random)
     if is_viewer_active():
         hide_viewer()
         show_viewer()

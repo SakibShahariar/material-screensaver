@@ -16,24 +16,30 @@ class TestNextScene(unittest.TestCase):
         self.config_path = os.path.join(self.temp.name, "config.json")
         self.available = {"a.html": "/x/a.html", "b.html": "/x/b.html", "c.html": "/x/c.html"}
 
-    def _run(self, active):
+    def _run(self, active, random_mode=False):
         with mock.patch.object(self.ctl, "CONFIG_PATH", self.config_path), \
              mock.patch.object(self.ctl, "list_screensavers", lambda: self.available), \
              mock.patch.object(self.ctl, "load_config",
-                               lambda: {"active": active, "favorites": []}), \
+                               lambda: {"active": active, "favorites": [],
+                                        "random": random_mode}), \
              mock.patch.object(self.ctl, "is_viewer_active", lambda: False):
             self.assertTrue(self.ctl.next_scene())
         with open(self.config_path, encoding="utf-8") as handle:
-            return json.load(handle)["active"]
+            return json.load(handle)
 
     def test_advances_to_next_scene(self):
-        self.assertEqual(self._run("a.html"), "b.html")
+        self.assertEqual(self._run("a.html")["active"], "b.html")
 
     def test_wraps_around(self):
-        self.assertEqual(self._run("c.html"), "a.html")
+        self.assertEqual(self._run("c.html")["active"], "a.html")
 
     def test_unknown_active_starts_from_first(self):
-        self.assertEqual(self._run("missing.html"), "b.html")
+        self.assertEqual(self._run("missing.html")["active"], "b.html")
+
+    def test_random_mode_is_disabled_so_choice_is_visible(self):
+        saved = self._run("a.html", random_mode=True)
+        self.assertEqual(saved["active"], "b.html")
+        self.assertFalse(saved["random"])
 
     def test_dbus_interface_exposes_next_scene(self):
         import pathlib
