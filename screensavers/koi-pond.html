@@ -169,7 +169,7 @@ function initScene() {
   fish = Array.from({ length: FISH }, (_, i) => ({
     x: Math.random() * W, y: H * (0.18 + Math.random() * 0.64),
     angle: (Math.random() - 0.5) * 0.8,
-    speed: 14 + Math.random() * 22,
+    speed: 28 + Math.random() * 38,
     phase: Math.random() * Math.PI * 2,
     size: 20 + Math.random() * 22,
     color: roleList[i % roleList.length]
@@ -223,6 +223,7 @@ function frame(now) {
     ctx.fill();
     ctx.restore();
   }
+  requestAnimationFrame(frame);
 }
 
 </script>

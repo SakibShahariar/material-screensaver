@@ -222,21 +222,23 @@ function frame(now) {
   ctx.fillStyle = rgba(theme.surface, 1);
   ctx.fillRect(0, 0, W, H);
 
-  for (let i = 0; i < stars.length; i++) {
-    const s = stars[i], target = targets[i];
+  for (const s of stars) {
+    const target = targets[stars.indexOf(s)];
     s.x += (target.x - s.x) * 0.02;
     s.y += (target.y - s.y) * 0.02;
+    s.dx = Math.sin(t * 0.7 + s.phase) * 8;
+    s.dy = Math.cos(t * 0.55 + s.phase) * 8;
   }
   ctx.lineWidth = 1;
   for (let i = 0; i < stars.length; i++) {
     for (let j = i + 1; j < stars.length; j++) {
       const a = stars[i], b = stars[j];
-      const dx = a.x - b.x, dy = a.y - b.y;
+      const dx = (a.x + a.dx) - (b.x + b.dx), dy = (a.y + a.dy) - (b.y + b.dy);
       if (dx * dx + dy * dy < 1600) {
         ctx.strokeStyle = rgba(theme.outline, 0.13);
         ctx.beginPath();
-        ctx.moveTo(a.x, a.y);
-        ctx.lineTo(b.x, b.y);
+        ctx.moveTo(a.x + a.dx, a.y + a.dy);
+        ctx.lineTo(b.x + b.dx, b.y + b.dy);
         ctx.stroke();
       }
     }
@@ -245,10 +247,10 @@ function frame(now) {
     const pulse = 0.6 + 0.4 * Math.sin(t * 1.5 + s.phase);
     ctx.fillStyle = rgba(s.color, 0.35 + pulse * 0.5);
     ctx.beginPath();
-    ctx.arc(s.x + Math.sin(t * 0.5 + s.phase) * 2,
-            s.y + Math.cos(t * 0.4 + s.phase) * 2, s.size, 0, Math.PI * 2);
+    ctx.arc(s.x + s.dx, s.y + s.dy, s.size, 0, Math.PI * 2);
     ctx.fill();
   }
+  requestAnimationFrame(frame);
 }
 
 </script>

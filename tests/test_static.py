@@ -189,6 +189,19 @@ class TestThemeConsistency(unittest.TestCase):
         self.assertIn("if (clockLike) return;", source)
         self.assertNotIn('scene_has_shared_clock = "clock-shared.js" in scene_source', source)
 
+    def test_animated_scenes_reschedule_their_frame_loop(self):
+        # A scene that calls requestAnimationFrame only once draws a single
+        # static frame; the callback must schedule the next one itself.
+        for path in support.html_files():
+            text = _read(path)
+            name = os.path.basename(path)
+            with self.subTest(file=name):
+                if "function frame(" in text:
+                    self.assertGreaterEqual(
+                        text.count("requestAnimationFrame(frame)"), 2,
+                        f"{name}: frame loop never reschedules itself",
+                    )
+
     def test_autumn_leaves_use_the_live_palette(self):
         text = _read(os.path.join(support.REPO_ROOT, "screensavers", "autumnleaves.html"))
         self.assertNotIn("const AUTUMN", text)
