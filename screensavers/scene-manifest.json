@@ -140,6 +140,18 @@
     "abyssal-drift.html": {
       "description": "A slow descent through deep water: drifting jellyfish, falling marine snow and faint bioluminescent flashes.",
       "capabilities": []
+    },
+    "turing-garden.html": {
+      "description": "Self-organizing chemical patterns grow into spots, stripes and spirals that keep reorganizing.",
+      "capabilities": []
+    },
+    "analog-clockwork.html": {
+      "description": "A precision dial with sweeping hands, turning gears and a steady escapement.",
+      "capabilities": []
+    },
+    "julia-bloom.html": {
+      "description": "A fractal bloom slowly zooms and changes shape as its parameter drifts.",
+      "capabilities": []
     }
   }
 }
