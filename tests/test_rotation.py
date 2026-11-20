@@ -6,6 +6,18 @@ import unittest
 from unittest import mock
 
 import support
+from material_screensaver_scene import next_scene_name, rotation_scene_names
+
+
+class TestSharedSceneModule(unittest.TestCase):
+    def test_pure_helpers_are_importable(self):
+        available = {"a.html": "/x/a.html", "b.html": "/x/b.html"}
+        self.assertEqual(rotation_scene_names({"favorites": ["b.html"]}, available), ["b.html"])
+        self.assertEqual(
+            next_scene_name({"active": "a.html"}, available),
+            "b.html",
+        )
+        self.assertEqual(next_scene_name({}, available), "b.html")
 
 
 class TestRotationConfig(unittest.TestCase):

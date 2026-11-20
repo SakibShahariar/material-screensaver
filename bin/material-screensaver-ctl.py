@@ -24,6 +24,7 @@ import json
 import glob
 import material_screensaver_config as config_store
 import material_screensaver_transitions as transitions
+import material_screensaver_scene as scene_selection
 import random
 import subprocess
 import atexit
@@ -464,10 +465,8 @@ def _scene_uri(scene_path, clock_format="24h", viewer_cfg=None):
 
 
 def _rotation_scene_names(cfg, available_scenes):
-    """Ordered rotation list: configured favorites when valid, else all scenes."""
-    favorites = cfg.get("favorites", []) if isinstance(cfg, dict) else []
-    chosen = [name for name in favorites if name in available_scenes]
-    return chosen if chosen else sorted(available_scenes)
+    """Thin wrapper around the shared scene-selection helper."""
+    return scene_selection.rotation_scene_names(cfg, available_scenes)
 
 
 def _configure_viewer_rotation(viewer_cfg, windows, clock_format):
@@ -2720,11 +2719,7 @@ def next_scene():
     available = list_screensavers()
     if not available:
         return False
-    names = _rotation_scene_names(cfg, available)
-    current = cfg.get("active")
-    if current not in names:
-        current = names[0]
-    chosen = names[(names.index(current) + 1) % len(names)]
+    chosen = scene_selection.next_scene_name(cfg, available)
     # An explicit Next Scene must be visible; Random each time would otherwise
     # override the saved active scene on the next viewer launch.
     was_random = bool(cfg.get("random", False))

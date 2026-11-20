@@ -7,7 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 ### Changed
-- Opacity animation helpers moved to `material_screensaver_transitions.py` (first slice of
+- Opacity animation helpers and pure scene-selection helpers moved to
+  `material_screensaver_transitions.py` and `material_screensaver_scene.py` (first slices of
   the `ctl.py` module split); no behavior change.
 - Inhibit/Uninhibit failures are now logged to stderr behind the MS_DEBUG env flag
   instead of being silently swallowed (useful when GNOME SessionManager changes).
