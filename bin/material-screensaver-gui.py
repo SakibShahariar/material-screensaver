@@ -40,8 +40,8 @@ KEYBINDING_PARENT_SCHEMA = "org.gnome.settings-daemon.plugins.media-keys"
 KEYBINDING_CHILD_SCHEMA = "org.gnome.settings-daemon.plugins.media-keys.custom-keybinding"
 
 COMBO_CSS = """
-.material-screensaver-combo button {
-    min-width: 14rem !important;
+.material-screensaver-combo listview {
+    min-width: 224px;
 }
 """
 _combo_css_provider = None
