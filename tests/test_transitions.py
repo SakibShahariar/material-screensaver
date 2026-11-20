@@ -61,6 +61,55 @@ class TestFadeAnimation(unittest.TestCase):
         self.assertEqual(done, [True])
 
 
+class TestRotationFade(unittest.TestCase):
+    def test_scene_switch_fades_through_black_when_enabled(self):
+        ctl = support.load_ctl()
+        callbacks = []
+
+        class FakeGLib:
+            @staticmethod
+            def timeout_add(interval, callback, *args):
+                callbacks.append(callback)
+                return 1
+
+        def drive():
+            while callbacks:
+                callback = callbacks.pop(0)
+                while callback():
+                    pass
+
+        loaded = []
+
+        class Web:
+            def load_uri(self, uri):
+                loaded.append(uri)
+
+        overlay = types.SimpleNamespace(opacity=1.0)
+        overlay.get_opacity = lambda: overlay.opacity
+        overlay.set_opacity = lambda value: setattr(overlay, "opacity", value)
+        window = types.SimpleNamespace(_rotation_web=Web(), _rotation_scene="a.html",
+                                       get_child=lambda: overlay)
+        state = {
+            "names": ["a.html", "b.html"],
+            "available": {"a.html": "/x/a.html", "b.html": "/x/b.html"},
+            "windows": [window], "clock_format": "24h", "viewer_cfg": {},
+            "transitions": True,
+        }
+        fake_gi = types.ModuleType("gi")
+        fake_repo = types.ModuleType("gi.repository")
+        fake_repo.GLib = FakeGLib
+        with mock.patch.dict(sys.modules, {"gi": fake_gi, "gi.repository": fake_repo}), \
+             mock.patch.object(ctl, "_scene_uri",
+                               side_effect=lambda path, fmt, cfg: f"file://{path}"):
+            self.assertTrue(ctl._rotate_viewer_scenes(state))
+            self.assertEqual(loaded, [])  # waits for fade-out before loading
+            drive()
+
+        self.assertEqual(loaded, ["file:///x/b.html"])
+        self.assertEqual(window._rotation_scene, "b.html")
+        self.assertEqual(overlay.opacity, 1.0)
+
+
 class TestTransitionWiring(unittest.TestCase):
     def _read(self, relative):
         return (Path(support.REPO_ROOT) / relative).read_text(encoding="utf-8")

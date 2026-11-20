@@ -515,6 +515,7 @@ def _configure_viewer_rotation(viewer_cfg, windows, clock_format):
         "windows": windows,
         "clock_format": clock_format,
         "viewer_cfg": viewer_cfg,
+        "transitions": viewer_cfg.get("transitions_enabled", False),
     }
     try:
         from gi.repository import GLib
@@ -540,9 +541,24 @@ def _rotate_viewer_scenes(state):
             scene_path = state["available"].get(next_name)
             if scene_path is None:
                 continue
-            web.load_uri(_scene_uri(
-                scene_path, state["clock_format"], state["viewer_cfg"]))
-            window._rotation_scene = next_name
+            def apply(web=web, window=window, next_name=next_name, scene_path=scene_path):
+                web.load_uri(_scene_uri(
+                    scene_path, state["clock_format"], state["viewer_cfg"]))
+                window._rotation_scene = next_name
+
+            overlay = None
+            if state.get("transitions"):
+                try:
+                    overlay = window.get_child()
+                except Exception:
+                    overlay = None
+            if overlay is not None and hasattr(overlay, "set_opacity"):
+                def finish(overlay=overlay, apply=apply):
+                    apply()
+                    _fade_opacity(overlay, 1.0, 120)
+                _fade_opacity(overlay, 0.0, 120, finish)
+            else:
+                apply()
         except Exception as exc:
             _dbg(f"Viewer rotation skipped a scene: {type(exc).__name__}")
     _log_event("viewer_rotated")
