@@ -124,6 +124,22 @@
     "wave-function-collapse.html": {
       "description": "A grid of glowing line segments, corners, and junctions gradually resolves into a connected pattern, then fades.",
       "capabilities": []
+    },
+    "aurora-veil.html": {
+      "description": "Wide ribbons of colored light drift and overlap, forming a slow, softly glowing veil across the sky.",
+      "capabilities": []
+    },
+    "hourglass.html": {
+      "description": "Fine grains of sand fall through a narrow neck and gather into a growing pile beneath it.",
+      "capabilities": []
+    },
+    "koi-pond.html": {
+      "description": "Several koi glide through dark water, leaving slow ripples that spread and fade behind them.",
+      "capabilities": []
+    },
+    "constellation-clock.html": {
+      "description": "Stars drift into glowing numeral shapes, linking with faint lines that reform each minute.",
+      "capabilities": []
     }
   }
 }

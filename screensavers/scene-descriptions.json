@@ -31,6 +31,10 @@
     "strange-attractor-flow.html": "Glowing particles curl through a continuously twisting, looped pattern, leaving fading trails.",
     "typewriter.html": "Lines of text appear one character at a time on a dark screen, followed by a blinking cursor.",
     "voronoi.html": "A shifting mosaic of irregular polygon cells fills the screen with softly glowing edges.",
-    "wave-function-collapse.html": "A grid of glowing line segments, corners, and junctions gradually resolves into a connected pattern, then fades."
+    "wave-function-collapse.html": "A grid of glowing line segments, corners, and junctions gradually resolves into a connected pattern, then fades.",
+    "aurora-veil.html": "Wide ribbons of colored light drift and overlap, forming a slow, softly glowing veil across the sky.",
+    "hourglass.html": "Fine grains of sand fall through a narrow neck and gather into a growing pile beneath it.",
+    "koi-pond.html": "Several koi glide through dark water, leaving slow ripples that spread and fade behind them.",
+    "constellation-clock.html": "Stars drift into glowing numeral shapes, linking with faint lines that reform each minute."
   }
 }
