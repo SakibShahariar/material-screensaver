@@ -6,6 +6,7 @@ dedup, and the viewer-active guard — all without a GNOME session.
 Skipped when GI/GLib is unavailable.
 """
 import unittest
+from unittest import mock
 import warnings
 
 import support
@@ -167,6 +168,19 @@ class TestCountdownCancellation(unittest.TestCase):
 
 
 
+    def test_activity_rearms_the_countdown(self):
+        import pathlib
+        source = (pathlib.Path(support.REPO_ROOT) / "bin" / "material-screensaver-ctl.py").read_text(
+            encoding="utf-8")
+        self.assertIn("def restart_countdown(", source)
+        self.assertEqual(source.count("if _notify_lock_activity():"), 3)
+        self.assertEqual(source.count("                    restart_countdown()"), 3)
+        self.assertNotIn("                cancel_countdown()", source)
+        # Re-arming resets the warning and schedules a fresh delayed start.
+        self.assertIn('state["seconds"] = min(lock_seconds, 10)', source)
+        self.assertIn("sources[\"delay\"] = GLib.timeout_add_seconds(", source)
+
+
 class TestActivityLockReset(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
@@ -184,9 +198,9 @@ class TestActivityLockReset(unittest.TestCase):
     def test_viewer_activity_resets_daemon_timer_at_most_once_per_second(self):
         calls = []
         self.ctl._is_viewer_mode = True
-        with unittest.mock.patch.object(
+        with mock.patch.object(
             self.ctl.time, "monotonic", side_effect=[10.0, 10.1, 10.25]
-        ), unittest.mock.patch.object(
+        ), mock.patch.object(
             self.ctl, "_call_daemon", side_effect=lambda method: (calls.append(method) or True, None)
         ):
             self.assertTrue(self.ctl._notify_lock_activity())
@@ -196,13 +210,13 @@ class TestActivityLockReset(unittest.TestCase):
 
     def test_standalone_activity_resets_local_timer(self):
         self.ctl._is_viewer_mode = False
-        with unittest.mock.patch.object(self.ctl.time, "monotonic", return_value=20.0), \
-             unittest.mock.patch.object(self.ctl, "_schedule_lock") as schedule:
+        with mock.patch.object(self.ctl.time, "monotonic", return_value=20.0), \
+             mock.patch.object(self.ctl, "_schedule_lock") as schedule:
             self.assertTrue(self.ctl._notify_lock_activity())
         schedule.assert_called_once_with()
 
     def test_daemon_activity_handler_reschedules_lock_timer(self):
-        with unittest.mock.patch.object(self.ctl, "_schedule_lock") as schedule:
+        with mock.patch.object(self.ctl, "_schedule_lock") as schedule:
             self.ctl._reset_lock_timer_from_activity()
         schedule.assert_called_once_with()
 

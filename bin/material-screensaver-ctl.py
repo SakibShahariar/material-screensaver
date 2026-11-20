@@ -1026,6 +1026,27 @@ p{color:#c4c0ca;line-height:1.5}
                 sources["tick"] = GLib.timeout_add_seconds(1, update_countdown)
                 return False
 
+            def restart_countdown(label=countdown, state=remaining,
+                                  sources=countdown_sources):
+                """Arm a fresh warning after activity restarted the lock timer."""
+                for key in ("delay", "tick"):
+                    source = sources.get(key)
+                    if source is not None:
+                        try:
+                            GLib.source_remove(source)
+                        except Exception as exc:
+                            _dbg(f"Suppressed non-fatal exception removing countdown source: {exc}")
+                    sources[key] = None
+                sources["cancelled"] = False
+                state["seconds"] = min(lock_seconds, 10)
+                label.set_visible(False)
+                if lock_seconds <= 10:
+                    start_countdown()
+                else:
+                    sources["delay"] = GLib.timeout_add_seconds(
+                        lock_seconds - 10, start_countdown
+                    )
+
             if lock_seconds <= 10:
                 start_countdown()
             else:
@@ -1037,11 +1058,11 @@ p{color:#c4c0ca;line-height:1.5}
         super_pressed = {"value": False}
 
         def on_key(ctrl, keyval, keycode, state, _win=win):
-            _notify_lock_activity()
-            try:
-                cancel_countdown()
-            except NameError:
-                pass
+            if _notify_lock_activity():
+                try:
+                    restart_countdown()
+                except NameError:
+                    pass
             # Only Super+Q closes, Super alone is consumed (no overview, no close)
             try:
                 from gi.repository import Gdk
@@ -1073,19 +1094,19 @@ p{color:#c4c0ca;line-height:1.5}
                 return False
         def on_click(ctrl, n_press, x, y, _win=win, _web=web):
             # Clicks reset the lock delay and cancel the current warning.
-            _notify_lock_activity()
-            try:
-                cancel_countdown()
-            except NameError:
-                pass
+            if _notify_lock_activity():
+                try:
+                    restart_countdown()
+                except NameError:
+                    pass
             return False
         def on_motion(ctrl, x, y, _win=win, _web=web):
             # Pointer activity resets the lock delay without dismissing.
-            _notify_lock_activity()
-            try:
-                cancel_countdown()
-            except NameError:
-                pass
+            if _notify_lock_activity():
+                try:
+                    restart_countdown()
+                except NameError:
+                    pass
             return False
         # cursor helpers — permanently hidden for non-interactive styles
         # (solar-system is interactive and manages cursor via body.show-cursor CSS)

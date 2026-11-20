@@ -32,6 +32,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   updated (the test-suite count check parses that line dynamically). Collection total
   is now 31.
 ### Fixed
+- The lock countdown warning now re-arms after user activity. Previously the countdown was
+  cancelled permanently, so it never reappeared even though the lock delay had restarted.
 - Viewer teardown now resolves the WebView inside the window's `Gtk.Overlay` instead of
   treating the overlay itself as the WebView. WebKit is properly stopped, loading is
   halted, and widgets are unparented before disposal — removing the silent
