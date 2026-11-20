@@ -19,11 +19,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - "Test it now" preview group (Start/Stop buttons) from the settings GUI — the inline
   Live Preview thumbnail already shows the selected style.
 ### Added
-- Six new scenes: **Aurora Veil** (drifting ribbons of light), **Koi Pond** (fish and
-  ripples), **Constellation Clock** (time drawn as linked stars), **Abyssal Drift** (deep
-  sea), **Fractal Landscape** (mountain ridges), and **Living Metropolis** (a shifting
-  city). All follow the shared Matugen palette, clock helper and reduced-motion
-  conventions. Total scene count is 37.
+- Three new scenes: **Aurora Veil** (drifting ribbons of light), **Koi Pond** (fish and
+  ripples), **Constellation Clock** (time drawn as linked stars), plus **Abyssal Drift**
+  (deep sea). All follow the shared Matugen palette, clock helper and reduced-motion
+  conventions. Total scene count is 35.
 - Optional top-bar status menu with Start / Stop / Toggle / Open Settings controls,
   provided by the companion Shell extension and gated by `status_menu_enabled`
   (off by default). Takes effect after a re-login. Next Scene uses the new daemon

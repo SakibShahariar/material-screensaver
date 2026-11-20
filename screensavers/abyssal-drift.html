@@ -185,8 +185,8 @@ function frame(now) {
   lastT = t;
   ctx.setTransform(DPR, 0, 0, DPR, 0, 0);
   const water = ctx.createLinearGradient(0, 0, 0, H);
-  water.addColorStop(0, rgba(theme.primary, 0.22));
-  water.addColorStop(0.35, rgba(theme.tertiary, 0.08));
+  water.addColorStop(0, rgba(theme.primary, 0.07));
+  water.addColorStop(0.35, rgba(theme.tertiary, 0.03));
   water.addColorStop(1, rgba(theme.surface, 1));
   ctx.fillStyle = water;
   ctx.fillRect(0, 0, W, H);
@@ -195,7 +195,7 @@ function frame(now) {
   for (let i = 0; i < 5; i++) {
     const x = W * (0.1 + i * 0.2) + Math.sin(t * 0.15 + i) * W * 0.04;
     const shaft = ctx.createLinearGradient(x, 0, x, H * 0.9);
-    shaft.addColorStop(0, rgba(theme.primary, 0.06));
+    shaft.addColorStop(0, rgba(theme.primary, 0.018));
     shaft.addColorStop(1, rgba(theme.primary, 0));
     ctx.fillStyle = shaft;
     ctx.beginPath();
@@ -210,13 +210,13 @@ function frame(now) {
     if (j.y < -60) { j.y = H + 60; j.x = Math.random() * W; }
     const r = j.r * (0.85 + Math.sin(t * 1.2 + j.phase) * 0.15);
     const glow = ctx.createRadialGradient(j.x, j.y, 0, j.x, j.y, r * 1.6);
-    glow.addColorStop(0, rgba(j.color, 0.5));
+    glow.addColorStop(0, rgba(j.color, 0.22));
     glow.addColorStop(1, rgba(j.color, 0));
     ctx.fillStyle = glow;
     ctx.beginPath();
     ctx.arc(j.x, j.y, r * 1.6, 0, Math.PI * 2);
     ctx.fill();
-    ctx.strokeStyle = rgba(j.color, 0.45);
+    ctx.strokeStyle = rgba(j.color, 0.25);
     ctx.lineWidth = 1.2;
     for (let k = -2; k <= 2; k++) {
       ctx.beginPath();
@@ -234,7 +234,7 @@ function frame(now) {
   for (let i = flashes.length - 1; i >= 0; i--) {
     const f = flashes[i];
     f.age += dt;
-    ctx.strokeStyle = rgba(f.color, Math.max(0, 0.4 - f.age * 0.4));
+    ctx.strokeStyle = rgba(f.color, Math.max(0, 0.18 - f.age * 0.18));
     ctx.lineWidth = 2;
     ctx.beginPath();
     ctx.arc(f.x, f.y, f.age * 90, 0, Math.PI * 2);
@@ -244,7 +244,7 @@ function frame(now) {
   ctx.globalCompositeOperation = "source-over";
 
   const wx = ((t * 12) % (W + 400)) - 200;
-  ctx.fillStyle = rgba(theme.container, 0.35);
+  ctx.fillStyle = rgba(theme.container, 0.2);
   ctx.beginPath();
   ctx.ellipse(wx, H * 0.55, 90, 18, 0, 0, Math.PI * 2);
   ctx.fill();
@@ -259,7 +259,7 @@ function frame(now) {
     s.y += s.v * dt;
     s.x += Math.sin(t * 0.4 + s.phase) * 4 * dt;
     if (s.y > H) { s.y = -5; s.x = Math.random() * W; }
-    ctx.fillStyle = rgba(theme.outline, 0.35);
+    ctx.fillStyle = rgba(theme.outline, 0.2);
     ctx.beginPath();
     ctx.arc(s.x, s.y, s.r, 0, Math.PI * 2);
     ctx.fill();
