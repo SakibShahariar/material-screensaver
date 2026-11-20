@@ -39,6 +39,13 @@ KEYBINDING_PATH = "/org/gnome/settings-daemon/plugins/media-keys/custom-keybindi
 KEYBINDING_PARENT_SCHEMA = "org.gnome.settings-daemon.plugins.media-keys"
 KEYBINDING_CHILD_SCHEMA = "org.gnome.settings-daemon.plugins.media-keys.custom-keybinding"
 
+COMBO_CSS = """
+.material-screensaver-combo button {
+    min-width: 14rem;
+}
+"""
+_combo_css_provider = None
+
 
 def get_keybinding_settings(create=False):
     """Read our binding without side effects; register it only when explicitly created."""
@@ -324,9 +331,26 @@ def settings_group_matches(group, query):
     return not query or query in widget_search_text(group)
 
 
+def _ensure_combo_css():
+    """Give combo values enough room so long scene names are not clipped."""
+    global _combo_css_provider
+    if _combo_css_provider is not None:
+        return
+    display = Gdk.Display.get_default()
+    if display is None:
+        return
+    provider = Gtk.CssProvider()
+    provider.load_from_data(COMBO_CSS.encode())
+    Gtk.StyleContext.add_provider_for_display(
+        display, provider, Gtk.STYLE_PROVIDER_PRIORITY_APPLICATION
+    )
+    _combo_css_provider = provider
+
+
 class ScreensaverWindow(Adw.PreferencesWindow):
     def __init__(self, app):
         super().__init__(application=app, title="Screensaver")
+        _ensure_combo_css()
         self._preview_override = REQUESTED_PREVIEW
         self.set_default_size(*self._initial_window_size())
         self._window_state_save_id = None
@@ -408,6 +432,7 @@ class ScreensaverWindow(Adw.PreferencesWindow):
 
         self.rotation_intervals = (30, 60, 300, 900)
         self.rotation_interval_row = Adw.ComboRow(title="Rotation interval")
+        self.rotation_interval_row.add_css_class("material-screensaver-combo")
         self.rotation_interval_row.set_model(Gtk.StringList.new(
             ["30 seconds", "1 minute", "5 minutes", "15 minutes"]))
         sv_group.add(self.rotation_interval_row)
@@ -437,6 +462,7 @@ class ScreensaverWindow(Adw.PreferencesWindow):
         sv_group.add(search_row)
 
         self.category_row = Adw.ComboRow(title="Category")
+        self.category_row.add_css_class("material-screensaver-combo")
         self.category_row.set_model(Gtk.StringList.new(CATEGORY_OPTIONS))
         sv_group.add(self.category_row)
 
@@ -463,6 +489,7 @@ class ScreensaverWindow(Adw.PreferencesWindow):
         self.selected_scene = None
         self._picker_updating = False
         self.combo_row = Adw.ComboRow(title="Active screensaver")
+        self.combo_row.add_css_class("material-screensaver-combo")
         if self.screensaver_files:
             names = Gtk.StringList.new([display_name(f) for f in self.screensaver_files])
             self.combo_row.set_model(names)
@@ -616,6 +643,7 @@ class ScreensaverWindow(Adw.PreferencesWindow):
         clock_group.add(overlay_row)
         self.clock_overlay_positions = ["top-left", "top-right", "bottom-left", "bottom-right"]
         self.clock_overlay_position_row = Adw.ComboRow(title="Overlay position")
+        self.clock_overlay_position_row.add_css_class("material-screensaver-combo")
         self.clock_overlay_position_row.set_model(Gtk.StringList.new(["Top left", "Top right", "Bottom left", "Bottom right"]))
         clock_group.add(self.clock_overlay_position_row)
         self.clock_overlay_opacity_row = Adw.SpinRow.new_with_range(20, 100, 5)
@@ -940,6 +968,7 @@ class ScreensaverWindow(Adw.PreferencesWindow):
         assignments = cfg.get("monitor_screensavers", {})
         for key, label in monitors:
             row = Adw.ComboRow(title=label, subtitle=key)
+            row.add_css_class("material-screensaver-combo")
             row.set_model(Gtk.StringList.new(options))
             selected = assignments.get(key)
             row.set_selected(scenes.index(selected) + 1 if selected in scenes else 0)

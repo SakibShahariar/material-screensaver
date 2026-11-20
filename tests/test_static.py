@@ -577,5 +577,16 @@ if (delivered.length !== 2 || delivered[1] < 66) {
                     self._check(body, f"{name} <script #{i}>")
 
 
+class TestSettingsGuiComboWidth(unittest.TestCase):
+    def test_combo_values_have_enough_room(self):
+        gui = _read(os.path.join(support.REPO_ROOT, "bin", "material-screensaver-gui.py"))
+        self.assertIn(".material-screensaver-combo button", gui)
+        self.assertIn("min-width: 14rem", gui)
+        self.assertIn("_ensure_combo_css()", gui)
+        self.assertIn("Gtk.StyleContext.add_provider_for_display", gui)
+        self.assertGreaterEqual(gui.count('add_css_class("material-screensaver-combo")'), 5)
+        self.assertGreaterEqual(gui.count("Adw.ComboRow("), 5)
+
+
 if __name__ == "__main__":
     unittest.main(verbosity=2)
