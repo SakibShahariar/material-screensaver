@@ -41,7 +41,7 @@ KEYBINDING_CHILD_SCHEMA = "org.gnome.settings-daemon.plugins.media-keys.custom-k
 
 COMBO_CSS = """
 .material-screensaver-combo button {
-    min-width: 14rem;
+    min-width: 14rem !important;
 }
 """
 _combo_css_provider = None
@@ -488,7 +488,7 @@ class ScreensaverWindow(Adw.PreferencesWindow):
         self.filtered_screensaver_files = list(self.screensaver_files)
         self.selected_scene = None
         self._picker_updating = False
-        self.combo_row = Adw.ComboRow(title="Active screensaver")
+        self.combo_row = Adw.ComboRow(title="Scene")
         self.combo_row.add_css_class("material-screensaver-combo")
         if self.screensaver_files:
             names = Gtk.StringList.new([display_name(f) for f in self.screensaver_files])
@@ -497,6 +497,11 @@ class ScreensaverWindow(Adw.PreferencesWindow):
             self.combo_row.set_model(Gtk.StringList.new(["No screensavers found"]))
             self.combo_row.set_sensitive(False)
         sv_group.add(self.combo_row)
+
+        # Keep long scene descriptions off the ComboRow: its subtitle would
+        # squeeze the selected value into an unreadable clipped fragment.
+        self.scene_description_row = Adw.ActionRow(title="Scene description")
+        sv_group.add(self.scene_description_row)
 
         self.monitor_assignment_group = Adw.PreferencesGroup(title="Per-monitor screensavers")
         scene_page.add(self.monitor_assignment_group)
@@ -1019,7 +1024,7 @@ class ScreensaverWindow(Adw.PreferencesWindow):
                 description = self.scene_descriptions.get(preserve_scene, "")
                 if description:
                     subtitle += " — " + description
-            self.combo_row.set_subtitle(subtitle)
+            self.scene_description_row.set_subtitle(subtitle)
             self.combo_row.set_sensitive(bool(filtered) and not self.random_switch.get_active())
         finally:
             self._picker_updating = False
@@ -1363,7 +1368,7 @@ class ScreensaverWindow(Adw.PreferencesWindow):
         had_preview_override = self._preview_override is not None
         self._preview_override = None
         self.selected_scene = self.filtered_screensaver_files[idx]
-        self.combo_row.set_subtitle(
+        self.scene_description_row.set_subtitle(
             self.scene_descriptions.get(self.selected_scene, "")
         )
         updates = {"active": self.selected_scene}

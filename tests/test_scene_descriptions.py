@@ -56,7 +56,8 @@ class TestSceneDescriptions(unittest.TestCase):
         self.assertIn("config_store.load_scene_descriptions(SCREENSAVER_DIR)", source)
         self.assertIn("description = self.scene_descriptions.get(preserve_scene, \"\")", source)
         self.assertIn('self.scene_descriptions.get(self.selected_scene, "")', source)
-        self.assertIn("self.combo_row.set_subtitle(subtitle)", source)
+        self.assertIn("self.scene_description_row.set_subtitle(subtitle)", source)
+        self.assertNotIn("self.combo_row.set_subtitle(", source)
 
     def test_readme_preview_captions_reuse_canonical_descriptions(self):
         readme = (Path(support.REPO_ROOT) / "README.md").read_text(encoding="utf-8")

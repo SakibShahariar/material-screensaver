@@ -136,6 +136,18 @@
     "constellation-clock.html": {
       "description": "Stars drift into glowing numeral shapes, linking with faint lines that reform each minute.",
       "capabilities": []
+    },
+    "abyssal-drift.html": {
+      "description": "A slow descent through deep water: drifting jellyfish, falling marine snow and faint bioluminescent flashes.",
+      "capabilities": []
+    },
+    "fractal-landscape.html": {
+      "description": "Layered fractal mountain ridges slide past beneath a sky whose light follows the time of day.",
+      "capabilities": []
+    },
+    "living-metropolis.html": {
+      "description": "A shifting city skyline with windows lighting up, traffic flowing and rain crossing the streets.",
+      "capabilities": []
     }
   }
 }
