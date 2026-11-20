@@ -199,18 +199,6 @@ function frame(now) {
     g.addColorStop(1, rgba(b.color, 0));
     ctx.fillStyle = g;
     ctx.fill();
-    // Bright crest line makes the ribbon shape readable.
-    ctx.beginPath();
-    for (let i = 0; i <= 48; i++) {
-      const x = (i / 48) * W;
-      const wave = Math.sin((x / W) * Math.PI * 2 + t * b.rate * 7 + b.phase) * H * b.amp
-                 + Math.sin((x / W) * Math.PI * 4 - t * b.rate * 3) * H * b.amp * 0.35;
-      if (i === 0) ctx.moveTo(x, base + wave);
-      else ctx.lineTo(x, base + wave);
-    }
-    ctx.strokeStyle = rgba(b.color, 0.45);
-    ctx.lineWidth = 1.5;
-    ctx.stroke();
   }
   ctx.globalCompositeOperation = "source-over";
   requestAnimationFrame(frame);

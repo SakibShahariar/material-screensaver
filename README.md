@@ -6,7 +6,7 @@
 
 **Animated ambient scenes for GNOME on Wayland.**
 
-35 offline HTML/JavaScript screensavers with a GTK4 and libadwaita settings app.
+34 offline HTML/JavaScript screensavers with a GTK4 and libadwaita settings app.
 
 [Features](#features) · [Install](#install) · [Controls](#controls) · [Documentation](#documentation)
 
@@ -23,7 +23,7 @@
 
 ## Features
 
-- **35 animated scenes** across abstract, geometric, space, and nature-inspired styles.
+- **34 animated scenes** across abstract, geometric, space, and nature-inspired styles.
 - **GNOME integration** with idle activation and multi-monitor support.
 - **Scene controls** for search, categories, favorites, random selection, and per-scene options.
 - **Clock overlay** and configurable keyboard shortcuts.
