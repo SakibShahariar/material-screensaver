@@ -19,10 +19,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - "Test it now" preview group (Start/Stop buttons) from the settings GUI — the inline
   Live Preview thumbnail already shows the selected style.
 ### Added
-- Six new scenes: **Aurora Veil**, **Koi Pond**, **Constellation Clock**,
-  **Turing Garden** (reaction–diffusion), **Analog Clockwork** (mechanical dial) and
-  **Julia Bloom** (GPU fractal). All follow the shared Matugen palette, clock helper and
-  reduced-motion conventions. Total scene count is 37.
+- Nine new scenes: **Aurora Veil**, **Koi Pond**, **Constellation Clock**,
+  **Turing Garden** (reaction–diffusion), **Analog Clockwork** (mechanical dial),
+  **Julia Bloom** (GPU fractal), **L-system Bloom** (recursive growth), **Word Tide**
+  (kinetic typography) and **Ink and Light** (monochrome). All follow the shared Matugen
+  palette, clock helper and reduced-motion conventions. Total scene count is 40.
 - Optional top-bar status menu with Start / Stop / Toggle / Open Settings controls,
   provided by the companion Shell extension and gated by `status_menu_enabled`
   (off by default). Takes effect after a re-login. Next Scene uses the new daemon

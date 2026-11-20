@@ -148,6 +148,18 @@
     "julia-bloom.html": {
       "description": "A fractal bloom slowly zooms and changes shape as its parameter drifts.",
       "capabilities": []
+    },
+    "l-system-bloom.html": {
+      "description": "A branching plant grows from simple rules, blossoms, then quietly regrows in a new form.",
+      "capabilities": []
+    },
+    "word-tide.html": {
+      "description": "Calm phrases assemble from drifting letters, briefly forming the current time each minute.",
+      "capabilities": []
+    },
+    "ink-and-light.html": {
+      "description": "Dark ink pools spread and fade on pale paper with crisp, high-contrast edges.",
+      "capabilities": []
     }
   }
 }

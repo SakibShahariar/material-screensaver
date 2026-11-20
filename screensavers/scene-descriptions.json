@@ -37,6 +37,9 @@
     "constellation-clock.html": "Stars drift into glowing numeral shapes, linking with faint lines that reform each minute.",
     "turing-garden.html": "Self-organizing chemical patterns grow into spots, stripes and spirals that keep reorganizing.",
     "analog-clockwork.html": "A precision dial with sweeping hands, turning gears and a steady escapement.",
-    "julia-bloom.html": "A fractal bloom slowly zooms and changes shape as its parameter drifts."
+    "julia-bloom.html": "A fractal bloom slowly zooms and changes shape as its parameter drifts.",
+    "l-system-bloom.html": "A branching plant grows from simple rules, blossoms, then quietly regrows in a new form.",
+    "word-tide.html": "Calm phrases assemble from drifting letters, briefly forming the current time each minute.",
+    "ink-and-light.html": "Dark ink pools spread and fade on pale paper with crisp, high-contrast edges."
   }
 }

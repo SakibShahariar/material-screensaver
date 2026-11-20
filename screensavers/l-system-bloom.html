@@ -1,0 +1,253 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; base-uri 'none'; form-action 'none'; object-src 'none'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; font-src 'self' data:; media-src 'self' data:; connect-src 'none';">
+<title>Material Screensaver — L-system Bloom</title>
+<style>
+:root {
+  --primary_rgb: 138 206 255;
+  --primary_container_rgb: 0 75 111;
+  --secondary_rgb: 180 199 233;
+  --secondary_container_rgb: 53 72 99;
+  --tertiary_rgb: 186 196 250;
+  --tertiary_container_rgb: 58 68 114;
+  --inverse_primary_rgb: 0 100 145;
+  --surface_rgb: 12 20 27;
+  --outline_rgb: 137 146 154;
+}
+* { margin: 0; padding: 0; box-sizing: border-box; }
+html, body {
+  width: 100%; height: 100%; overflow: hidden;
+  background: rgb(var(--surface_rgb));
+  cursor: none;
+  font-family: "Google Sans", "Segoe UI", system-ui, sans-serif;
+}
+body.show-cursor { cursor: default; }
+canvas { display: block; width: 100vw; height: 100vh; }
+#clock {
+  position: fixed;
+  left: clamp(28px, 3vw, 48px);
+  bottom: clamp(40px, 4.5vw, 56px);
+  font-weight: 200;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: -2px;
+  font-size: clamp(40px, 5.5vw, 78px);
+  color: rgb(var(--primary_rgb));
+  text-shadow: 0 0 40px rgb(var(--primary_rgb) / .4), 0 2px 16px rgba(0,0,0,.6);
+  pointer-events: none;
+  transition: opacity .7s ease;
+}
+#clock .ampm {
+  font-size: .26em; margin-left: 10px; opacity: .7;
+  vertical-align: 22%; letter-spacing: 2px; font-weight: 400;
+}
+#date {
+  position: fixed;
+  left: clamp(30px, 3.1vw, 50px);
+  bottom: clamp(18px, 2.2vw, 28px);
+  font-size: clamp(11px, 1.05vw, 14px);
+  letter-spacing: 4px; text-transform: uppercase;
+  color: rgb(var(--secondary_rgb) / .88);
+  text-shadow: 0 1px 10px rgba(0,0,0,.5);
+  pointer-events: none; transition: opacity .7s ease;
+}
+#clock.hidden, #date.hidden { opacity: 0; }
+#hint {
+  position: fixed; right: 28px; bottom: 24px;
+  font-size: 11px; letter-spacing: 1.5px;
+  color: rgb(var(--outline_rgb) / .55);
+  opacity: 0; transition: opacity 1s ease;
+  text-transform: uppercase; pointer-events: none;
+}
+#hint.show { opacity: .7; }
+</style>
+<link rel="stylesheet" href="matugen-colors.css">
+</head>
+<body>
+<canvas id="c"></canvas>
+<div id="clock">00:00<span class="ampm">AM</span></div>
+<div id="date">MON, JAN 1</div>
+<div id="hint">C · toggle clock</div>
+<script>
+
+"use strict";
+
+const canvas = document.getElementById("c");
+const ctx = canvas.getContext("2d", { alpha: false, desynchronized: true });
+const clockEl = document.getElementById("clock");
+const dateEl  = document.getElementById("date");
+const hintEl  = document.getElementById("hint");
+
+let W = 0, H = 0, DPR = 1;
+let theme = {};
+let roleList = [];
+let start = performance.now();
+let lastT = 0;
+
+const reduceMotion = matchMedia("(prefers-reduced-motion: reduce)").matches;
+
+function readRGB(name, fb = [160, 160, 160]) {
+  const r = getComputedStyle(document.documentElement).getPropertyValue(name).trim();
+  const p = r.split(/\s+/).map(Number);
+  return (p.length === 3 && p.every(n => !isNaN(n))) ? p : fb;
+}
+function rgba(c, a = 1) {
+  return `rgba(${c[0]},${c[1]},${c[2]},${a})`;
+}
+function loadTheme() {
+  theme = {
+    surface:   readRGB("--surface_rgb", [12, 20, 27]),
+    primary:   readRGB("--primary_rgb", [138, 206, 255]),
+    secondary: readRGB("--secondary_rgb", [180, 199, 233]),
+    tertiary:  readRGB("--tertiary_rgb", [186, 196, 250]),
+    container: readRGB("--tertiary_container_rgb", [58, 68, 114]),
+    outline:   readRGB("--outline_rgb", [137, 146, 154])
+  };
+  roleList = [theme.primary, theme.secondary, theme.tertiary];
+  document.body.style.background = rgba(theme.surface);
+  clockEl.style.color = rgba(theme.primary, 0.97);
+  dateEl.style.color = rgba(theme.secondary, 0.88);
+  hintEl.style.color = rgba(theme.outline, 0.6);
+}
+function resize() {
+  W = innerWidth; H = innerHeight;
+  DPR = Math.min(devicePixelRatio || 1, 2);
+  canvas.width = Math.floor(W * DPR);
+  canvas.height = Math.floor(H * DPR);
+  ctx.setTransform(DPR, 0, 0, DPR, 0, 0);
+}
+addEventListener("resize", resize, { passive: true });
+addEventListener("keydown", e => {
+  if (e.key.toLowerCase() === "c") {
+    clockEl.classList.toggle("hidden");
+    dateEl.classList.toggle("hidden");
+  }
+});
+function fallbackClock() {
+  function update() {
+    const n = new Date();
+    let h = n.getHours();
+    const ap = h >= 12 ? "PM" : "AM";
+    h = h % 12 || 12;
+    clockEl.innerHTML =
+      `${String(h).padStart(2,"0")}:${String(n.getMinutes()).padStart(2,"0")}` +
+      `<span class="ampm">${ap}</span>`;
+    dateEl.textContent = n.toLocaleDateString("en-US", {
+      weekday: "short", month: "short", day: "numeric"
+    }).toUpperCase();
+  }
+  update();
+  setInterval(update, 1000);
+}
+addEventListener("load", () => {
+  loadTheme();
+  resize();
+  initScene();
+  const s = document.createElement("script");
+  s.src = "clock-shared.js";
+  s.onload = () => {
+    try {
+      if (typeof startClock === "function") startClock(clockEl, dateEl);
+      else fallbackClock();
+    } catch { fallbackClock(); }
+  };
+  s.onerror = fallbackClock;
+  document.head.appendChild(s);
+  hintEl.classList.add("show");
+  setTimeout(() => hintEl.classList.remove("show"), 4000);
+  requestAnimationFrame(frame);
+});
+
+
+const speedMul = reduceMotion ? 0.3 : 1;
+let segments = [], tips = [], scale = 1, baseX = 0, baseY = 0;
+let cycleStart = 0, seed = 1;
+
+function rng() {
+  seed = (seed * 1664525 + 1013904223) >>> 0;
+  return seed / 4294967296;
+}
+
+function buildPlant() {
+  let s = "X";
+  const angle = 20 + rng() * 10;
+  for (let i = 0; i < 4; i++) {
+    let next = "";
+    for (const ch of s) {
+      if (ch === "X") next += "F[+X][-X]FX";
+      else if (ch === "F") next += "FF";
+      else next += ch;
+    }
+    s = next;
+  }
+  segments = [];
+  tips = [];
+  let x = 0, y = 0, a = -Math.PI / 2, depth = 0;
+  const stack = [];
+  let minX = 0, maxX = 0, minY = 0, maxY = 0;
+  for (const ch of s) {
+    if (ch === "F") {
+      const nx = x + Math.cos(a), ny = y + Math.sin(a);
+      segments.push({ x1: x, y1: y, x2: nx, y2: ny, depth });
+      x = nx; y = ny;
+      minX = Math.min(minX, x); maxX = Math.max(maxX, x);
+      minY = Math.min(minY, y); maxY = Math.max(maxY, y);
+    } else if (ch === "+") a += angle * Math.PI / 180;
+    else if (ch === "-") a -= angle * Math.PI / 180;
+    else if (ch === "[") { stack.push({ x, y, a, depth }); depth++; }
+    else if (ch === "]") {
+      tips.push({ x, y });
+      const p = stack.pop();
+      if (p) { x = p.x; y = p.y; a = p.a; depth = p.depth; }
+    }
+  }
+  const spanX = Math.max(1, maxX - minX), spanY = Math.max(1, maxY - minY);
+  scale = Math.min((W * 0.8) / spanX, (H * 0.78) / spanY);
+  baseX = W / 2 - ((minX + maxX) / 2) * scale;
+  baseY = H * 0.92 - maxY * scale;
+}
+
+function initScene() {
+  seed = Math.floor(Math.random() * 100000) + 1;
+  buildPlant();
+  cycleStart = performance.now();
+}
+
+function frame(now) {
+  const t = ((now - start) / 1000) * speedMul;
+  if ((now - cycleStart) / 1000 > 26) { buildPlant(); cycleStart = now; }
+  ctx.setTransform(DPR, 0, 0, DPR, 0, 0);
+  ctx.fillStyle = rgba(theme.surface, 1);
+  ctx.fillRect(0, 0, W, H);
+  const sway = Math.sin(t * 0.45) * 0.05;
+  const grown = Math.min(segments.length, Math.floor(segments.length * Math.min(1, (now - cycleStart) / 9000)));
+  for (let i = 0; i < grown; i++) {
+    const s = segments[i];
+    const role = roleList[Math.min(2, Math.floor((s.depth / 8) * 3))] || theme.primary;
+    ctx.strokeStyle = rgba(role, 0.32 + Math.min(0.5, s.depth * 0.06));
+    ctx.lineWidth = Math.max(1, (7 - Math.min(6, s.depth)) * 0.55);
+    ctx.beginPath();
+    ctx.moveTo(baseX + s.x1 * scale, baseY + s.y1 * scale);
+    ctx.lineTo(baseX + s.x2 * scale + sway * s.depth * 3, baseY + s.y2 * scale);
+    ctx.stroke();
+  }
+  if (grown === segments.length) {
+    for (let i = 0; i < tips.length; i++) {
+      const tip = tips[i];
+      const role = roleList[i % roleList.length];
+      const pulse = 0.6 + 0.4 * Math.sin(t * 1.4 + i);
+      ctx.fillStyle = rgba(role, 0.35 + pulse * 0.45);
+      ctx.beginPath();
+      ctx.arc(baseX + tip.x * scale + sway * 8, baseY + tip.y * scale,
+              2 + pulse * 2.5, 0, Math.PI * 2);
+      ctx.fill();
+    }
+  }
+  requestAnimationFrame(frame);
+}
+
+</script>
+</body>
+</html>
