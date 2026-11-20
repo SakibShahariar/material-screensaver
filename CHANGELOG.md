@@ -16,6 +16,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - "Test it now" preview group (Start/Stop buttons) from the settings GUI — the inline
   Live Preview thumbnail already shows the selected style.
 ### Added
+- Optional subtle fade-in/fade-out transitions for the viewer (off by default). Enable
+  **Fade transitions** in Settings; the viewer fades in on start and out on dismissal,
+  with a short 150–180 ms duration.
 - Optional scene rotation while the screensaver is active (off by default). Configure
   **Rotate scenes while active** and an interval in Settings; rotation cycles through
   favorites when set, otherwise all valid scenes, by reloading the existing viewer

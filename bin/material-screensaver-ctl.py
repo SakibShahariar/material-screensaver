@@ -414,6 +414,46 @@ def _battery_is_discharging():
     return state
 
 
+def _opacity_at(start, target, elapsed_ms, duration_ms):
+    """Linear opacity interpolation used by the optional fade transitions."""
+    if duration_ms <= 0:
+        return target
+    fraction = min(1.0, max(0.0, elapsed_ms / float(duration_ms)))
+    return start + (target - start) * fraction
+
+
+def _fade_opacity(widget, target, duration_ms=180, on_complete=None):
+    """Animate a widget's opacity on the GLib main loop; failures are non-fatal."""
+    if widget is None:
+        if on_complete is not None:
+            on_complete()
+        return
+    try:
+        from gi.repository import GLib
+        start = widget.get_opacity()
+        step_ms = max(16, duration_ms // 8)
+        elapsed = [0]
+
+        def tick():
+            elapsed[0] += step_ms
+            value = _opacity_at(start, target, elapsed[0], duration_ms)
+            try:
+                widget.set_opacity(value)
+            except Exception:
+                return False
+            if elapsed[0] >= duration_ms:
+                if on_complete is not None:
+                    on_complete()
+                return False
+            return True
+
+        GLib.timeout_add(step_ms, tick)
+    except Exception as exc:
+        _dbg(f"Could not animate viewer opacity: {exc}")
+        if on_complete is not None:
+            on_complete()
+
+
 def _viewer_webview(window):
     """Return the WebView hosted by a viewer window.
 
@@ -1159,6 +1199,12 @@ p{color:#c4c0ca;line-height:1.5}
                 w.set_visible(True)
             except Exception as exc:
                 _dbg(f"Suppressed non-fatal exception in _do_fullscreen: {exc}")
+            if viewer_cfg.get("transitions_enabled", False):
+                try:
+                    w.set_opacity(0.0)
+                    _fade_opacity(w, 1.0, 180)
+                except Exception as exc:
+                    _dbg(f"Suppressed non-fatal exception in _do_fullscreen fade: {exc}")
             try:
                 w.grab_focus()
             except Exception as exc:
@@ -1981,19 +2027,31 @@ def run_viewer(html_path, clock_format="24h", scene_options=None, viewer_cfg=Non
             except Exception as exc:
                 _dbg(f"Suppressed non-fatal exception connecting close-request: {exc}")
 
+        _sig_handled = [False]
+
         def _viewer_sig(*_a):
-            try:
-                for w in list(_viewer_windows):
-                    try:
-                        w.close()
-                    except Exception as exc:
-                        _dbg(f"Suppressed non-fatal exception in _viewer_sig: {exc}")
-            except Exception as exc:
-                _dbg(f"Suppressed non-fatal exception in _viewer_sig: {exc}")
-            try:
-                loop.quit()
-            except Exception as exc:
-                _dbg(f"Suppressed non-fatal exception in _viewer_sig: {exc}")
+            if _sig_handled[0]:
+                return False
+            _sig_handled[0] = True
+
+            def finish():
+                try:
+                    for w in list(_viewer_windows):
+                        try:
+                            w.close()
+                        except Exception as exc:
+                            _dbg(f"Suppressed non-fatal exception in _viewer_sig: {exc}")
+                except Exception as exc:
+                    _dbg(f"Suppressed non-fatal exception in _viewer_sig: {exc}")
+                try:
+                    loop.quit()
+                except Exception as exc:
+                    _dbg(f"Suppressed non-fatal exception in _viewer_sig: {exc}")
+
+            if viewer_cfg.get("transitions_enabled", False) and _viewer_windows:
+                _fade_opacity(_viewer_windows[0], 0.0, 150, finish)
+            else:
+                finish()
             return False
         try:
             GLib.unix_signal_add(GLib.PRIORITY_DEFAULT, signal.SIGTERM, _viewer_sig)

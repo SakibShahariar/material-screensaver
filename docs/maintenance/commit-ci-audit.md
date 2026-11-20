@@ -24,10 +24,10 @@ Persistent repository-specific record of commit-level CI checks and red-cross in
 
 - Repository: `SakibShahariar/material-screensaver`
 - Default branch: `master`
-- Checkpoint SHA: `814afc697af08133c3c378ef3989d235e9fdacbf`
+- Checkpoint SHA: `5b40cf8562d555792ad30fc4aba862089905a329`
 - Initialized: 2026-11-02
 - Baseline correction: a workflow run for the checkpoint commit was later found and inspected; it failed in the test-suite step. The failure is recorded below rather than treating the earlier empty combined-status response as authoritative.
-- Next session: review commits after `814afc697af08133c3c378ef3989d235e9fdacbf`; retain the historical red, pending, and unavailable entries below for audit context.
+- Next session: review commits after `5b40cf8562d555792ad30fc4aba862089905a329` (including the fade-transitions commit whose CI is pending at checkpoint time); retain the historical red, pending, and unavailable entries below for audit context.
 
 ## Initial baseline
 
@@ -127,6 +127,20 @@ Diagnosis: one root cause. `43ac3f4` dropped three README strings asserted by `t
 
 Fix: `814afc697af08133c3c378ef3989d235e9fdacbf` restored the canonical preview captions, the `**31 animated scenes**` feature wording, and the `requestAnimationFrame-driven scenes at **10 FPS**` reduced-motion line in `README.md`; kept the remainder of the streamline. Local verification: 216/216 unit tests pass, `validate-scenes.py` 31/31 pass, `check-scene-payload-budget.py` passes. Ruff is not installed locally; the change is README-only. Pushed to `master` on 2026-11-19 and verified green in [run 44498147410](https://github.com/SakibShahariar/material-screensaver/actions/runs/44498147410) (lint success, tests success). The four red entries above are therefore resolved; the nine unavailable entries remain without evidence and are carried forward.
 
+### 2026-11-20 follow-up audit
+
+All commits below were observed green; lint and tests both succeeded in every run.
+
+| Commit SHA | Subject | CI result | Workflow run |
+|---|---|---|---|
+| `c13ad41038a9234171003df77f316379e8d249c0` | docs(maintenance): record verified green CI for README fix | green | [44498605046](https://github.com/SakibShahariar/material-screensaver/actions/runs/44498605046) |
+| `0a8f08a8684ae3530036a6fdebd73f5a464227ca` | fix(extension): block 4+ finger swipes in gesture guard | green | [44527705653](https://github.com/SakibShahariar/material-screensaver/actions/runs/44527705653) |
+| `7d4e82705fa66fcc97a16081a756499a98281a7c` | fix(ctl): close GNOME Overview before showing viewer | green | [44530915086](https://github.com/SakibShahariar/material-screensaver/actions/runs/44530915086) |
+| `a3377d5c720531fbd2550503202aa89afdbc0282` | fix(gui): clamp restored settings window size to work area | green | [44579340182](https://github.com/SakibShahariar/material-screensaver/actions/runs/44579340182) |
+| `0d86c729c4ca07782a1f4069a1bcf8a3035eb041` | docs: document Settings window size restore and position limitation | green | [44580644104](https://github.com/SakibShahariar/material-screensaver/actions/runs/44580644104) |
+| `b6039e9eb7ab77fee4a2a1cc8f0f951ff518a39d` | feat(ctl): add optional scene rotation while viewer is active | green | [44583587099](https://github.com/SakibShahariar/material-screensaver/actions/runs/44583587099) |
+| `5b40cf8562d555792ad30fc4aba862089905a329` | fix(viewer): dispose the real WebView during teardown | green | [44589744196](https://github.com/SakibShahariar/material-screensaver/actions/runs/44589744196) |
+
 ### Failure record template
 
 - Commit SHA:
@@ -147,3 +161,4 @@ Fix: `814afc697af08133c3c378ef3989d235e9fdacbf` restored the canonical preview c
 |---|---|---|
 | 2026-11-02 | Initial checkpoint: `44ec3498851aff1735124f2d80ef232f35af6c84` | Latest commit queried; empty status response recorded as unavailable. Earlier history not retroactively audited. |
 | 2026-11-19 | `48a9c421` → `814afc69` (16 commits) | Two green, nine unavailable (no check runs), four red from the README-streamline regression at `43ac3f4`. Fix `814afc69` pushed and verified green in run 44498147410; red entries resolved, unavailable entries carried forward. |
+| 2026-11-20 | `814afc69` → `5b40cf85` (7 commits) | All seven green; reviewed and recorded above. Checkpoint advanced to `5b40cf85`. |
