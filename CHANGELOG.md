@@ -18,7 +18,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Added
 - Optional top-bar status menu with Start / Stop / Toggle / Open Settings controls,
   provided by the companion Shell extension and gated by `status_menu_enabled`
-  (off by default). Takes effect after a re-login; Next Scene is not included yet.
+  (off by default). Takes effect after a re-login. Next Scene uses the new daemon
+  `NextScene` D-Bus method and `next` CLI command.
 - Optional subtle fade-in/fade-out transitions for the viewer (off by default). Enable
   **Fade transitions** in Settings; the viewer fades in on start and out on dismissal,
   with a short 150–180 ms duration.

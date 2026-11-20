@@ -1,7 +1,7 @@
 {
   "uuid": "material-screensaver-gestures@io.github.sakib",
   "name": "Material Screensaver Gesture Guard",
-  "description": "Blocks touchpad swipes with three or more fingers while the Material screensaver's fullscreen viewer is focused, and optionally adds a top-bar status menu with quick Start/Stop/Toggle/Settings controls (disabled by default).",
+  "description": "Blocks touchpad swipes with three or more fingers while the Material screensaver's fullscreen viewer is focused, and optionally adds a top-bar status menu with quick Start/Stop/Toggle/Next Scene/Settings controls (disabled by default).",
   "shell-version": ["45", "46", "47", "48", "49", "50", "51"],
   "version-name": "1.2",
   "version": 3

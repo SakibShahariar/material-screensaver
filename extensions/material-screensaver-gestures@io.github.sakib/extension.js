@@ -128,11 +128,13 @@ export default class MaterialScreensaverGestureGuard extends Extension {
             start: new PopupMenu.PopupMenuItem("Start"),
             stop: new PopupMenu.PopupMenuItem("Stop"),
             toggle: new PopupMenu.PopupMenuItem("Toggle"),
+            next: new PopupMenu.PopupMenuItem("Next Scene"),
             settings: new PopupMenu.PopupMenuItem("Open Settings"),
         };
         items.start.connect("activate", () => this._call("Show"));
         items.stop.connect("activate", () => this._call("Hide"));
         items.toggle.connect("activate", () => this._call("Toggle"));
+        items.next.connect("activate", () => this._call("NextScene"));
         items.settings.connect("activate", () => {
             const app = Gio.DesktopAppInfo.new("material-screensaver-settings.desktop");
             if (app)

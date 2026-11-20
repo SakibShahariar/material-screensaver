@@ -51,8 +51,9 @@ class TestShellExtension(unittest.TestCase):
         self.assertIn("Main.panel.addToStatusArea", source)
         self.assertIn("Gio.bus_watch_name", source)
         self.assertIn("Gio.bus_unwatch_name", source)
-        for method in ("Show", "Hide", "Toggle", "IsActive"):
+        for method in ("Show", "Hide", "Toggle", "NextScene", "IsActive"):
             self.assertIn(method, source)
+        self.assertIn('new PopupMenu.PopupMenuItem("Next Scene")', source)
         self.assertIn("material-screensaver-settings.desktop", source)
         self.assertNotIn("Shell.Eval", source)
         # Gesture guard must remain intact.

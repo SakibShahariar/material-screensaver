@@ -2705,6 +2705,29 @@ def stop():
         except Exception as exc:
             _dbg(f"Suppressed non-fatal exception in stop: {exc}")
 
+def next_scene():
+    """Advance the configured scene; restart the viewer if one is showing."""
+    cfg = load_config()
+    available = list_screensavers()
+    if not available:
+        return False
+    names = _rotation_scene_names(cfg, available)
+    current = cfg.get("active")
+    if current not in names:
+        current = names[0]
+    chosen = names[(names.index(current) + 1) % len(names)]
+    try:
+        config_store.save_config(CONFIG_PATH, active=chosen)
+    except Exception as exc:
+        print(f"Could not save next scene: {exc}", file=sys.stderr)
+        return False
+    _log_event("scene_changed_next", scene=chosen)
+    if is_viewer_active():
+        hide_viewer()
+        show_viewer()
+    return True
+
+
 def toggle():
     # Use daemon atomic Toggle if available (avoids IsActive→Show race)
     ok, _ = _call_daemon("Toggle")
@@ -2988,6 +3011,7 @@ def run_daemon():
                         <method name="Show"/>
                         <method name="Hide"/>
                         <method name="Toggle"/>
+                        <method name="NextScene"/>
                         <method name="Activity"/>
                         <method name="IsActive">
                           <arg type="b" name="active" direction="out"/>
@@ -3011,6 +3035,9 @@ def run_daemon():
                                     hide_viewer()
                                 else:
                                     show_viewer()
+                                invocation.return_value(None)
+                            elif method == "NextScene":
+                                next_scene()
                                 invocation.return_value(None)
                             elif method == "Activity":
                                 _reset_lock_timer_from_activity()
@@ -3058,6 +3085,10 @@ if __name__ == "__main__":
         start()
     elif action == "stop":
         stop()
+    elif action == "next":
+        ok, _ = _call_daemon("NextScene")
+        if not ok:
+            next_scene()
     elif action == "daemon":
         run_daemon()
     elif action == "message":
