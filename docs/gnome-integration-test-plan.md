@@ -82,6 +82,12 @@ These were actually executed in a GNOME Shell 51.1 / Wayland session or an isola
 
 | Case | Result | Evidence |
 |---|---|---|
+| START-01 (manual start) | **Passed**: `start` exited 0, viewer active with one viewer process. | Live D-Bus + process count, 2026-11-20. |
+| START-02 (stop while visible) | **Passed**: `stop` exited 0, viewer inactive with no viewer process. | Live D-Bus + process count, 2026-11-20. |
+| START-03 (toggle idempotency) | **Passed**: two concurrent `toggle` calls from hidden left the viewer hidden with no duplicate process. | Live D-Bus + process count, 2026-11-20. |
+| IDLE-01 (idle activation) | **Passed**: with `idle_seconds=10`, the daemon registered a 10 s watch and the viewer spawned without manual Show. | Journal `idle_watch_registered timeout_seconds='10'` + `viewer_spawned`, 2026-11-20. |
+| IDLE-03 (change timeout while active) | **Passed**: changing to 42 s while the viewer was active did not re-register the watch; after Hide the new 42 s watch was registered. | Journal timestamps, 2026-11-20. |
+| LOCK-03 (lock timer zero) | **Passed**: with `lock_after_seconds=0`, no `lock_timer_fired` event during an 8 s visible period. | Journal, 2026-11-20. |
 | START-04 (no graphical session) | **Passed** with the daemon stopped: `DISPLAY`/`WAYLAND_DISPLAY` unset, `start` exited 1 with `No graphical session available; cannot start screensaver.` With the daemon running, the CLI intentionally delegates the Show to the daemon instead, so this case must be run with the service stopped. | Live command output, 2026-11-20. |
 | LIFE-01 (service restart while hidden) | **Passed**: service restarted, new PID active, `idle_watch_registered` emitted by the new daemon, viewer inactive. | `systemctl --user restart` + journal, 2026-11-20. |
 | LIFE-02 (service restart while visible) | **Passed**: viewer was active before restart; after restart no viewer process or WebKit helper remained and `IsActive` was false. | Viewer PID before/after and `pgrep` counts, 2026-11-20. The service's cgroup kill cleans up the detached viewer subprocess. |
