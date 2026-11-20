@@ -24,10 +24,10 @@ Persistent repository-specific record of commit-level CI checks and red-cross in
 
 - Repository: `SakibShahariar/material-screensaver`
 - Default branch: `master`
-- Checkpoint SHA: `5b40cf8562d555792ad30fc4aba862089905a329`
+- Checkpoint SHA: `0f790d348db4f44c6dfc162756a0e61370b90061`
 - Initialized: 2026-11-02
 - Baseline correction: a workflow run for the checkpoint commit was later found and inspected; it failed in the test-suite step. The failure is recorded below rather than treating the earlier empty combined-status response as authoritative.
-- Next session: review commits after `5b40cf8562d555792ad30fc4aba862089905a329` (including the fade-transitions commit whose CI is pending at checkpoint time); retain the historical red, pending, and unavailable entries below for audit context.
+- Next session: review commits after `0f790d348db4f44c6dfc162756a0e61370b90061`; retain the historical red, pending, and unavailable entries below for audit context.
 
 ## Initial baseline
 
@@ -141,6 +141,19 @@ All commits below were observed green; lint and tests both succeeded in every ru
 | `b6039e9eb7ab77fee4a2a1cc8f0f951ff518a39d` | feat(ctl): add optional scene rotation while viewer is active | green | [44583587099](https://github.com/SakibShahariar/material-screensaver/actions/runs/44583587099) |
 | `5b40cf8562d555792ad30fc4aba862089905a329` | fix(viewer): dispose the real WebView during teardown | green | [44589744196](https://github.com/SakibShahariar/material-screensaver/actions/runs/44589744196) |
 
+### 2026-11-20 second follow-up audit
+
+| Commit SHA | Subject | CI result | Workflow run | Outcome |
+|---|---|---|---|---|
+| `527ad6a860481a2542e554987ad7c195fa150431` | feat(viewer): add optional fade transitions | green | [44675711305](https://github.com/SakibShahariar/material-screensaver/actions/runs/44675711305) | First run green. Note: the run recorded for `5b40cf85` was initially pending at that checkpoint and is now resolved. |
+| `928e798e77e3fbc97949701e61b2bda27047b465` | feat(extension): add optional top-bar status menu | red → green | [44677421407](https://github.com/SakibShahariar/material-screensaver/actions/runs/44677421407), [44677705936](https://github.com/SakibShahariar/material-screensaver/actions/runs/44677705936) | First run: ESLint failed on GJS globals `TextDecoder`/`log`. Its tests job also hit an `apt-get install` timeout (exit 124). Fixed by `0d735f2`; rerun attempt 2 green. |
+| `0d735f2d20a0160d160a69c6350a391ffa24a0f4` | fix(extension): declare GJS globals for ESLint | green | [44677705936](https://github.com/SakibShahariar/material-screensaver/actions/runs/44677705936) | Attempt 2 of the rerun covering the fix; lint and tests passed. |
+| `096833aa63a69679a6192d8e99bad301f8537da3` | feat(ctl): add NextScene control for the status menu | green | [44680448819](https://github.com/SakibShahariar/material-screensaver/actions/runs/44680448819) | First run green. |
+| `3b149e2937471a26ebb8cb3554df8a8c3d490b2d` | feat(viewer): fade scene changes during rotation | red → green | [44681317842](https://github.com/SakibShahariar/material-screensaver/actions/runs/44681317842) | First run: `apt-get install` timeout (exit 124), infrastructure. Rerun attempt 2 green; no code change. |
+| `0f790d348db4f44c6dfc162756a0e61370b90061` | fix(viewer): re-arm lock countdown after activity | green | [44683846290](https://github.com/SakibShahariar/material-screensaver/actions/runs/44683846290) | First run green. |
+
+Diagnosis: the only code-related red in this range was the GJS-globals ESLint failure on `928e798`, fixed by `0d735f2`. The two `apt-get` exit-124 failures were runner infrastructure timeouts; both passed on rerun without code changes. Checkpoint advanced through `0f790d3`.
+
 ### Failure record template
 
 - Commit SHA:
@@ -162,3 +175,4 @@ All commits below were observed green; lint and tests both succeeded in every ru
 | 2026-11-02 | Initial checkpoint: `44ec3498851aff1735124f2d80ef232f35af6c84` | Latest commit queried; empty status response recorded as unavailable. Earlier history not retroactively audited. |
 | 2026-11-19 | `48a9c421` → `814afc69` (16 commits) | Two green, nine unavailable (no check runs), four red from the README-streamline regression at `43ac3f4`. Fix `814afc69` pushed and verified green in run 44498147410; red entries resolved, unavailable entries carried forward. |
 | 2026-11-20 | `814afc69` → `5b40cf85` (7 commits) | All seven green; reviewed and recorded above. Checkpoint advanced to `5b40cf85`. |
+| 2026-11-20 | `5b40cf85` → `0f790d3` (6 commits) | Four green on first run; one red (GJS globals, fixed by `0d735f2`) and two `apt-get` timeout reruns. All final results green; checkpoint advanced to `0f790d3`. |

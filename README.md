@@ -29,6 +29,7 @@
 - **Clock overlay** and configurable keyboard shortcuts.
 - **Power controls** with frame-rate limits, battery saver, and display blanking.
 - **Reduced motion** support for the system preference, capping requestAnimationFrame-driven scenes at **10 FPS** when enabled.
+- **Optional scene rotation** on a timer, subtle fade transitions, and a top-bar quick-control menu — all disabled by default (the menu needs a re-login after install).
 - **Offline by default:** bundled scenes require no network connection.
 
 > **Not a lock screen.** Use GNOME's session lock to secure your computer.
