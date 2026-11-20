@@ -82,6 +82,9 @@ These were actually executed in a GNOME Shell 51.1 / Wayland session or an isola
 
 | Case | Result | Evidence |
 |---|---|---|
+| START-04 (no graphical session) | **Passed** with the daemon stopped: `DISPLAY`/`WAYLAND_DISPLAY` unset, `start` exited 1 with `No graphical session available; cannot start screensaver.` With the daemon running, the CLI intentionally delegates the Show to the daemon instead, so this case must be run with the service stopped. | Live command output, 2026-11-20. |
+| LIFE-01 (service restart while hidden) | **Passed**: service restarted, new PID active, `idle_watch_registered` emitted by the new daemon, viewer inactive. | `systemctl --user restart` + journal, 2026-11-20. |
+| LIFE-02 (service restart while visible) | **Passed**: viewer was active before restart; after restart no viewer process or WebKit helper remained and `IsActive` was false. | Viewer PID before/after and `pgrep` counts, 2026-11-20. The service's cgroup kill cleans up the detached viewer subprocess. |
 | LIFE-03 (rapid start/stop) | **Passed** for cleanup: 8 consecutive Show/Hide cycles via the daemon D-Bus; 56 newly spawned viewer/WebKit/bwrap processes, 0 remained after any Hide. | Recorded on issue #60 along with a before/after procfs-read and latency comparison on a ~500-process desktop. |
 | IDLE-05 (Overview) | **Partial**: the Shell's `OverviewActive` D-Bus setter was verified live (Overview opened and closed). The full idle-from-Overview scenario was not run. | Code path adds the setter call before viewer spawn in `show_viewer()`. |
 | VIEW-04 (rotation) | **Partial**: an isolated Xvfb viewer armed rotation (`viewer_rotation_armed`, 3 scenes), ticked (`viewer_rotated`), and kept WebKit/bwrap process count flat at 7 across the tick. | Lock timer and Super+Q during rotation were not exercised in a live session. |
