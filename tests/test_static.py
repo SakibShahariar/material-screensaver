@@ -189,6 +189,23 @@ class TestThemeConsistency(unittest.TestCase):
         self.assertIn("if (clockLike) return;", source)
         self.assertNotIn('scene_has_shared_clock = "clock-shared.js" in scene_source', source)
 
+    def test_body_background_uses_themed_surface(self):
+        # A hardcoded body background would ignore the live Matugen palette.
+        for path in support.html_files():
+            text = _read(path)
+            name = os.path.basename(path)
+            with self.subTest(file=name):
+                self.assertRegex(
+                    text,
+                    r"background:\s*rgb\(var\(--surface_rgb\)\)",
+                    f"{name}: body background does not use the themed surface color",
+                )
+                self.assertNotRegex(
+                    text,
+                    r"background:\s*#[0-9a-fA-F]{3,8}\b",
+                    f"{name}: hardcoded hex body background",
+                )
+
     def test_clock_shared_referenced(self):
         # Every style renders a clock; each must at least reference the helper
         # (loaded dynamically at runtime, so check the string reference).
