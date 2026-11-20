@@ -23,6 +23,7 @@ import sys
 import json
 import glob
 import material_screensaver_config as config_store
+import material_screensaver_transitions as transitions
 import random
 import subprocess
 import atexit
@@ -414,44 +415,15 @@ def _battery_is_discharging():
     return state
 
 
-def _opacity_at(start, target, elapsed_ms, duration_ms):
-    """Linear opacity interpolation used by the optional fade transitions."""
-    if duration_ms <= 0:
-        return target
-    fraction = min(1.0, max(0.0, elapsed_ms / float(duration_ms)))
-    return start + (target - start) * fraction
+def _opacity_at(*args, **kwargs):
+    """Thin wrapper around the shared opacity helper (keeps ctl call sites stable)."""
+    return transitions.opacity_at(*args, **kwargs)
 
 
 def _fade_opacity(widget, target, duration_ms=180, on_complete=None):
-    """Animate a widget's opacity on the GLib main loop; failures are non-fatal."""
-    if widget is None:
-        if on_complete is not None:
-            on_complete()
-        return
-    try:
-        from gi.repository import GLib
-        start = widget.get_opacity()
-        step_ms = max(16, duration_ms // 8)
-        elapsed = [0]
-
-        def tick():
-            elapsed[0] += step_ms
-            value = _opacity_at(start, target, elapsed[0], duration_ms)
-            try:
-                widget.set_opacity(value)
-            except Exception:
-                return False
-            if elapsed[0] >= duration_ms:
-                if on_complete is not None:
-                    on_complete()
-                return False
-            return True
-
-        GLib.timeout_add(step_ms, tick)
-    except Exception as exc:
-        _dbg(f"Could not animate viewer opacity: {exc}")
-        if on_complete is not None:
-            on_complete()
+    """Thin wrapper passing the debug logger into the shared fade helper."""
+    return transitions.fade_opacity(
+        widget, target, duration_ms, on_complete, debug=_dbg)
 
 
 def _viewer_webview(window):

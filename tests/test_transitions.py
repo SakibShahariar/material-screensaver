@@ -6,6 +6,13 @@ import unittest
 from unittest import mock
 
 import support
+from material_screensaver_transitions import opacity_at
+
+
+class TestSharedTransitionModule(unittest.TestCase):
+    def test_opacity_at_is_directly_importable(self):
+        self.assertAlmostEqual(opacity_at(0.0, 1.0, 50, 100), 0.5)
+        self.assertAlmostEqual(opacity_at(1.0, 0.0, 100, 100), 0.0)
 
 
 class TestTransitionConfig(unittest.TestCase):
