@@ -40,6 +40,10 @@
     "julia-bloom.html": "A fractal bloom slowly zooms and changes shape as its parameter drifts.",
     "l-system-bloom.html": "A branching plant grows from simple rules, blossoms, then quietly regrows in a new form.",
     "word-tide.html": "Calm phrases assemble from drifting letters, briefly forming the current time each minute.",
-    "ink-and-light.html": "High-contrast ink pools spread and fade in the app's theme colors with crisp edges."
+    "ink-and-light.html": "High-contrast ink pools spread and fade in the app's theme colors with crisp edges.",
+    "harmonograph.html": "Fine mathematical curves trace slowly shifting, decaying loops in the theme colors.",
+    "topographic-contours.html": "Layered contour lines morph like a living elevation map across the screen.",
+    "moire-field.html": "Overlapping line grids drift to produce shifting interference patterns.",
+    "wave-interference.html": "Crisp ripple bands spread from several moving sources and overlap."
   }
 }

@@ -24,7 +24,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   **Julia Bloom** (GPU fractal), **L-system Bloom** (recursive growth), **Word Tide**
   (kinetic typography) and **Ink and Light** (themed high-contrast ink). All follow the
   shared Matugen palette, clock helper and reduced-motion conventions. Total scene count
-  is 40. The Settings scene picker is now sorted by displayed name rather than filename.
+  is 44. Four more abstract scenes: **Harmonograph** (mathematical curves),
+  **Topographic Contours**, **Moiré Field** and **Wave Interference**. The Settings scene
+  picker is now sorted by displayed name rather than filename.
 - Optional top-bar status menu with Start / Stop / Toggle / Open Settings controls,
   provided by the companion Shell extension and gated by `status_menu_enabled`
   (off by default). Takes effect after a re-login. Next Scene uses the new daemon

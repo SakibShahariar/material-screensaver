@@ -160,6 +160,22 @@
     "ink-and-light.html": {
       "description": "High-contrast ink pools spread and fade in the app's theme colors with crisp edges.",
       "capabilities": []
+    },
+    "harmonograph.html": {
+      "description": "Fine mathematical curves trace slowly shifting, decaying loops in the theme colors.",
+      "capabilities": []
+    },
+    "topographic-contours.html": {
+      "description": "Layered contour lines morph like a living elevation map across the screen.",
+      "capabilities": []
+    },
+    "moire-field.html": {
+      "description": "Overlapping line grids drift to produce shifting interference patterns.",
+      "capabilities": []
+    },
+    "wave-interference.html": {
+      "description": "Crisp ripple bands spread from several moving sources and overlap.",
+      "capabilities": []
     }
   }
 }
