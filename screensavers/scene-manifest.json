@@ -180,10 +180,6 @@
     "prism-field.html": {
       "description": "Soft light orbs split into colored fringes around a slowly drifting glass lens.",
       "capabilities": []
-    },
-    "pendulum-waves.html": {
-      "description": "Fifteen pendulums of different lengths trace evolving wave and symmetry patterns.",
-      "capabilities": []
     }
   }
 }
