@@ -181,11 +181,11 @@ function frame(now) {
   ctx.fillStyle = rgba(theme.surface, 1);
   ctx.fillRect(0, 0, W, H);
   ctx.globalCompositeOperation = "lighter";
-  ctx.lineWidth = 2;
+  ctx.lineWidth = 1.5;
   const shift = Math.sin(t * 0.12) * 26;
-  ctx.strokeStyle = rgba(theme.primary, 0.55);
+  ctx.strokeStyle = rgba(theme.primary, 0.24);
   rings(W / 2 - shift, H / 2, 15, 0);
-  ctx.strokeStyle = rgba(theme.secondary, 0.55);
+  ctx.strokeStyle = rgba(theme.secondary, 0.24);
   rings(W / 2 + shift, H / 2, 15, 0);
   ctx.globalCompositeOperation = "source-over";
   requestAnimationFrame(frame);
