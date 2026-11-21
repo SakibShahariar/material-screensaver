@@ -998,27 +998,6 @@ p{color:#c4c0ca;line-height:1.5}
                 sources["tick"] = GLib.timeout_add_seconds(1, update_countdown)
                 return False
 
-            def restart_countdown(label=countdown, state=remaining,
-                                  sources=countdown_sources):
-                """Arm a fresh warning after activity restarted the lock timer."""
-                for key in ("delay", "tick"):
-                    source = sources.get(key)
-                    if source is not None:
-                        try:
-                            GLib.source_remove(source)
-                        except Exception as exc:
-                            _dbg(f"Suppressed non-fatal exception removing countdown source: {exc}")
-                    sources[key] = None
-                sources["cancelled"] = False
-                state["seconds"] = min(lock_seconds, 10)
-                label.set_visible(False)
-                if lock_seconds <= 10:
-                    start_countdown()
-                else:
-                    sources["delay"] = GLib.timeout_add_seconds(
-                        lock_seconds - 10, start_countdown
-                    )
-
             if lock_seconds <= 10:
                 start_countdown()
             else:
@@ -1030,11 +1009,9 @@ p{color:#c4c0ca;line-height:1.5}
         super_pressed = {"value": False}
 
         def on_key(ctrl, keyval, keycode, state, _win=win):
-            if _notify_lock_activity():
-                try:
-                    restart_countdown()
-                except NameError:
-                    pass
+            # lock_after_seconds is a fixed deadline from viewer start; input
+            # does not restart the countdown (see _reset_lock_timer_from_activity).
+            _notify_lock_activity()
             # Only Super+Q closes, Super alone is consumed (no overview, no close)
             try:
                 from gi.repository import Gdk
@@ -1066,19 +1043,15 @@ p{color:#c4c0ca;line-height:1.5}
                 return False
         def on_click(ctrl, n_press, x, y, _win=win, _web=web):
             # Clicks reset the lock delay and cancel the current warning.
-            if _notify_lock_activity():
-                try:
-                    restart_countdown()
-                except NameError:
-                    pass
+            # lock_after_seconds is a fixed deadline from viewer start; input
+            # does not restart the countdown (see _reset_lock_timer_from_activity).
+            _notify_lock_activity()
             return False
         def on_motion(ctrl, x, y, _win=win, _web=web):
             # Pointer activity resets the lock delay without dismissing.
-            if _notify_lock_activity():
-                try:
-                    restart_countdown()
-                except NameError:
-                    pass
+            # lock_after_seconds is a fixed deadline from viewer start; input
+            # does not restart the countdown (see _reset_lock_timer_from_activity).
+            _notify_lock_activity()
             return False
         # cursor helpers — permanently hidden for non-interactive styles
         # (solar-system is interactive and manages cursor via body.show-cursor CSS)
@@ -1649,15 +1622,23 @@ def _handle_user_active_watch(add_idle_watch):
     is showing, activity cancels the pending lock and re-arms normal idle.
     """
     if _is_showing or is_viewer_active():
-        _log_event("lock_timer_reset_from_viewer_activity")
-        _schedule_lock()
+        # lock_after_seconds is a deadline from viewer start: activity must not
+        # push it back, or a screensaver with any input never locks at all.
+        _log_event("lock_deadline_kept", reason="viewer_active")
     else:
         _cancel_lock()
         add_idle_watch()
 
 
 def _reset_lock_timer_from_activity():
-    """Restart the configured lock delay after user activity."""
+    """Restart the configured lock delay after user activity.
+
+    Ignored while the viewer is showing: lock_after_seconds is a fixed deadline
+    from activation, so viewer input cannot postpone the lock indefinitely.
+    """
+    if _is_showing or is_viewer_active():
+        _log_event("lock_deadline_kept", reason="viewer_activity")
+        return
     _schedule_lock()
 
 

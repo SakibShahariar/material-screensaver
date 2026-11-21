@@ -168,17 +168,14 @@ class TestCountdownCancellation(unittest.TestCase):
 
 
 
-    def test_activity_rearms_the_countdown(self):
+    def test_viewer_input_does_not_restart_lock_deadline(self):
         import pathlib
         source = (pathlib.Path(support.REPO_ROOT) / "bin" / "material-screensaver-ctl.py").read_text(
             encoding="utf-8")
-        self.assertIn("def restart_countdown(", source)
-        self.assertEqual(source.count("if _notify_lock_activity():"), 3)
-        self.assertEqual(source.count("                    restart_countdown()"), 3)
-        self.assertNotIn("                cancel_countdown()", source)
-        # Re-arming resets the warning and schedules a fresh delayed start.
-        self.assertIn('state["seconds"] = min(lock_seconds, 10)', source)
-        self.assertIn("sources[\"delay\"] = GLib.timeout_add_seconds(", source)
+        self.assertNotIn("def restart_countdown(", source)
+        self.assertEqual(source.count("_notify_lock_activity()"), 4)  # 3 handlers + def
+        self.assertNotIn("restart_countdown()", source)
+        self.assertIn("lock_deadline_kept", source)
 
 
 class TestActivityLockReset(unittest.TestCase):
@@ -215,10 +212,18 @@ class TestActivityLockReset(unittest.TestCase):
             self.assertTrue(self.ctl._notify_lock_activity())
         schedule.assert_called_once_with()
 
-    def test_daemon_activity_handler_reschedules_lock_timer(self):
-        with mock.patch.object(self.ctl, "_schedule_lock") as schedule:
+    def test_daemon_activity_handler_reschedules_lock_timer_when_idle(self):
+        self.ctl._is_showing = False
+        with mock.patch.object(self.ctl, "_schedule_lock") as schedule, \
+             mock.patch.object(self.ctl, "is_viewer_active", lambda: False):
             self.ctl._reset_lock_timer_from_activity()
         schedule.assert_called_once_with()
+
+    def test_daemon_activity_handler_keeps_deadline_while_viewer_active(self):
+        self.ctl._is_showing = True
+        with mock.patch.object(self.ctl, "_schedule_lock") as schedule:
+            self.ctl._reset_lock_timer_from_activity()
+        schedule.assert_not_called()
 
     def test_dbus_interface_exposes_activity_method_and_input_handlers_use_it(self):
         from pathlib import Path

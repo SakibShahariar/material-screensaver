@@ -33,7 +33,7 @@ class TestIdleWatchRefresh(unittest.TestCase):
     def test_timeout_change_refreshes_after_viewer_dismissal(self):
         self.assertTrue(self.ctl._idle_watch_needs_refresh(600, 300, 42))
 
-    def test_active_watch_resets_lock_while_viewer_is_showing(self):
+    def test_active_watch_keeps_deadline_while_viewer_is_showing(self):
         ctl = self.ctl
         armed = []
         with mock.patch.object(ctl, "is_viewer_active", lambda: True), \
@@ -41,7 +41,7 @@ class TestIdleWatchRefresh(unittest.TestCase):
              mock.patch.object(ctl, "_cancel_lock", lambda: armed.append("cancel")):
             ctl._is_showing = True
             ctl._handle_user_active_watch(lambda: armed.append("idle"))
-        self.assertEqual(armed, ["lock"])
+        self.assertEqual(armed, [])
 
     def test_active_watch_cancels_lock_when_no_viewer(self):
         ctl = self.ctl

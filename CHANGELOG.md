@@ -5,6 +5,13 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+### Fixed
+- `lock_after_seconds` is now a fixed deadline from viewer activation: mouse/keyboard
+  activity and Mutter's user-active watch no longer restart it. Previously any input
+  pushed the timer back, so an active session could run for hours without ever locking.
+  The countdown overlay no longer resets on input either, keeping it consistent.
+
 ## [2.4.0] - 2026-11-21
 ### Added
 - Fourteen new scenes, taking the collection from 31 to 45: **Aurora Veil**, **Koi Pond**,
