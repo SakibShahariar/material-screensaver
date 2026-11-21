@@ -164,14 +164,6 @@
     "fluid-field.html": {
       "description": "Colored dye curls and folds through a simulated fluid driven by slow moving vortices.",
       "capabilities": []
-    },
-    "shadow-play.html": {
-      "description": "A lone silhouette moves slowly across a softly lit space, its shadow following on the floor.",
-      "capabilities": []
-    },
-    "machine-pulse.html": {
-      "description": "A breathing ring pattern reflects this machine's CPU count, load and running processes.",
-      "capabilities": []
     }
   }
 }
