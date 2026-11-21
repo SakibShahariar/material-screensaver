@@ -248,7 +248,9 @@ function fluidStep(t) {
         const i = cx + c, j = cy + r;
         if (i < 1 || j < 1 || i > N || j > N) continue;
         const falloff = Math.max(0, 1 - (r*r + c*c) / 20);
-        dens[ix(i,j)] = Math.min(1, dens[ix(i,j)] + 0.35 * falloff);
+        // Approach 1 asymptotically; a hard clip creates flat plateaus with
+        // jagged borders once the field is advected and upscaled.
+        dens[ix(i,j)] += 0.28 * falloff * (1 - dens[ix(i,j)]);
         u[ix(i,j)] += 0.45 * falloff * Math.cos(t * 0.7 + s);
         v[ix(i,j)] += 0.45 * falloff * Math.sin(t * 0.6 + s);
       }
@@ -264,6 +266,16 @@ function fluidStep(t) {
   project(u, v, u0, v0);
   dens0.set(dens);
   advect(0, dens, dens0, u, v, a);
+  // Diffuse the dye each step: semi-Lagrangian advection injects cell-scale
+  // speckle, which looks like pixelation when the grid is stretched.
+  for (let j = 1; j <= N; j++) {
+    for (let i = 1; i <= N; i++) {
+      dens0[ix(i,j)] = dens[ix(i,j)] * 0.52
+        + (dens[ix(i-1,j)] + dens[ix(i+1,j)]
+         + dens[ix(i,j-1)] + dens[ix(i,j+1)]) * 0.12;
+    }
+  }
+  dens.set(dens0);
   for (let i = 0; i < SZ; i++) dens[i] *= 0.998;
 }
 function dtStep() { return 0.14 * speedMul; }
@@ -287,7 +299,8 @@ function frame(now) {
       const avg = (dens[ix(i+1,j+1)] * 4
                  + dens[ix(i,j+1)] + dens[ix(i+2,j+1)]
                  + dens[ix(i+1,j)] + dens[ix(i+1,j+2)]) / 8;
-      const m = Math.min(1, Math.max(0, avg * 2.4));
+      // Smooth exponential mapping: no hard saturation edge.
+      const m = 1 - Math.exp(-Math.max(0, avg) * 2.0);
       data[p] = theme.surface[0] * (1 - m) + r0 * m;
       data[p+1] = theme.surface[1] * (1 - m) + g0 * m;
       data[p+2] = theme.surface[2] * (1 - m) + b0 * m;
@@ -300,7 +313,7 @@ function frame(now) {
   ctx.imageSmoothingQuality = "high";
   // The solver runs on a coarse grid; a light blur on the upscale removes the
   // blocky bilinear look without paying for a much larger simulation.
-  ctx.filter = "blur(11px)";
+  ctx.filter = "blur(14px)";
   ctx.drawImage(off, 0, 0, W, H);
   ctx.filter = "none";
   requestAnimationFrame(frame);
