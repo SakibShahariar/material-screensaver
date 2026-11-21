@@ -5,101 +5,58 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [Unreleased]
+## [2.4.0] - 2026-11-21
+### Added
+- Fourteen new scenes, taking the collection from 31 to 45: **Aurora Veil**, **Koi Pond**,
+  **Constellation Clock**, **Turing Garden** (reaction–diffusion), **Analog Clockwork**
+  (mechanical dial), **Julia Bloom** (GPU fractal), **L-system Bloom** (recursive growth),
+  **Word Tide** (kinetic typography), **Ink and Light** (themed high-contrast ink),
+  **Harmonograph** (mathematical curves), **Topographic Contours**, **Moiré Field**,
+  **Wave Interference** and **Prism Field**. All follow the shared Matugen palette, clock
+  helper and reduced-motion conventions. The Settings scene picker now sorts by displayed
+  name rather than filename.
+- **Rain on a Window** — Canvas 2D droplets on glass with clock and reduced-motion handling.
+- Optional top-bar status menu with Start / Stop / Toggle / Next Scene / Open Settings
+  controls, provided by the companion Shell extension and gated by `status_menu_enabled`
+  (off by default, needs a re-login). Next Scene uses the new daemon `NextScene` D-Bus
+  method and `next` CLI command, and disables Random each time so the chosen scene shows.
+- Optional scene rotation while the screensaver is active (off by default), with an
+  interval in Settings. It cycles through favorites when set, otherwise all valid scenes,
+  by reloading the existing WebViews — no new processes.
+- Optional subtle fade-in/fade-out transitions (off by default, 150–180 ms).
 ### Changed
-- Opacity animation, pure scene-selection, and D-Bus client helpers moved to
-  `material_screensaver_transitions.py`, `material_screensaver_scene.py`, and
+- Opacity animation, scene-selection and D-Bus client helpers moved into
+  `material_screensaver_transitions.py`, `material_screensaver_scene.py` and
   `material_screensaver_dbus.py` (first slices of the `ctl.py` module split); no behavior change.
-- Inhibit/Uninhibit failures are now logged to stderr behind the MS_DEBUG env flag
-  instead of being silently swallowed (useful when GNOME SessionManager changes).
-- WebKit no longer grants universal access from file URLs; local file access remains
-  enabled for sibling helper scripts and the Matugen stylesheet. A narrower resource
-  loading mechanism is still needed to fully isolate user-added scenes from other files.
-### Removed
-- "Test it now" preview group (Start/Stop buttons) from the settings GUI — the inline
-  Live Preview thumbnail already shows the selected style.
-### Added
-- Nine new scenes: **Aurora Veil**, **Koi Pond**, **Constellation Clock**,
-  **Turing Garden** (reaction–diffusion), **Analog Clockwork** (mechanical dial),
-  **Julia Bloom** (GPU fractal), **L-system Bloom** (recursive growth), **Word Tide**
-  (kinetic typography) and **Ink and Light** (themed high-contrast ink). All follow the
-  shared Matugen palette, clock helper and reduced-motion conventions. Total scene count
-  is 45. Five more abstract scenes: **Harmonograph** (mathematical curves),
-  **Topographic Contours**, **Moiré Field**, **Wave Interference** and **Prism Field**.
-  The Settings scene picker is now sorted by displayed name rather than filename.
-- Optional top-bar status menu with Start / Stop / Toggle / Open Settings controls,
-  provided by the companion Shell extension and gated by `status_menu_enabled`
-  (off by default). Takes effect after a re-login. Next Scene uses the new daemon
-  `NextScene` D-Bus method and `next` CLI command, and disables Random each time so
-  the chosen scene is actually shown.
-- Optional subtle fade-in/fade-out transitions for the viewer (off by default). Enable
-  **Fade transitions** in Settings; the viewer fades in on start and out on dismissal,
-  with a short 150–180 ms duration.
-- Optional scene rotation while the screensaver is active (off by default). Configure
-  **Rotate scenes while active** and an interval in Settings; rotation cycles through
-  favorites when set, otherwise all valid scenes, by reloading the existing viewer
-  WebViews — no new processes, and the lock timer and Super+Q dismissal are unaffected.
-- New screensaver styles **Rain on a Window** (Canvas 2D, blob.html-shaped, full clock
-  + hint + `prefers-reduced-motion` handling). README "Styles included" list + count
-  updated (the test-suite count check parses that line dynamically). Collection total
-  is now 31.
+- WebKit no longer grants universal access from file URLs; local access remains for sibling
+  helpers and the Matugen stylesheet. A narrower resource-loading mechanism is still needed
+  to fully isolate user-added scenes (known limitation, tracked on #6).
+- Inhibit/Uninhibit failures are logged under `MS_DEBUG` instead of being swallowed.
+- Dismissal is **Super+Q only**; mouse movement, clicks and ordinary keys no longer close
+  the viewer. The `close_on_mouse` config key and its toggle were removed.
+- The companion extension consumes touchpad swipes with three or more fingers while the
+  viewer is fullscreen, so 4-finger workspace/overview swipes cannot reveal the desktop.
+  `org.gnome.Shell.Eval` is disabled on GNOME 45+, so the old overview-hide was a no-op.
+- Live preview stays active under **Random**, previewing a style on each refresh; clicking
+  it loads another random style. The "Test it now" Start/Stop buttons were removed.
 ### Fixed
-- The configured lock timer now actually fires while the screensaver is running. Mutter's
-  user-active watch keeps firing during a fullscreen viewer (focus grabs, fullscreen
-  transitions), and the daemon treated that as activity that cancelled the lock outright.
-  While a viewer is showing, those events now restart the lock delay instead.
-- The lock countdown warning now re-arms after user activity. Previously the countdown was
-  cancelled permanently, so it never reappeared even though the lock delay had restarted.
-- Viewer teardown now resolves the WebView inside the window's `Gtk.Overlay` instead of
-  treating the overlay itself as the WebView. WebKit is properly stopped, loading is
-  halted, and widgets are unparented before disposal — removing the silent
-  `'Overlay' object has no attribute 'terminate_web_process'` failure and the GTK
-  critical emitted on window dispose.
-- Idle activation now closes an open GNOME Overview before showing the viewer, via the
-  Shell's `OverviewActive` D-Bus property. Previously the fullscreen viewer could appear
-  as a thumbnail inside the Overview instead of covering the screen. The step fails open
-  when the Shell D-Bus service is unavailable.
-- The gesture guard now blocks touchpad swipes with three **or more** fingers. GNOME
-  Shell treats 4-finger swipes as workspace/overview gestures too, so a 4-finger swipe
-  could previously reveal the desktop over the fullscreen screensaver viewer.
-- The daemon now uses GLib's child-watch notification for the isolated viewer instead
-  of polling its process every 500 ms; the watch is removed before synchronous shutdown
-  so GLib and `subprocess.Popen` cannot compete to reap the same child.
-- Desktop entry launches the settings app through a shell-expanded `$HOME` path; the
-  desktop-entry `Exec` field does not support systemd's `%h` specifier.
-- `_valid_int` (ctl + gui) rejects fractional floats instead of silently truncating
-  (`300.9` → `300`) in user-editable config.
-- Lock fallback chain: failed lock commands now fall through to the next candidate and
-  return an explicit failure if all candidates fail. The viewer remains visible unless a
-  lock command reports success.
-- An abnormal viewer subprocess exit now triggers an immediate lock attempt when locking
-  is configured; viewer stderr is sent to the user service journal for diagnosis.
-- External locks (Super+L, `loginctl lock-session`, GNOME Settings timer) now dismiss the
-  screensaver: the daemon subscribes to `org.gnome.ScreenSaver.ActiveChanged` and hides
-  the viewer when the session locks, so it no longer keeps running after unlock.
-### Changed
-- Dismissal is now **Super+Q only**: mouse movement, clicks and ordinary keys no longer
-  close the screensaver (interactive styles still receive them in-page for their own use);
-  removed the now-meaningless `close_on_mouse` config key and its settings-toggle.
-  The daemon no longer arms Mutter's user-active watch, since activity no longer dismisses.
-- 3-finger touchpad swipes no longer switch workspace/overview over the screensaver: a
-  companion shell extension (`extensions/material-screensaver-gestures@io.github.sakib`)
-  consumes `TOUCHPAD_SWIPE` events while the fullscreen viewer is focused (self-guarded
-  by window title). Installed + enabled by `install.sh`; takes effect after one re-login.
-  Note: `org.gnome.Shell.Eval` is disabled since GNOME 45, so the previous `Shell.Eval`
-  overview-hide has been a silent no-op on modern GNOME.
-- Live preview stays active when **Random** is enabled (it previews a random style on
-  every refresh instead of blanking); clicking the preview loads the next one — a random
-  style in random mode.
-### Added
-- Test suite under `tests/`: JS syntax via `node --check` on every inline script + shared
-  helpers, theming consistency (clock/theme helper usage, `rgb(var(--x) / alpha)` CSS lint),
-  HTML structure, config-parsing edge cases, screensaver selection, lock command fallback
-  chain, lock scheduling (fire/cancel/disable/dedup/inactive-guard via GLib loop),
-  external-lock handling, packaging checks.
-- CI: validate installer shell syntax, ShellCheck, desktop metadata, systemd unit markers,
-  Python syntax, GI imports, and the unittest suite with system Python so GUI logic tests
-  run instead of being silently skipped under `setup-python`.
+- The configured lock timer now actually fires while the screensaver runs: Mutter's
+  user-active watch was cancelling it during fullscreen focus transitions; those events now
+  restart the delay instead. The lock countdown also re-arms after activity.
+- Idle activation closes an open GNOME Overview before showing the viewer via the Shell's
+  `OverviewActive` D-Bus property, so the viewer covers the screen instead of appearing as
+  a thumbnail inside the Overview.
+- Viewer teardown resolves the WebView inside its `Gtk.Overlay`, so WebKit is actually
+  stopped and disposed without the GTK parent/child critical.
+- External locks (Super+L, `loginctl`, GNOME timer) dismiss the viewer and no longer leave
+  it running under the lock screen; lock commands fall through on failure and an abnormal
+  viewer exit triggers a lock attempt when configured.
+- The daemon uses GLib child-watch for the isolated viewer instead of 500 ms polling.
+- Desktop entry expands `$HOME` itself (`Exec=` does not support systemd's `%h`); icon
+  install uses the hicolor theme and refreshes caches.
+- `_valid_int` rejects fractional floats rather than truncating them.
+- Gesture guard, config validation, scene validation and settings window size clamping are
+  covered by the expanded test suite and CI checks.
 
 ## [2.2.2] - 2026-08-30
 ### Fixed
