@@ -160,10 +160,6 @@
     "ink-and-light.html": {
       "description": "High-contrast ink pools spread and fade in the app's theme colors with crisp edges.",
       "capabilities": []
-    },
-    "fluid-field.html": {
-      "description": "Colored dye curls and folds through a simulated fluid driven by slow moving vortices.",
-      "capabilities": []
     }
   }
 }
