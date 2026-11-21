@@ -1,0 +1,292 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; base-uri 'none'; form-action 'none'; object-src 'none'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; font-src 'self' data:; media-src 'self' data:; connect-src 'none';">
+<title>Material Screensaver — Fluid Field</title>
+<style>
+:root {
+  --primary_rgb: 138 206 255;
+  --primary_container_rgb: 0 75 111;
+  --secondary_rgb: 180 199 233;
+  --secondary_container_rgb: 53 72 99;
+  --tertiary_rgb: 186 196 250;
+  --tertiary_container_rgb: 58 68 114;
+  --inverse_primary_rgb: 0 100 145;
+  --surface_rgb: 12 20 27;
+  --outline_rgb: 137 146 154;
+}
+* { margin: 0; padding: 0; box-sizing: border-box; }
+html, body {
+  width: 100%; height: 100%; overflow: hidden;
+  background: rgb(var(--surface_rgb));
+  cursor: none;
+  font-family: "Google Sans", "Segoe UI", system-ui, sans-serif;
+}
+body.show-cursor { cursor: default; }
+canvas { display: block; width: 100vw; height: 100vh; }
+#clock {
+  position: fixed;
+  left: clamp(28px, 3vw, 48px);
+  bottom: clamp(40px, 4.5vw, 56px);
+  font-weight: 200;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: -2px;
+  font-size: clamp(40px, 5.5vw, 78px);
+  color: rgb(var(--primary_rgb));
+  text-shadow: 0 0 40px rgb(var(--primary_rgb) / .4), 0 2px 16px rgba(0,0,0,.6);
+  pointer-events: none;
+  transition: opacity .7s ease;
+}
+#clock .ampm {
+  font-size: .26em; margin-left: 10px; opacity: .7;
+  vertical-align: 22%; letter-spacing: 2px; font-weight: 400;
+}
+#date {
+  position: fixed;
+  left: clamp(30px, 3.1vw, 50px);
+  bottom: clamp(18px, 2.2vw, 28px);
+  font-size: clamp(11px, 1.05vw, 14px);
+  letter-spacing: 4px; text-transform: uppercase;
+  color: rgb(var(--secondary_rgb) / .88);
+  text-shadow: 0 1px 10px rgba(0,0,0,.5);
+  pointer-events: none; transition: opacity .7s ease;
+}
+#clock.hidden, #date.hidden { opacity: 0; }
+#hint {
+  position: fixed; right: 28px; bottom: 24px;
+  font-size: 11px; letter-spacing: 1.5px;
+  color: rgb(var(--outline_rgb) / .55);
+  opacity: 0; transition: opacity 1s ease;
+  text-transform: uppercase; pointer-events: none;
+}
+#hint.show { opacity: .7; }
+</style>
+<link rel="stylesheet" href="matugen-colors.css">
+</head>
+<body>
+<canvas id="c"></canvas>
+<div id="clock">00:00<span class="ampm">AM</span></div>
+<div id="date">MON, JAN 1</div>
+<div id="hint">C · toggle clock</div>
+<script>
+
+"use strict";
+
+const canvas = document.getElementById("c");
+const ctx = canvas.getContext("2d", { alpha: false, desynchronized: true });
+const clockEl = document.getElementById("clock");
+const dateEl  = document.getElementById("date");
+const hintEl  = document.getElementById("hint");
+
+let W = 0, H = 0, DPR = 1;
+let theme = {};
+let roleList = [];
+let start = performance.now();
+let lastT = 0;
+
+const reduceMotion = matchMedia("(prefers-reduced-motion: reduce)").matches;
+
+function readRGB(name, fb = [160, 160, 160]) {
+  const r = getComputedStyle(document.documentElement).getPropertyValue(name).trim();
+  const p = r.split(/\s+/).map(Number);
+  return (p.length === 3 && p.every(n => !isNaN(n))) ? p : fb;
+}
+function rgba(c, a = 1) {
+  return `rgba(${c[0]},${c[1]},${c[2]},${a})`;
+}
+function loadTheme() {
+  theme = {
+    surface:   readRGB("--surface_rgb", [12, 20, 27]),
+    primary:   readRGB("--primary_rgb", [138, 206, 255]),
+    secondary: readRGB("--secondary_rgb", [180, 199, 233]),
+    tertiary:  readRGB("--tertiary_rgb", [186, 196, 250]),
+    container: readRGB("--tertiary_container_rgb", [58, 68, 114]),
+    outline:   readRGB("--outline_rgb", [137, 146, 154])
+  };
+  roleList = [theme.primary, theme.secondary, theme.tertiary];
+  document.body.style.background = rgba(theme.surface);
+  clockEl.style.color = rgba(theme.primary, 0.97);
+  dateEl.style.color = rgba(theme.secondary, 0.88);
+  hintEl.style.color = rgba(theme.outline, 0.6);
+}
+function resize() {
+  W = innerWidth; H = innerHeight;
+  DPR = Math.min(devicePixelRatio || 1, 2);
+  canvas.width = Math.floor(W * DPR);
+  canvas.height = Math.floor(H * DPR);
+  ctx.setTransform(DPR, 0, 0, DPR, 0, 0);
+}
+addEventListener("resize", resize, { passive: true });
+addEventListener("keydown", e => {
+  if (e.key.toLowerCase() === "c") {
+    clockEl.classList.toggle("hidden");
+    dateEl.classList.toggle("hidden");
+  }
+});
+function fallbackClock() {
+  function update() {
+    const n = new Date();
+    let h = n.getHours();
+    const ap = h >= 12 ? "PM" : "AM";
+    h = h % 12 || 12;
+    clockEl.innerHTML =
+      `${String(h).padStart(2,"0")}:${String(n.getMinutes()).padStart(2,"0")}` +
+      `<span class="ampm">${ap}</span>`;
+    dateEl.textContent = n.toLocaleDateString("en-US", {
+      weekday: "short", month: "short", day: "numeric"
+    }).toUpperCase();
+  }
+  update();
+  setInterval(update, 1000);
+}
+addEventListener("load", () => {
+  loadTheme();
+  resize();
+  initScene();
+  const s = document.createElement("script");
+  s.src = "clock-shared.js";
+  s.onload = () => {
+    try {
+      if (typeof startClock === "function") startClock(clockEl, dateEl);
+      else fallbackClock();
+    } catch { fallbackClock(); }
+  };
+  s.onerror = fallbackClock;
+  document.head.appendChild(s);
+  hintEl.classList.add("show");
+  setTimeout(() => hintEl.classList.remove("show"), 4000);
+  requestAnimationFrame(frame);
+});
+
+
+const N = 88, W2 = N + 2, SZ = W2 * W2;
+let u, v, u0, v0, dens, dens0, off, octx, img;
+const speedMul = reduceMotion ? 0.35 : 1;
+const ix = (x, y) => x + y * W2;
+
+function setBnd(b, x) {
+  for (let i = 1; i <= N; i++) {
+    x[ix(0, i)] = b === 1 ? -x[ix(1, i)] : x[ix(1, i)];
+    x[ix(N + 1, i)] = b === 1 ? -x[ix(N, i)] : x[ix(N, i)];
+    x[ix(i, 0)] = b === 2 ? -x[ix(i, 1)] : x[ix(i, 1)];
+    x[ix(i, N + 1)] = b === 2 ? -x[ix(i, N)] : x[ix(i, N)];
+  }
+  x[ix(0, 0)] = 0.5 * (x[ix(1, 0)] + x[ix(0, 1)]);
+  x[ix(0, N + 1)] = 0.5 * (x[ix(1, N + 1)] + x[ix(0, N)]);
+  x[ix(N + 1, 0)] = 0.5 * (x[ix(N, 0)] + x[ix(N + 1, 1)]);
+  x[ix(N + 1, N + 1)] = 0.5 * (x[ix(N, N + 1)] + x[ix(N + 1, N)]);
+}
+
+function linSolve(b, x, x0, a, c, iters) {
+  for (let k = 0; k < iters; k++) {
+    for (let j = 1; j <= N; j++) {
+      for (let i = 1; i <= N; i++) {
+        x[ix(i, j)] = (x0[ix(i, j)] + a * (x[ix(i-1,j)] + x[ix(i+1,j)]
+                      + x[ix(i,j-1)] + x[ix(i,j+1)])) / c;
+      }
+    }
+    setBnd(b, x);
+  }
+}
+
+function project(uu, vv, p, divv) {
+  for (let j = 1; j <= N; j++) {
+    for (let i = 1; i <= N; i++) {
+      divv[ix(i,j)] = -0.5 * (uu[ix(i+1,j)] - uu[ix(i-1,j)]
+                     + vv[ix(i,j+1)] - vv[ix(i,j-1)]) / N;
+      p[ix(i,j)] = 0;
+    }
+  }
+  setBnd(0, divv); setBnd(0, p);
+  linSolve(0, p, divv, 1, 4, 12);
+  for (let j = 1; j <= N; j++) {
+    for (let i = 1; i <= N; i++) {
+      uu[ix(i,j)] -= 0.5 * N * (p[ix(i+1,j)] - p[ix(i-1,j)]);
+      vv[ix(i,j)] -= 0.5 * N * (p[ix(i,j+1)] - p[ix(i,j-1)]);
+    }
+  }
+  setBnd(1, uu); setBnd(2, vv);
+}
+
+function advect(b, d, d0, uu, vv, dt) {
+  for (let j = 1; j <= N; j++) {
+    for (let i = 1; i <= N; i++) {
+      let x = i - dt * N * uu[ix(i,j)];
+      let y = j - dt * N * vv[ix(i,j)];
+      x = Math.max(0.5, Math.min(N + 0.5, x));
+      y = Math.max(0.5, Math.min(N + 0.5, y));
+      const i0 = Math.floor(x), i1 = i0 + 1;
+      const j0 = Math.floor(y), j1 = j0 + 1;
+      const s1 = x - i0, s0 = 1 - s1, t1 = y - j0, t0 = 1 - t1;
+      d[ix(i,j)] = s0 * (t0 * d0[ix(i0,j0)] + t1 * d0[ix(i0,j1)])
+                 + s1 * (t0 * d0[ix(i1,j0)] + t1 * d0[ix(i1,j1)]);
+    }
+  }
+  setBnd(b, d);
+}
+
+function initScene() {
+  u = new Float32Array(SZ); v = new Float32Array(SZ);
+  u0 = new Float32Array(SZ); v0 = new Float32Array(SZ);
+  dens = new Float32Array(SZ); dens0 = new Float32Array(SZ);
+  off = document.createElement("canvas");
+  off.width = N; off.height = N;
+  octx = off.getContext("2d", { alpha: false });
+  img = octx.createImageData(N, N);
+}
+
+function fluidStep(t) {
+  const a = dtStep(), diff = 0.00002, visc = 0.00002;
+  const sx = 0.5 + 0.28 * Math.cos(t * 0.31), sy = 0.5 + 0.28 * Math.sin(t * 0.27);
+  const cx = Math.floor(sx * N), cy = Math.floor(sy * N);
+  for (let r = -3; r <= 3; r++) {
+    for (let c = -3; c <= 3; c++) {
+      const i = cx + c, j = cy + r;
+      if (i < 1 || j < 1 || i > N || j > N) continue;
+      const falloff = Math.max(0, 1 - (r*r + c*c) / 12);
+      dens[ix(i,j)] = Math.min(1, dens[ix(i,j)] + 0.55 * falloff);
+      u[ix(i,j)] += 0.7 * falloff * Math.cos(t * 0.9);
+      v[ix(i,j)] += 0.7 * falloff * Math.sin(t * 0.8);
+    }
+  }
+  u0.set(u); v0.set(v);
+  linSolve(1, u, u0, visc * a, 1 + 4 * visc * a, 4);
+  linSolve(2, v, v0, visc * a, 1 + 4 * visc * a, 4);
+  project(u, v, u0, v0);
+  u0.set(u); v0.set(v);
+  advect(1, u, u0, u0, v0, a);
+  advect(2, v, v0, u0, v0, a);
+  project(u, v, u0, v0);
+  dens0.set(dens);
+  advect(0, dens, dens0, u, v, a);
+  for (let i = 0; i < SZ; i++) dens[i] *= 0.996;
+}
+function dtStep() { return 0.14 * speedMul; }
+
+function frame(now) {
+  const t = ((now - start) / 1000) * speedMul;
+  fluidStep(t);
+  const data = img.data;
+  for (let j = 0; j < N; j++) {
+    const role = roleList[Math.min(2, Math.floor((j / N) * 3))] || theme.primary;
+    for (let i = 0; i < N; i++) {
+      const p = (j * N + i) * 4;
+      const m = Math.min(1, Math.max(0, dens[ix(i + 1, j + 1)] * 1.6));
+      data[p] = theme.surface[0] * (1 - m) + role[0] * m;
+      data[p+1] = theme.surface[1] * (1 - m) + role[1] * m;
+      data[p+2] = theme.surface[2] * (1 - m) + role[2] * m;
+      data[p+3] = 255;
+    }
+  }
+  octx.putImageData(img, 0, 0);
+  ctx.setTransform(DPR, 0, 0, DPR, 0, 0);
+  ctx.imageSmoothingEnabled = true;
+  ctx.drawImage(off, 0, 0, W, H);
+  requestAnimationFrame(frame);
+}
+
+</script>
+</body>
+</html>

@@ -32,7 +32,7 @@ import atexit
 import signal
 import tempfile
 import time
-from urllib.parse import urlencode
+from urllib.parse import urlencode, quote
 
 SCREENSAVER_DIR = os.path.expanduser("~/.local/share/material-screensaver/screensavers")
 CONFIG_PATH = os.path.expanduser("~/.config/material-screensaver/config.json")
@@ -454,6 +454,29 @@ def _viewer_webview(window):
     return None
 
 
+def _telemetry_snapshot():
+    """Local, non-private machine state for telemetry-driven scenes."""
+    try:
+        with open("/proc/uptime", encoding="ascii") as stream:
+            uptime = float(stream.read().split()[0])
+    except Exception:
+        uptime = 0.0
+    try:
+        procs = sum(1 for name in os.listdir("/proc") if name.isdigit())
+    except OSError:
+        procs = 0
+    try:
+        load = os.getloadavg()[0]
+    except OSError:
+        load = 0.0
+    return {
+        "cores": os.cpu_count() or 1,
+        "procs": procs,
+        "load": round(load, 2),
+        "uptime": int(uptime),
+    }
+
+
 def _scene_uri(scene_path, clock_format="24h", viewer_cfg=None):
     """Build the file URI a viewer WebView loads for one scene."""
     import gi
@@ -616,6 +639,9 @@ def _create_viewer_windows(html_path, clock_format="24h", scene_options=None, vi
                 and monitor_assignments.get(monitor_key) in available_scenes
             )
             uri = _scene_uri(monitor_html_path, clock_format, viewer_cfg)
+            telemetry = os.environ.get("MS_TELEMETRY")
+            if telemetry:
+                uri += "&ms_telem=" + quote(telemetry, safe="")
             if _daemon_app is not None:
                 win = Gtk.ApplicationWindow(application=_daemon_app, title="Material Screensaver")
             else:
@@ -2179,10 +2205,15 @@ def show_viewer():
         _viewer_windows = []
         # Spawn isolated viewer — daemon stays 30M, WebKit ~400M lives in child and is reaped on Hide
         try:
+            env = dict(os.environ)
+            try:
+                env["MS_TELEMETRY"] = json.dumps(_telemetry_snapshot())
+            except Exception as exc:
+                _dbg(f"Could not collect telemetry snapshot: {exc}")
             _viewer_process = subprocess.Popen(
                 [sys.executable, os.path.abspath(__file__), "viewer", html_path, clock_format, json.dumps(scene_options)],
                 stdout=subprocess.DEVNULL, stderr=None,
-                start_new_session=True)
+                env=env, start_new_session=True)
             _log_event("viewer_spawned")
         except Exception as e:
             _log_event("viewer_spawn_failed", error=type(e).__name__)
