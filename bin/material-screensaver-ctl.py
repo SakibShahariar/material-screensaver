@@ -1640,6 +1640,22 @@ def _schedule_lock():
         _dbg(f"Suppressed non-fatal exception in _schedule_lock: {exc}")
 
 
+def _handle_user_active_watch(add_idle_watch):
+    """Handle Mutter's user-active watch firing.
+
+    While the viewer is showing, its own focus grabs and fullscreen transitions
+    keep this watch firing. Cancelling the lock there meant it never fired
+    during an active screensaver, so restart the delay instead. When no viewer
+    is showing, activity cancels the pending lock and re-arms normal idle.
+    """
+    if _is_showing or is_viewer_active():
+        _log_event("lock_timer_reset_from_viewer_activity")
+        _schedule_lock()
+    else:
+        _cancel_lock()
+        add_idle_watch()
+
+
 def _reset_lock_timer_from_activity():
     """Restart the configured lock delay after user activity."""
     _schedule_lock()
@@ -2879,9 +2895,7 @@ def run_daemon():
                 show_viewer()
                 add_active_watch()
             elif fired_id == _idle_watch_ids["active"]:
-                # Activity cancels the pending lock before re-arming normal idle.
-                _cancel_lock()
-                add_idle_watch()
+                _handle_user_active_watch(add_idle_watch)
 
         try:
             _idle_proxy.connect("g-signal", on_signal)

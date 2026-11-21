@@ -1,6 +1,7 @@
 """Regression tests for idle-watch registration recovery."""
 import os
 import unittest
+from unittest import mock
 
 import support
 
@@ -31,6 +32,26 @@ class TestIdleWatchRefresh(unittest.TestCase):
 
     def test_timeout_change_refreshes_after_viewer_dismissal(self):
         self.assertTrue(self.ctl._idle_watch_needs_refresh(600, 300, 42))
+
+    def test_active_watch_resets_lock_while_viewer_is_showing(self):
+        ctl = self.ctl
+        armed = []
+        with mock.patch.object(ctl, "is_viewer_active", lambda: True), \
+             mock.patch.object(ctl, "_schedule_lock", lambda: armed.append("lock")), \
+             mock.patch.object(ctl, "_cancel_lock", lambda: armed.append("cancel")):
+            ctl._is_showing = True
+            ctl._handle_user_active_watch(lambda: armed.append("idle"))
+        self.assertEqual(armed, ["lock"])
+
+    def test_active_watch_cancels_lock_when_no_viewer(self):
+        ctl = self.ctl
+        armed = []
+        with mock.patch.object(ctl, "is_viewer_active", lambda: False), \
+             mock.patch.object(ctl, "_schedule_lock", lambda: armed.append("lock")), \
+             mock.patch.object(ctl, "_cancel_lock", lambda: armed.append("cancel")):
+            ctl._is_showing = False
+            ctl._handle_user_active_watch(lambda: armed.append("idle"))
+        self.assertEqual(armed, ["cancel", "idle"])
 
     def test_daemon_poll_checks_registration_state(self):
         path = os.path.join(support.REPO_ROOT, "bin", "material-screensaver-ctl.py")

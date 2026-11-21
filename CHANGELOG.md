@@ -43,6 +43,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   updated (the test-suite count check parses that line dynamically). Collection total
   is now 31.
 ### Fixed
+- The configured lock timer now actually fires while the screensaver is running. Mutter's
+  user-active watch keeps firing during a fullscreen viewer (focus grabs, fullscreen
+  transitions), and the daemon treated that as activity that cancelled the lock outright.
+  While a viewer is showing, those events now restart the lock delay instead.
 - The lock countdown warning now re-arms after user activity. Previously the countdown was
   cancelled permanently, so it never reappeared even though the lock delay had restarted.
 - Viewer teardown now resolves the WebView inside the window's `Gtk.Overlay` instead of
