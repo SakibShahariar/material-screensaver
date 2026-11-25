@@ -55,6 +55,15 @@ class TestScenePerformanceMetrics(unittest.TestCase):
         self.assertEqual(summary[0]["cpu_percent_process_tree_median"], 140)
         self.assertEqual(summary[0]["rss_end_mib_sum_median"], 220)
 
+    def test_native_uncapped_reference_skips_the_frame_cap(self):
+        measure_source = SCRIPT.read_text(encoding="utf-8")
+        self.assertIn("native_reference = fps == 0", measure_source)
+        self.assertIn('"fps_cap_disabled": native_reference', measure_source)
+        self.assertIn('"fps_label": "native (uncapped)"', measure_source)
+        ctl_source = (ROOT / "bin" / "material-screensaver-ctl.py").read_text(
+            encoding="utf-8")
+        self.assertIn('viewer_cfg.get("fps_cap_disabled", False)', ctl_source)
+
 
 if __name__ == "__main__":
     unittest.main(verbosity=2)

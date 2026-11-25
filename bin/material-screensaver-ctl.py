@@ -673,10 +673,13 @@ def _create_viewer_windows(html_path, clock_format="24h", scene_options=None, vi
         # Cap requestAnimationFrame-driven scenes to reduce CPU/GPU use.
         # Timer-driven scenes are unaffected by this cap.
         try:
-            fps_limit = viewer_cfg.get("fps_limit", 30)
-            if battery_saving:
-                fps_limit = min(fps_limit, 15)
-            fps_script = """(() => {
+            if viewer_cfg.get("fps_cap_disabled", False):
+                _dbg("FPS cap disabled for benchmark reference")
+            else:
+                fps_limit = viewer_cfg.get("fps_limit", 30)
+                if battery_saving:
+                    fps_limit = min(fps_limit, 15)
+                fps_script = """(() => {
 const requestedLimit = __FPS_LIMIT__;
 const reducedMotion = window.matchMedia &&
   window.matchMedia("(prefers-reduced-motion: reduce)").matches;
@@ -750,15 +753,15 @@ window.cancelAnimationFrame = id => {
   }
 };
 })();""".replace("__FPS_LIMIT__", str(fps_limit))
-            ucm = web.get_user_content_manager()
-            fps_user_script = WebKit.UserScript.new(
-                fps_script,
-                WebKit.UserContentInjectedFrames.ALL_FRAMES,
-                WebKit.UserScriptInjectionTime.START,
-                None,
-                None,
-            )
-            ucm.add_script(fps_user_script)
+                ucm = web.get_user_content_manager()
+                fps_user_script = WebKit.UserScript.new(
+                    fps_script,
+                    WebKit.UserContentInjectedFrames.ALL_FRAMES,
+                    WebKit.UserScriptInjectionTime.START,
+                    None,
+                    None,
+                )
+                ucm.add_script(fps_user_script)
         except Exception as exc:
             _dbg(f"Could not install animation frame cap: {exc}")
 

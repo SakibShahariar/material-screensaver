@@ -90,6 +90,7 @@ def _summarize_repeated_samples(samples):
         summary.append({
             "scene": scene,
             "fps_limit": fps,
+            "fps_label": "native (uncapped)" if fps == 0 else f"{fps} FPS",
             "sample_count": len(values),
             "startup_ms_median": round(statistics.median(
                 value["startup_ms_to_load_finished"] for value in values
@@ -131,8 +132,10 @@ def _webviews_from_windows(windows):
 
 def _measure_one(ctl, Gtk, GLib, WebKit, scene_path: Path, fps: int, warmup: int, duration: int):
     config = dict(ctl.DEFAULT_CONFIG)
+    native_reference = fps == 0
     config.update({
-        "fps_limit": fps,
+        "fps_limit": 60 if native_reference else fps,
+        "fps_cap_disabled": native_reference,
         "reduce_fps_on_battery": False,
         "lock_after_seconds": 0,
         "lock_countdown": False,
@@ -217,6 +220,8 @@ def _measure_one(ctl, Gtk, GLib, WebKit, scene_path: Path, fps: int, warmup: int
             else "Canvas 2D"
         ),
         "fps_limit": fps,
+        "fps_label": "native (uncapped)" if native_reference else f"{fps} FPS",
+        "fps_cap_disabled": native_reference,
         "startup_ms_to_load_finished": state["startup_ms"],
         "measurement_seconds": round(state["elapsed"], 2),
         **metrics,
@@ -236,8 +241,8 @@ def main(argv=None) -> int:
         fps_values = [int(value) for value in args.fps.split(",")]
     except ValueError:
         parser.error("--fps must be a comma-separated list of integers")
-    if not fps_values or any(value < 10 or value > 60 for value in fps_values):
-        parser.error("FPS values must be between 10 and 60")
+    if not fps_values or any(value < 0 or value > 60 for value in fps_values):
+        parser.error("FPS values must be between 0 (native/uncapped reference) and 60")
     if args.duration < 1 or args.warmup < 0 or args.repeat < 1:
         parser.error("--duration must be positive, --warmup cannot be negative, and --repeat must be at least 1")
 
