@@ -146,7 +146,7 @@ export default class MaterialScreensaverGestureGuard extends Extension {
         Main.panel.addToStatusArea(ROLE, indicator);
         this._indicator = indicator;
         this._items = items;
-        this._pollId = GLib.timeout_add_seconds(2, () => {
+        this._pollId = GLib.timeout_add_seconds(GLib.PRIORITY_DEFAULT, 2, () => {
             this._syncState();
             return true;
         });

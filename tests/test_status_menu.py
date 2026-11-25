@@ -58,10 +58,14 @@ class TestShellExtension(unittest.TestCase):
         self.assertNotIn("Shell.Eval", source)
         # Gesture guard must remain intact.
         self.assertIn("if (fingers < 3)", source)
+        # GJS requires the priority argument; a 2-arg call throws in GNOME 51
+        # and leaves the status indicator without its state-sync poll.
+        self.assertIn("GLib.timeout_add_seconds(GLib.PRIORITY_DEFAULT, 2,", source)
+        self.assertNotIn("GLib.timeout_add_seconds(2,", source)
 
     def test_metadata_version_bumped(self):
         metadata = json.loads(self._ext_path("metadata.json").read_text(encoding="utf-8"))
-        self.assertEqual(metadata["version"], 3)
+        self.assertEqual(metadata["version"], 4)
         self.assertIn("status menu", metadata["description"].lower())
 
 
