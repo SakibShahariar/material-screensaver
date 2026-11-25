@@ -62,10 +62,11 @@ class TestShellExtension(unittest.TestCase):
         # and leaves the status indicator without its state-sync poll.
         self.assertIn("GLib.timeout_add_seconds(GLib.PRIORITY_DEFAULT, 2,", source)
         self.assertNotIn("GLib.timeout_add_seconds(2,", source)
+        self.assertIn('icon_name: "preferences-desktop-screensaver-symbolic"', source)
 
     def test_metadata_version_bumped(self):
         metadata = json.loads(self._ext_path("metadata.json").read_text(encoding="utf-8"))
-        self.assertEqual(metadata["version"], 4)
+        self.assertEqual(metadata["version"], 5)
         self.assertIn("status menu", metadata["description"].lower())
 
 

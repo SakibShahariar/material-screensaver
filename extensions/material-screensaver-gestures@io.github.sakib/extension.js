@@ -119,7 +119,7 @@ export default class MaterialScreensaverGestureGuard extends Extension {
             return;
         const indicator = new PanelMenu.Button(0.0, "Material Screensaver", false);
         const icon = new St.Icon({
-            icon_name: "media-watch-symbolic",
+            icon_name: "preferences-desktop-screensaver-symbolic",
             style_class: "system-status-icon",
         });
         indicator.add_child(icon);
