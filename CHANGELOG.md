@@ -5,6 +5,14 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.4.5] - 2026-11-26
+### Added
+- Headless scene performance measurements now include an uncapped native-frame
+  reference (`--fps 0`), which skips the injected `requestAnimationFrame` wrapper
+  entirely. CI samples native, 30 FPS, and 15 FPS for both representative scenes;
+  reports label the native sample and include it in medians. `docs/performance.md`
+  records the latest comparison.
+
 ## [2.4.4] - 2026-11-26
 ### Fixed
 - Scenes (and the Settings preview) now load through an allowlisted `material-scene://`
