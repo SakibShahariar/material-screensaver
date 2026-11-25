@@ -17,12 +17,12 @@ import sys
 import time
 import json
 import material_screensaver_config as config_store
+import material_screensaver_scene_uri as scene_uri_store
 import random
 import subprocess
 import tempfile
 import re
 import html as html_lib
-from urllib.parse import urlencode
 
 SCREENSAVER_DIR = os.path.expanduser("~/.local/share/material-screensaver/screensavers")
 CONFIG_PATH = os.path.expanduser("~/.config/material-screensaver/config.json")
@@ -554,6 +554,10 @@ class ScreensaverWindow(Adw.PreferencesWindow):
                     self.preview_context.set_cache_model(WebKit.CacheModel.DOCUMENT_VIEWER)
                 except Exception:
                     pass
+                # Serve preview scenes through the same allowlisted scheme as
+                # the fullscreen viewer, so relative assets work but scenes
+                # cannot load files outside the screensavers directory.
+                scene_uri_store.register_scene_scheme(self.preview_context, SCREENSAVER_DIR)
                 self.preview_web = WebKit.WebView.new_with_context(self.preview_context)
             except Exception:
                 self.preview_context = None
@@ -1123,8 +1127,7 @@ class ScreensaverWindow(Adw.PreferencesWindow):
             fmt = cfg.get("clock_format", "24h")
             params = {"format": fmt, "clockOverlay": "1" if cfg.get("clock_overlay", False) else "0", "clockOverlayPosition": cfg.get("clock_overlay_position", "bottom-right"), "clockOverlayOpacity": str(cfg.get("clock_overlay_opacity", 80))}
             params.update(config_store.get_scene_options(cfg, fn))
-            uri = Gio.File.new_for_path(path).get_uri()
-            uri = f"{uri}?{urlencode(params)}"
+            uri = scene_uri_store.scene_uri(path, params)
             try:
                 self.preview_web.load_uri(uri)
             except Exception:

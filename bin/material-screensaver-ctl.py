@@ -25,6 +25,7 @@ import glob
 import material_screensaver_config as config_store
 import material_screensaver_transitions as transitions
 import material_screensaver_scene as scene_selection
+import material_screensaver_scene_uri as scene_uri_store
 import material_screensaver_dbus as dbus_client
 import random
 import subprocess
@@ -32,7 +33,6 @@ import atexit
 import signal
 import tempfile
 import time
-from urllib.parse import urlencode
 
 SCREENSAVER_DIR = os.path.expanduser("~/.local/share/material-screensaver/screensavers")
 CONFIG_PATH = os.path.expanduser("~/.config/material-screensaver/config.json")
@@ -455,14 +455,16 @@ def _viewer_webview(window):
 
 
 def _scene_uri(scene_path, clock_format="24h", viewer_cfg=None):
-    """Build the file URI a viewer WebView loads for one scene."""
-    import gi
-    gi.require_version("Gio", "2.0")
-    from gi.repository import Gio
+    """Build the allowlisted URI a viewer WebView loads for one scene."""
     viewer_cfg = viewer_cfg if isinstance(viewer_cfg, dict) else {}
     params = {"format": clock_format}
     params.update(config_store.get_scene_options(viewer_cfg, os.path.basename(scene_path)))
-    return f"{Gio.File.new_for_path(scene_path).get_uri()}?{urlencode(params)}"
+    return scene_uri_store.scene_uri(scene_path, params)
+
+
+def _register_scene_scheme(ctx, root):
+    """Serve scene resources only from ``root`` on the custom scene scheme."""
+    return scene_uri_store.register_scene_scheme(ctx, root, debug=_dbg)
 
 
 def _rotation_scene_names(cfg, available_scenes):
@@ -602,6 +604,9 @@ def _create_viewer_windows(html_path, clock_format="24h", scene_options=None, vi
         except Exception:
             _ephemeral_ctx = _get_shared_context()
     ctx = _ephemeral_ctx
+    # All scenes (and their relative assets) live beside the requested scene.
+    # Register the allowlisted scheme before any WebView is created.
+    _register_scene_scheme(ctx, os.path.dirname(os.path.abspath(html_path)))
     for monitor_index, mon in enumerate(monitors):
         rotation_locked = False
         try:

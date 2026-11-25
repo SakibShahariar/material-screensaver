@@ -5,6 +5,16 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.4.4] - 2026-11-26
+### Fixed
+- Scenes (and the Settings preview) now load through an allowlisted `material-scene://`
+  URI handler instead of `file://`. WebKit no longer permits overriding the file scheme,
+  and its file-access settings did not stop subresources such as
+  `<script src="../other.js">`; a user-added scene could execute JavaScript outside its
+  directory. The handler serves only files inside the screensavers directory, rejects
+  traversal and missing resources, and still allows bundled assets such as
+  `matugen-colors.css` and `clock-shared.js`.
+
 ## [2.4.3] - 2026-11-25
 ### Changed
 - The optional status-menu indicator now uses `preferences-desktop-screensaver-symbolic`
