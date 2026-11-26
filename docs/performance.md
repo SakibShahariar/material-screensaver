@@ -39,3 +39,27 @@ Recorded in [CI run 45676694299](https://github.com/SakibShahariar/material-scre
 | `organic-harmonic-field.html` (WebGL) | 15 FPS | 249.99 ms | 140.00% | 690.03 MiB |
 
 In this runner the cap reduced median process-tree CPU by about 11% (Canvas) and 42% (WebGL) at 30 FPS versus native, and by about 40% and 57% at 15 FPS. The earlier [run 41656846195](https://github.com/SakibShahariar/material-screensaver/actions/runs/41656846195) recorded only 30/15 FPS and no native reference. Treat these as diagnostic CI references, not portable budgets: the renderer is software-based, CPU percentages aggregate several processes, and summed RSS can double-count shared pages. GPU utilization is unavailable.
+
+## Target-hardware baseline
+
+Collected on GNOME 51.1 / Wayland with an Intel HD Graphics 620 (Mesa 26.2.7), using `scripts/measure-hardware-performance.py` with `intel_gpu_top` for GPU busy percentage. Three repeats of four seconds per scene/cap pair; full samples are in `docs/hardware-performance-baseline.json`.
+
+| Scene | Cap | Startup median | CPU median | GPU Render/3D median | Summed RSS median |
+|---|---:|---:|---:|---:|---:|
+| `flow.html` (Canvas 2D) | native | 670.02 ms | 35.65% | 69.72% | 413.73 MiB |
+| `flow.html` (Canvas 2D) | 30 FPS | 746.16 ms | 22.57% | 32.19% | 404.73 MiB |
+| `flow.html` (Canvas 2D) | 15 FPS | 672.56 ms | 15.99% | 24.56% | 403.04 MiB |
+| `organic-harmonic-field.html` (WebGL) | native | 717.69 ms | 32.17% | 61.35% | 404.71 MiB |
+| `organic-harmonic-field.html` (WebGL) | 30 FPS | 686.63 ms | 13.80% | 33.12% | 405.05 MiB |
+| `organic-harmonic-field.html` (WebGL) | 15 FPS | 748.16 ms | 10.40% | 23.85% | 402.49 MiB |
+
+This is one machine only; more target hardware should be measured before the budgets are treated as portable.
+
+## Budgets
+
+Two profiles are committed under `docs/performance/`:
+
+- `ci-budgets.json` — derived from the Xvfb/software CI measurements (no GPU metric).
+- `hardware-budgets.json` — derived from the target-hardware baseline above (includes GPU busy %).
+
+`scripts/derive-performance-budgets.py` regenerates a profile from any repeated-samples report. The rule is 1.5× the worst observed sample for CPU/GPU/startup and 1.3× for summed RSS, rounded outward, with GPU busy capped at 100%. `scripts/check-performance-budgets.py` compares report medians with a profile. CI currently runs it in `--warn-only` mode for the Xvfb profile so regressions are surfaced without failing on software-rendering noise; hardware enforcement needs data from more target machines. These are regression-detection thresholds, not performance guarantees.

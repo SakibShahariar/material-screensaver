@@ -1,0 +1,41 @@
+{
+  "profile": "ci",
+  "source": "CI run 45677545203 (Xvfb, software rendering), 3 repeats at 30/15/native FPS",
+  "method": "1.5x worst sample for CPU/GPU/startup, 1.3x for summed RSS; GPU capped at 100%",
+  "budgets": {
+    "flow.html": {
+      "0": {
+        "startup_ms": 500,
+        "cpu_percent": 489,
+        "rss_mib": 980
+      },
+      "15": {
+        "startup_ms": 500,
+        "cpu_percent": 332,
+        "rss_mib": 970
+      },
+      "30": {
+        "startup_ms": 1150,
+        "cpu_percent": 461,
+        "rss_mib": 1000
+      }
+    },
+    "organic-harmonic-field.html": {
+      "0": {
+        "startup_ms": 500,
+        "cpu_percent": 507,
+        "rss_mib": 910
+      },
+      "15": {
+        "startup_ms": 500,
+        "cpu_percent": 238,
+        "rss_mib": 900
+      },
+      "30": {
+        "startup_ms": 550,
+        "cpu_percent": 311,
+        "rss_mib": 920
+      }
+    }
+  }
+}

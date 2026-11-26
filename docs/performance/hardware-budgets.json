@@ -1,0 +1,47 @@
+{
+  "profile": "hardware",
+  "source": "GNOME 51.1 Wayland, Intel HD Graphics 620, 3 repeats at 30/15/native FPS (docs/hardware-performance-baseline.json)",
+  "method": "1.5x worst sample for CPU/GPU/startup, 1.3x for summed RSS; GPU capped at 100%",
+  "budgets": {
+    "flow.html": {
+      "0": {
+        "startup_ms": 1050,
+        "cpu_percent": 55,
+        "rss_mib": 540,
+        "gpu_busy_percent": 100
+      },
+      "15": {
+        "startup_ms": 1100,
+        "cpu_percent": 25,
+        "rss_mib": 530,
+        "gpu_busy_percent": 39
+      },
+      "30": {
+        "startup_ms": 1150,
+        "cpu_percent": 35,
+        "rss_mib": 530,
+        "gpu_busy_percent": 49
+      }
+    },
+    "organic-harmonic-field.html": {
+      "0": {
+        "startup_ms": 1200,
+        "cpu_percent": 49,
+        "rss_mib": 530,
+        "gpu_busy_percent": 93
+      },
+      "15": {
+        "startup_ms": 1200,
+        "cpu_percent": 16,
+        "rss_mib": 530,
+        "gpu_busy_percent": 37
+      },
+      "30": {
+        "startup_ms": 1100,
+        "cpu_percent": 22,
+        "rss_mib": 530,
+        "gpu_busy_percent": 51
+      }
+    }
+  }
+}

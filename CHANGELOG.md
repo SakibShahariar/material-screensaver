@@ -5,6 +5,18 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.4.8] - 2026-11-26
+### Added
+- Real-hardware performance tooling: `scripts/measure-hardware-performance.py`
+  samples the viewer on the running desktop and collects GPU busy percentage via
+  `intel_gpu_top`, alongside CPU, RSS and startup time. A three-repeat baseline
+  from GNOME 51.1 / Wayland with an Intel HD Graphics 620 is committed as
+  `docs/hardware-performance-baseline.json`.
+- Derived budget profiles under `docs/performance/` and
+  `scripts/check-performance-budgets.py`. CI checks the software-rendering
+  profile in warn-only mode; hardware thresholds need data from more machines
+  before enforcement.
+
 ## [2.4.7] - 2026-11-26
 ### Changed
 - The battery-saver/FPS indicator now uses the same accent pill styling as the
