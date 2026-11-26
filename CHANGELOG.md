@@ -5,6 +5,14 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.4.9] - 2026-11-26
+### Changed
+- Extracted the procfs reader layer (`read_proc_process`, `proc_child_pids`,
+  `discover_proc_descendants`) into `bin/material_screensaver_process.py`. The
+  control script keeps thin wrappers, so process cleanup, the benchmark sampler
+  and existing test patch points behave identically. Part of #35; the tightly
+  coupled idle/viewer/lock/D-Bus modules are unchanged.
+
 ## [2.4.8] - 2026-11-26
 ### Added
 - Real-hardware performance tooling: `scripts/measure-hardware-performance.py`

@@ -26,6 +26,7 @@ import material_screensaver_config as config_store
 import material_screensaver_transitions as transitions
 import material_screensaver_scene as scene_selection
 import material_screensaver_scene_uri as scene_uri_store
+import material_screensaver_process as process_store
 import material_screensaver_dbus as dbus_client
 import random
 import subprocess
@@ -218,82 +219,16 @@ def _get_shared_context():
         _shared_web_context = None
     return _shared_web_context
 
-def _read_proc_process(proc_root, pid):
-    """Read the parent PID, command line, and kernel start time for one process."""
-    try:
-        with open(os.path.join(proc_root, str(pid), "stat"), encoding="utf-8") as stream:
-            stat = stream.read()
-        # comm is parenthesized and may itself contain spaces or ')'.
-        tail = stat[stat.rfind(")") + 2:].split()
-        # tail starts at stat field 3 (state); ppid is field 4 and
-        # starttime is field 22. starttime distinguishes a reused PID.
-        if len(tail) < 20:
-            return None
-        ppid = int(tail[1])
-        start_time = tail[19]
-        with open(os.path.join(proc_root, str(pid), "cmdline"), "rb") as stream:
-            raw_cmd = stream.read()
-        cmd = raw_cmd.replace(b"\0", b" ").decode(errors="replace").strip()
-        return ppid, cmd, start_time
-    except (OSError, ValueError, IndexError):
-        return None
-
-
-def _proc_child_pids(proc_root, pid):
-    """Return child PIDs reported by each thread of one process."""
-    task_dir = os.path.join(proc_root, str(pid), "task")
-    try:
-        thread_ids = os.listdir(task_dir)
-    except OSError:
-        return set()
-
-    children = set()
-    for thread_id in thread_ids:
-        if not thread_id.isdigit():
-            continue
-        path = os.path.join(task_dir, thread_id, "children")
-        try:
-            with open(path, encoding="ascii") as stream:
-                children.update(int(value) for value in stream.read().split())
-        except (OSError, ValueError):
-            continue
-    return children
+# Procfs readers live in a standalone module; these wrappers keep the original
+# call sites (and their test patch points) unchanged.
+_read_proc_process = process_store.read_proc_process
+_proc_child_pids = process_store.proc_child_pids
 
 
 def _discover_proc_descendants(proc_root, root_pid):
     """Walk only this process tree using procfs child lists, not all of /proc."""
-    root_info = _read_proc_process(proc_root, root_pid)
-    if root_info is None:
-        return []
-
-    pending = [(root_pid, root_info[2])]
-    seen = {root_pid}
-    descendants = []
-    while pending:
-        parent_pid, parent_start = pending.pop()
-        parent_info = _read_proc_process(proc_root, parent_pid)
-        if parent_info is None or parent_info[2] != parent_start:
-            continue
-
-        child_pids = _proc_child_pids(proc_root, parent_pid)
-        # Do not trust a child list if the parent exited and its PID was reused
-        # while the list was being read.
-        parent_after = _read_proc_process(proc_root, parent_pid)
-        if parent_after is None or parent_after[2] != parent_start:
-            continue
-
-        for child_pid in child_pids:
-            if child_pid in seen:
-                continue
-            child_info = _read_proc_process(proc_root, child_pid)
-            if child_info is None or child_info[0] != parent_pid:
-                continue
-            seen.add(child_pid)
-            descendants.append((
-                child_pid, parent_pid, parent_start, child_info[2], child_info[1]
-            ))
-            pending.append((child_pid, child_info[2]))
-    return descendants
+    return process_store.discover_proc_descendants(
+        proc_root, root_pid, _read_proc_process, _proc_child_pids)
 
 
 def _kill_orphan_webkit(proc_root="/proc", root_pid=None, kill_process=None,
