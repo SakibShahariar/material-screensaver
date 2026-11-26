@@ -474,6 +474,24 @@ def _rotate_viewer_scenes(state):
     return True
 
 
+def _monitors_for_display(display):
+    """Return connected monitors, or ``[None]`` for the single-screen fallback."""
+    if display is None:
+        return [None]
+    try:
+        model = display.get_monitors()
+        monitors = []
+        for index in range(model.get_n_items()):
+            monitor = model.get_item(index)
+            if monitor is not None:
+                monitors.append(monitor)
+        if monitors:
+            return monitors
+    except Exception as exc:
+        _dbg(f"Suppressed non-fatal exception enumerating monitors: {exc}")
+    return [None]
+
+
 def _create_viewer_windows(html_path, clock_format="24h", scene_options=None, viewer_cfg=None):
     """Create one fullscreen Gtk.Window per monitor with WebKit WebView."""
     if not isinstance(viewer_cfg, dict):
@@ -501,22 +519,7 @@ def _create_viewer_windows(html_path, clock_format="24h", scene_options=None, vi
         except Exception:
             display = None
 
-    monitors = []
-    if display is not None:
-        try:
-            lm = display.get_monitors()
-            n = lm.get_n_items()
-            for i in range(n):
-                try:
-                    m = lm.get_item(i)
-                    if m is not None:
-                        monitors.append(m)
-                except Exception:
-                    continue
-        except Exception as exc:
-            _dbg(f"Suppressed non-fatal exception in _create_viewer_windows: {exc}")
-    if not monitors:
-        monitors = [None]
+    monitors = _monitors_for_display(display)
 
     # Assignments are keyed by connector where available; new displays use the global scene.
     monitor_assignments = viewer_cfg.get("monitor_screensavers", {})
@@ -576,6 +579,14 @@ def _create_viewer_windows(html_path, clock_format="24h", scene_options=None, vi
                 win.set_default_size(1920, 1080)
         except Exception:
             win.set_default_size(1920, 1080)
+        _log_event(
+            "viewer_window_created",
+            monitor_index=monitor_index,
+            monitor=monitor_key,
+            scene=os.path.basename(monitor_html_path),
+            width=win.get_default_size()[0],
+            height=win.get_default_size()[1],
+        )
         try:
             win.add_css_class("screensaver-window")
         except Exception as exc:

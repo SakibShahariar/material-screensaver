@@ -5,6 +5,13 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.4.10] - 2026-11-26
+### Added
+- The viewer now logs a structured `viewer_window_created` event for each
+  window, including monitor index, connector, scene and geometry, so monitor
+  coverage can be verified from the journal. Monitor enumeration moved into a
+  small tested helper (`_monitors_for_display`). Part of #6.
+
 ## [2.4.9] - 2026-11-26
 ### Changed
 - Extracted the procfs reader layer (`read_proc_process`, `proc_child_pids`,
