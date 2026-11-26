@@ -5,6 +5,13 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.4.6] - 2026-11-26
+### Changed
+- The lock countdown pill now uses the GTK/Matugen accent colors instead of the
+  generic OSD inverse-surface style. It no longer carries the `osd` CSS class,
+  whose `label.osd` rule was more specific and overrode the accent colors. The
+  battery-saver/FPS indicator is unchanged and remains a neutral OSD label.
+
 ## [2.4.5] - 2026-11-26
 ### Added
 - Headless scene performance measurements now include an uncapped native-frame

@@ -950,13 +950,14 @@ p{color:#c4c0ca;line-height:1.5}
         lock_seconds = int(viewer_cfg.get("lock_after_seconds", 0) or 0)
         if viewer_cfg.get("lock_countdown", False) and lock_seconds > 0:
             countdown = Gtk.Label(label="")
-            countdown.add_css_class("osd")
+            # Not .osd: the theme's `label.osd` rule is more specific and
+            # overrides our accent colors with its inverse-surface style.
             countdown.add_css_class("caption")
             countdown.add_css_class("material-lock-countdown")
             try:
                 countdown_css = Gtk.CssProvider()
                 countdown_css.load_from_data(b"""
-.material-lock-countdown {
+label.material-lock-countdown {
   color: @accent_fg_color;
   background-color: @accent_bg_color;
   border-radius: 999px;
