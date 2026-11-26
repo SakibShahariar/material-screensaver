@@ -177,17 +177,18 @@ class TestCountdownCancellation(unittest.TestCase):
         self.assertNotIn("restart_countdown()", source)
         self.assertIn("lock_deadline_kept", source)
 
-    def test_countdown_pill_uses_accent_colors_without_osd_class(self):
+    def test_status_pills_use_accent_colors_without_osd_class(self):
         import pathlib
         source = (pathlib.Path(support.REPO_ROOT) / "bin" / "material-screensaver-ctl.py").read_text(
             encoding="utf-8")
-        block = source[source.index('countdown = Gtk.Label(label="")'):
+        block = source[source.index("viewer_content = Gtk.Overlay()"):
                        source.index("viewer_content.add_overlay(countdown)")]
-        self.assertNotIn('countdown.add_css_class("osd")', block)
-        self.assertIn('countdown.add_css_class("material-lock-countdown")', block)
-        self.assertIn("label.material-lock-countdown {", block)
+        self.assertNotIn('add_css_class("osd")', block)
+        self.assertIn("label.material-accent-pill {", block)
         self.assertIn("color: @accent_fg_color;", block)
         self.assertIn("background-color: @accent_bg_color;", block)
+        self.assertIn('indicator.add_css_class("material-accent-pill")', block)
+        self.assertIn('countdown.add_css_class("material-accent-pill")', block)
 
 
 class TestActivityLockReset(unittest.TestCase):

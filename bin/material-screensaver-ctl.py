@@ -937,10 +937,30 @@ p{color:#c4c0ca;line-height:1.5}
             _dbg(f"Could not record rotation state: {exc}")
         viewer_content = Gtk.Overlay()
         viewer_content.set_child(web)
+        # Shared accent-pill style for viewer status labels. GTK's `label.osd`
+        # rule has higher specificity than a plain class and would replace
+        # these colors with its neutral inverse-surface style, so these labels
+        # deliberately do not use the `osd` class.
+        try:
+            status_css = Gtk.CssProvider()
+            status_css.load_from_data(b"""
+label.material-accent-pill {
+  color: @accent_fg_color;
+  background-color: @accent_bg_color;
+  border-radius: 999px;
+  padding: 8px 16px;
+  font-weight: 600;
+}
+""")
+            Gtk.StyleContext.add_provider_for_display(
+                display, status_css, Gtk.STYLE_PROVIDER_PRIORITY_APPLICATION
+            )
+        except Exception as exc:
+            _dbg(f"Could not apply Material status pill styling: {exc}")
         if battery_indicator_text:
             indicator = Gtk.Label(label=battery_indicator_text)
-            indicator.add_css_class("osd")
             indicator.add_css_class("caption")
+            indicator.add_css_class("material-accent-pill")
             indicator.set_halign(Gtk.Align.START)
             indicator.set_valign(Gtk.Align.START)
             indicator.set_margin_top(16)
@@ -950,26 +970,9 @@ p{color:#c4c0ca;line-height:1.5}
         lock_seconds = int(viewer_cfg.get("lock_after_seconds", 0) or 0)
         if viewer_cfg.get("lock_countdown", False) and lock_seconds > 0:
             countdown = Gtk.Label(label="")
-            # Not .osd: the theme's `label.osd` rule is more specific and
-            # overrides our accent colors with its inverse-surface style.
             countdown.add_css_class("caption")
             countdown.add_css_class("material-lock-countdown")
-            try:
-                countdown_css = Gtk.CssProvider()
-                countdown_css.load_from_data(b"""
-label.material-lock-countdown {
-  color: @accent_fg_color;
-  background-color: @accent_bg_color;
-  border-radius: 999px;
-  padding: 8px 16px;
-  font-weight: 600;
-}
-""")
-                Gtk.StyleContext.add_provider_for_display(
-                    display, countdown_css, Gtk.STYLE_PROVIDER_PRIORITY_APPLICATION
-                )
-            except Exception as exc:
-                _dbg(f"Could not apply Material countdown styling: {exc}")
+            countdown.add_css_class("material-accent-pill")
             countdown.set_halign(Gtk.Align.CENTER)
             countdown.set_valign(Gtk.Align.END)
             countdown.set_margin_bottom(28)

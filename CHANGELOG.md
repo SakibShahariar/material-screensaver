@@ -5,6 +5,13 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.4.7] - 2026-11-26
+### Changed
+- The battery-saver/FPS indicator now uses the same accent pill styling as the
+  lock countdown. Both viewer status labels share the `material-accent-pill` CSS
+  class and no longer use GTK's `osd` class, so they follow the GTK/Matugen
+  accent instead of the neutral inverse-surface OSD style.
+
 ## [2.4.6] - 2026-11-26
 ### Changed
 - The lock countdown pill now uses the GTK/Matugen accent colors instead of the
